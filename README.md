@@ -52,7 +52,7 @@ HUDs while you evaluate it.
 Paste this manifest URL into Foundry's *Install Module* dialog:
 
 ```
-https://github.com/YOUR_USER/dnd5e-hud-to-rule-them-all/releases/latest/download/module.json
+https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all/releases/latest/download/module.json
 ```
 
 ## Configuration
@@ -71,7 +71,11 @@ generic actions (Dash, Dodge, Hide, …).
 **Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
 
 Per-actor overrides for pool sizes are read from the actor flag
-`flags.dnd5e-hud-to-rule-them-all.config.max`.
+`flags.dnd5e-hud-to-rule-them-all.config.max`. Extra Attack is handled the same way:
+`flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction` (default `1`) sets how many
+"attack"-type activity uses share a single action for that actor — dnd5e has no
+reliable built-in signal for this, so it's GM-configured per character rather than
+guessed at.
 
 ## Public API
 
@@ -90,7 +94,7 @@ await api.resetTurn(combatant);
 No build step. Plain ESM, Handlebars and CSS, loaded directly by Foundry.
 
 ```bash
-git clone https://github.com/YOUR_USER/dnd5e-hud-to-rule-them-all
+git clone https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all
 ln -s "$(pwd)/dnd5e-hud-to-rule-them-all" \
   <foundry-data>/Data/modules/dnd5e-hud-to-rule-them-all
 ```
