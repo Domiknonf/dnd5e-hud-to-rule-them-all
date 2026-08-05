@@ -1,6 +1,6 @@
 import {
-  MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS, INTRINSIC_ACTIONS,
-  GENERIC_ACTIVITY_ICON
+  MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS,
+  GENERIC_ACTIVITY_ICON, ATTACK_SUBSTITUTE_NAMES
 } from "./const.mjs";
 
 /**
@@ -104,6 +104,21 @@ export function guessAttacksPerAction(actor) {
   return best;
 }
 
+/**
+ * Whether this item's activities may replace one attack inside the Attack action
+ * (see ATTACK_SUBSTITUTE_NAMES). Player Characters only: the substitute rule is a
+ * PC racial trait, while an NPC's breath weapon is its own full action.
+ */
+export function isAttackSubstituteItem(item) {
+  if (item?.actor?.type !== "character") return false;
+  return ATTACK_SUBSTITUTE_NAMES.has((item.name ?? "").trim().toLowerCase());
+}
+
+/** Activity-level view of isAttackSubstituteItem, for the usage hooks. */
+export function isAttackSubstitute(activity) {
+  return isAttackSubstituteItem(activity?.item);
+}
+
 /** Cheap availability filter. Extend this — it is where most house rules land. */
 function isUsable(item) {
   // dnd5e caches a real spell Item on the actor for every "cast" activity on a
@@ -129,6 +144,76 @@ function isUsable(item) {
   return true;
 }
 
+/**
+ * BG3-style hover-card details. dnd5e precomputes localized labels on each
+ * activity during data prep (activity.labels.range/.target/...); those are read
+ * first and the raw structured fields serve as fallback, so a missing label
+ * degrades to something legible instead of an empty row. Every field is optional
+ * - the HUD omits rows it has no value for.
+ */
+function detailsFor(activity) {
+  if (!activity) return null;
+  const labels = activity.labels ?? {};
+  const details = {
+    range: labels.range || rangeLabel(activity.range),
+    target: labels.target || targetLabel(activity.target),
+    damage: damageLabel(activity)
+  };
+  for (const k of Object.keys(details)) if (!details[k]) delete details[k];
+  return Object.keys(details).length ? details : null;
+}
+
+function rangeLabel(range) {
+  const value = range?.value ?? range?.reach;
+  if (!value) return "";
+  const units = CONFIG.DND5E?.movementUnits?.[range?.units]?.abbreviation ?? range?.units ?? "";
+  return `${value} ${units}`.trim();
+}
+
+function targetLabel(target) {
+  const tpl = target?.template;
+  if (tpl?.type) {
+    const shape = CONFIG.DND5E?.areaTargetTypes?.[tpl.type]?.label ?? tpl.type;
+    const size = tpl.size ? `${tpl.size} ${tpl.units ?? ""}`.trim() : "";
+    return [size, game.i18n.localize(shape)].filter(Boolean).join(" ");
+  }
+  const affects = target?.affects;
+  if (affects?.type) {
+    const cfg = CONFIG.DND5E?.individualTargetTypes?.[affects.type];
+    const label = game.i18n.localize(cfg?.label ?? cfg ?? affects.type);
+    return [affects.count, label].filter(Boolean).join(" ");
+  }
+  return "";
+}
+
+function damageLabel(activity) {
+  const parts = activity?.damage?.parts ?? (activity?.healing ? [activity.healing] : []);
+  return parts.map(p => {
+    const types = [...(p?.types ?? [])]
+      .map(t => game.i18n.localize(CONFIG.DND5E?.damageTypes?.[t]?.label ?? CONFIG.DND5E?.healingTypes?.[t]?.label ?? t));
+    return [p?.formula ?? "", types.join("/")].filter(Boolean).join(" ");
+  }).filter(Boolean).join(", ");
+}
+
+/**
+ * Plain-text preview of the item's description for the hover card. Enrichment
+ * (@UUID links, [[/roll]] inline rolls) is deliberately NOT run - it is async and
+ * would have to fire on every render for every entry. Instead the enricher's label
+ * is kept (or the enricher dropped) and the text clamped at a word boundary.
+ */
+function plainDescription(item) {
+  let text = item.system?.description?.value ?? "";
+  text = text
+    .replace(/<[^>]+>/g, " ")
+    .replace(/(@\w+\[[^\]]*\]|\[\[[^\]]*\]\])\{([^}]*)\}/g, "$2")
+    .replace(/@\w+\[[^\]]*\]|\[\[[^\]]*\]\]/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length > 300) text = `${text.slice(0, 300).replace(/\s+\S*$/, "")}…`;
+  return text;
+}
+
 function usesFor(activity, item) {
   const a = activity?.uses ?? {};
   const i = item.system?.uses ?? {};
@@ -142,6 +227,8 @@ export function collectActions(actor, combatant) {
   const buckets = {};
   for (const key of Object.keys(RESOURCES)) buckets[key] = [];
   if (!actor) return buckets;
+
+  const bucketedItems = new Set();
 
   for (const item of actor.items) {
     const activities = item.system?.activities;
@@ -166,6 +253,7 @@ export function collectActions(actor, combatant) {
     }
 
     for (const [bucket, group] of byBucket) {
+      bucketedItems.add(item.id);
       if (group.length > 1) {
         buckets[bucket].push({
           kind: "item",
@@ -176,7 +264,9 @@ export function collectActions(actor, combatant) {
           activityType: null,
           itemType: item.type,
           level: item.type === "spell" ? item.system.level : null,
-          uses: usesFor(null, item)
+          uses: usesFor(null, item),
+          description: plainDescription(item),
+          attackSubstitute: isAttackSubstituteItem(item)
         });
         continue;
       }
@@ -191,23 +281,33 @@ export function collectActions(actor, combatant) {
         activityType: activity.type,
         itemType: item.type,
         level: item.type === "spell" ? item.system.level : null,
-        uses: usesFor(activity, item)
+        uses: usesFor(activity, item),
+        details: detailsFor(activity),
+        description: plainDescription(item),
+        attackSubstitute: isAttackSubstituteItem(item)
       });
     }
   }
 
-  if (game.settings.get(MODULE_ID, "showIntrinsic")) {
-    for (const def of INTRINSIC_ACTIONS) {
-      buckets[def.type]?.push({
-        kind: "intrinsic",
-        id: def.id,
-        handler: def.handler,
-        skill: def.skill ?? null,
-        name: game.i18n.localize(`${MODULE_ID}.intrinsic.${def.id}`),
-        subtitle: "",
-        icon: def.icon
-      });
-    }
+  // Passive, "good to know" features (Tactical Shift, Fighting Styles, ...):
+  // feat-type items that produced no usable entry above - either no activities at
+  // all or only out-of-combat ones. They can't be used or booked, so both left and
+  // middle click open the description card ("describe" instead of "use").
+  for (const item of actor.items) {
+    if (item.type !== "feat" || bucketedItems.has(item.id)) continue;
+    buckets.passive.push({
+      kind: "passive",
+      action: "describe",
+      uuid: item.uuid,
+      name: item.name,
+      subtitle: "",
+      img: item.img,
+      activityType: null,
+      itemType: item.type,
+      level: null,
+      uses: usesFor(null, item),
+      description: plainDescription(item)
+    });
   }
 
   const sort = game.settings.get(MODULE_ID, "sortAlphabetically");

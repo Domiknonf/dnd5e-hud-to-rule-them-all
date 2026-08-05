@@ -1,7 +1,7 @@
 {
   "id": "dnd5e-hud-to-rule-them-all",
   "title": "A DnD 5e HUD To Rule Them All",
-  "description": "Combat HUD for D&D 5e that shows every available activity grouped by action type and tracks the action / bonus action / reaction economy plus remaining movement.",
+  "description": "Combat HUD for D&D 5e that shows every available activity grouped by action type and tracks the action / bonus action / reaction economy.",
   "version": "0.1.0",
   "authors": [
     {

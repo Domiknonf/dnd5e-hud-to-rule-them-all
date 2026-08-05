@@ -5,7 +5,9 @@ Guidance for Claude Code working in this repository.
 ## What this is
 
 A Foundry VTT module: a combat HUD for D&D 5e that lists usable activities grouped by
-action type and tracks the action economy plus remaining movement.
+action type and tracks the action economy. (Movement tracking, the generic intrinsic
+actions and the Free Interaction pool existed in early versions and were deliberately
+removed — do not reintroduce them.)
 
 **Pinned targets — do not write code for other versions:**
 
@@ -29,15 +31,14 @@ reading the code, say so rather than claiming it works.
 
 | File | Responsibility |
 | --- | --- |
-| `scripts/const.mjs` | Every runtime assumption: pool definitions, activation-type map, generic actions |
+| `scripts/const.mjs` | Every runtime assumption: pool definitions, activation-type map |
 | `scripts/economy.mjs` | State model. The **only** place that reads or writes the economy flag |
-| `scripts/movement.mjs` | Derives the movement budget. Stores nothing |
 | `scripts/actions.mjs` | Walks actor items, buckets their activities |
 | `scripts/hud.mjs` | The `ApplicationV2` and its action handlers |
 | `scripts/socket.mjs` | Relays player writes to the active GM |
 | `scripts/module.mjs` | Hook wiring only. No business logic belongs here |
 
-### Three load-bearing decisions
+### Two load-bearing decisions
 
 **1. The economy lives in a flag on the Combatant document.**
 Key: `flags["dnd5e-hud-to-rule-them-all"].economy`. Combatant flags replicate to all
@@ -45,12 +46,7 @@ clients and disappear with the encounter. Players own their Actor but usually no
 Combatant, so their writes go through `socket.mjs` to the active GM. Never write this flag
 outside `economy.mjs`.
 
-**2. Movement is derived, never stored.**
-`remaining = speed × (1 + dashCount) − movementHistory.cost`. Foundry v13 records the
-history itself, including terrain cost, and clears it on turn start. Do not introduce a
-movement counter.
-
-**3. There is exactly one write path for costs.**
+**2. There is exactly one write path for costs.**
 `dnd5e.postUseActivity` books them. HUD buttons only call `activity.use()`. This is why
 sheet clicks, macros and Midi QoL workflows all count correctly and none double-count. Do
 not add a second booking site.
@@ -75,7 +71,10 @@ Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
   bare global, and likewise for other v13-namespaced helpers. If you are unsure whether a
   global is deprecated, check the console for deprecation warnings rather than guessing.
 - **Declarative click handling.** `data-action="name"` in the template, static handler in
-  `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery.
+  `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery. One documented
+  exception: ApplicationV2 only binds `click`/`contextmenu`, so the middle-click
+  description popup needs a single delegated `auxclick` listener in
+  `hud.mjs -> _onFirstRender`. Do not add further listeners.
 - **No browser storage.** No `localStorage` or `sessionStorage`. State goes in document
   flags or `game.settings`.
 - **CSS lives in `@layer modules`** and uses Foundry's CSS variables so light and dark
@@ -89,13 +88,12 @@ Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
 
 ## Assumptions that must be verified, not guessed
 
-These are pinned in `const.mjs` and `movement.mjs` because they may drift between system
-and core releases. If behaviour looks wrong, check these first and report what you find —
-do not silently rewrite them.
+These are pinned in `const.mjs` because they may drift between system and core releases.
+If behaviour looks wrong, check these first and report what you find — do not silently
+rewrite them.
 
 ```js
 Object.keys(CONFIG.DND5E.activityActivationTypes)   // does ACTIVATION_MAP still match?
-_token.document.movementHistory                     // is there a .cost field?
 CONFIG.debug.hooks = true                           // does combatTurnChange fire as expected?
 game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
 ```
@@ -111,15 +109,13 @@ Do not "fix" these casually — each needs a design decision.
   during other creatures' turns for that to be usable.
 - **Missed hooks.** If the GM client misses a turn change, no reset happens. The flag's
   `key` field records `round:turn` as the hook for a future staleness guard.
-- **Forced movement** (Thunderwave, grapple drag) counts against the target's own budget
-  in v13.
 - **Midi QoL** wraps activity usage. The dnd5e hooks still fire; verify ordering before
   adding Midi-specific hooks.
 
 ## Working style in this repo
 
 - Small, reviewable changes. This is a personal project used at a live table.
-- When touching the economy or the booking path, state which of the three load-bearing
+- When touching the economy or the booking path, state which of the two load-bearing
   decisions the change affects.
 - Prefer extending the data tables in `const.mjs` over adding branches in logic files.
 - If a change would need a new dependency, a build step, or a second write path, propose

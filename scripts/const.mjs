@@ -9,38 +9,19 @@ export const FLAGS = {
 };
 
 /**
- * The actual selectable movement types. actor.system.attributes.movement also
- * carries derived/computed fields alongside these (verified live, dnd5e 5.3.3):
- * jump (jump distance), speed and max (aggregate/cap values), slowed (bool),
- * ignoredDifficultTerrain (object). An allowlist here, rather than blacklisting
- * those by name, so future dnd5e additions to that object don't leak into the
- * movement-mode cycle by default.
- */
-export const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
-
-/**
- * Activity names that represent taking the Dash action when granted through a
- * feature (e.g. Rogue's Cunning Action) rather than clicked via our own intrinsic
- * Dash button. Name-matched because dnd5e has no structured "this is Dash" marker
- * on these - verified live, Cunning Action's "Dash" sub-activity has empty
- * roll/consumption/effects, same as Multiattack's narrative-only pattern, it's
- * just real this time. English-only SRD phrasing for now; extend for other
- * languages/homebrew naming as needed.
- */
-export const DASH_ACTIVITY_NAMES = new Set(["dash"]);
-
-/**
  * The resource pools the HUD tracks. Order = display order.
  * `perTurn: true` means the pool is refilled when the owner's turn starts (RAW for
- * action / bonus action / reaction / free object interaction).
+ * action / bonus action / reaction).
  */
 export const RESOURCES = {
   action:    { icon: "fa-solid fa-hand-fist",     perTurn: true,  order: 10 },
   bonus:     { icon: "fa-solid fa-bolt",          perTurn: true,  order: 20 },
   reaction:  { icon: "fa-solid fa-reply",         perTurn: true,  order: 30 },
-  free:      { icon: "fa-solid fa-hand-pointer",  perTurn: true,  order: 40 },
   legendary: { icon: "fa-solid fa-crown",         perTurn: true,  order: 50 },
-  other:     { icon: "fa-solid fa-ellipsis",      perTurn: false, order: 90 }
+  other:     { icon: "fa-solid fa-ellipsis",      perTurn: false, order: 90 },
+  // Not a real pool: max stays 0 (never shows pips, never exhausts, costs
+  // nothing). Exists so passive features get a HUD section like any other bucket.
+  passive:   { icon: "fa-solid fa-book-open",     perTurn: false, order: 95 }
 };
 
 /**
@@ -66,22 +47,15 @@ export const OUT_OF_COMBAT_ACTIVATIONS = new Set([
 ]);
 
 /**
- * Actions every creature has, which are not items on the sheet.
- * `handler` maps to a case in hud.mjs -> #onIntrinsic.
+ * Item names whose activities may REPLACE one attack within the Attack action
+ * (2024 rules: the Dragonborn's Breath Weapon explicitly substitutes for one of
+ * the attacks). Matched on the ITEM name, not the activity, because such traits
+ * typically carry several non-attack activities (Breath Weapon: Cone + Line, both
+ * "save"-type) that collapse into a single item-level HUD button. Restricted to
+ * character actors in isAttackSubstituteItem() - NPC breath weapons are their own
+ * full action, not a substitute. English SRD naming; homebrew needs its own entry.
  */
-export const INTRINSIC_ACTIONS = [
-  { id: "dash",       type: "action",   icon: "fa-solid fa-person-running", handler: "dash" },
-  { id: "disengage",  type: "action",   icon: "fa-solid fa-shoe-prints",    handler: "spendOnly" },
-  { id: "dodge",      type: "action",   icon: "fa-solid fa-shield-halved",  handler: "spendOnly" },
-  { id: "hide",       type: "action",   icon: "fa-solid fa-eye-slash",      handler: "skill", skill: "ste" },
-  { id: "shove",      type: "action",   icon: "fa-solid fa-hand-back-fist", handler: "spendOnly" },
-  { id: "grapple",    type: "action",   icon: "fa-solid fa-handshake",      handler: "spendOnly" },
-  { id: "offhand",    type: "bonus",    icon: "fa-solid fa-hand-sparkles",  handler: "spendOnly" },
-  { id: "opportunity",type: "reaction", icon: "fa-solid fa-crosshairs",     handler: "spendOnly" }
-  // "interact" (free object interaction) deliberately omitted - DM's call whether
-  // one happened, not a trackable button. The Free Interaction pool/pips stay
-  // available for manual bookkeeping via the header row.
-];
+export const ATTACK_SUBSTITUTE_NAMES = new Set(["breath weapon"]);
 
 /**
  * dnd5e seeds activity.img with a generic per-type placeholder

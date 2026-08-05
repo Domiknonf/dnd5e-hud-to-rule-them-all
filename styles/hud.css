@@ -2,127 +2,617 @@
    specificity fights without resorting to !important. */
 @layer modules {
 
-  #hud-to-rule-them-all {
-    --hudtra-bg: color-mix(in oklab, var(--color-cool-5, #1c1c22) 88%, transparent);
-    --hudtra-border: var(--color-border-dark-primary, #000);
-    --hudtra-text: var(--color-text-primary, #eee);
-    --hudtra-accent: #c9a227;
-    --hudtra-spent: #55555f;
-    --hudtra-move: #4f8ac9;
-    --hudtra-danger: #b83f3f;
+  /* DELIBERATE DEPARTURE from this module's usual "respect Foundry's theme"
+     convention: the BG3-style bar commits to one fixed dark leather-and-gold look,
+     so the palette below is hardcoded instead of derived from Foundry's theme
+     variables. Structural values (font size, z-index) still come from core.
+     The palette is shared with :is(#tooltip, .locked-tooltip).hudtra-tooltip - core's tooltip element
+     lives outside our application root, so it can't inherit these. */
+  #hud-to-rule-them-all,
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip {
+    --hudtra-gold: #c8a352;
+    --hudtra-gold-bright: #ecd193;
+    --hudtra-gold-dark: #6e5626;
+    --hudtra-leather-hi: #342b23;
+    --hudtra-leather-lo: #151009;
+    --hudtra-text: #e8ddc4;
+    --hudtra-text-dim: #a89877;
+    --hudtra-spent: #45403a;
+    --hudtra-danger: #c0392b;
+    --hudtra-hp: #57a64a;
+    --hudtra-pool-action: #57a64a;
+    --hudtra-pool-bonus: #e0862b;
+    --hudtra-pool-reaction: #a75ce0;
+    --hudtra-pool-legendary: #d8ab2d;
+    --hudtra-slot: 3.1em;
+    --hudtra-anim: 120ms; /* zeroed under prefers-reduced-motion */
+  }
 
+  #hud-to-rule-them-all {
     position: fixed;
-    left: 0.75rem;
-    bottom: 0.75rem;
+    inset-inline: 0;
+    bottom: 0;
     z-index: 60;
-    max-width: min(46rem, 60vw);
-    color: var(--hudtra-text);
-    font-size: var(--font-size-13, 13px);
+    display: flex;
+    justify-content: center;
     pointer-events: none;
   }
 
+  /* Don't rely on core's global border-box reset staying reachable from our layer. */
+  #hud-to-rule-them-all,
+  #hud-to-rule-them-all *,
+  #hud-to-rule-them-all *::before,
+  #hud-to-rule-them-all *::after { box-sizing: border-box; }
+
   #hud-to-rule-them-all .hudtra-frame {
     pointer-events: all;
+    position: relative;
+    /* All sizing below is em-based so this one line scales the whole bar. */
+    font-size: calc(var(--font-size-13, 13px) * var(--hudtra-scale, 1));
+    color: var(--hudtra-text);
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.5rem 0.6rem;
-    background: var(--hudtra-bg);
-    border: 1px solid var(--hudtra-border);
-    border-radius: 6px;
-    backdrop-filter: blur(6px);
+    gap: 0.45em;
+    max-width: min(97vw, 120em);
+    padding: 0.45em 0.75em 0.4em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-bottom: none;
+    border-radius: 0.6em 0.6em 0 0;
+    background:
+      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.06), transparent 60%),
+      repeating-linear-gradient(115deg, rgb(255 255 255 / 0.015) 0 2px, transparent 2px 5px),
+      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+    box-shadow:
+      inset 0 1px 0 rgb(236 209 147 / 0.25),
+      inset 0 0 2.5em rgb(0 0 0 / 0.55),
+      0 -0.2em 1em rgb(0 0 0 / 0.5);
+    /* Collapse slides the bar below the viewport; the tab (top: -1.3em) stays. */
+    transition: transform calc(var(--hudtra-anim) * 2.2) ease;
+  }
+  #hud-to-rule-them-all.collapsed .hudtra-frame { transform: translateY(100%); }
+
+  #hud-to-rule-them-all .hudtra-main {
+    display: flex;
+    align-items: stretch;
+    gap: 0.7em;
   }
 
-  /* ---- header ---- */
-  #hud-to-rule-them-all .hudtra-header {
+  /* ---- collapse tab, peeking above the top edge of its parent ----
+     Parent is the description panel when one is open, the frame otherwise (see
+     hud.hbs) - both are containing blocks, so one rule covers both cases. ---- */
+  #hud-to-rule-them-all .hudtra-collapse {
+    position: absolute;
+    top: -1.3em;
+    right: 1.2em;
+    height: 1.3em;
+    padding: 0 0.7em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-bottom: none;
+    border-radius: 0.4em 0.4em 0 0;
+    background: linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+    color: var(--hudtra-gold);
+    font-size: 0.9em;
+  }
+  #hud-to-rule-them-all .hudtra-collapse:hover { color: var(--hudtra-gold-bright); }
+  #hud-to-rule-them-all .hudtra-collapse i {
+    transition: transform calc(var(--hudtra-anim) * 2.2) ease;
+  }
+  #hud-to-rule-them-all.collapsed .hudtra-collapse i { transform: rotate(180deg); }
+
+  /* ---- description panel above the bar (middle click / passive features) ----
+     Absolutely positioned ON PURPOSE: as a normal column child its content would
+     feed into the frame's intrinsic width and opening a description would resize
+     the whole bar. Out of flow, the bar's width stays driven solely by
+     .hudtra-main (i.e. by the action columns). */
+  #hud-to-rule-them-all .hudtra-desc-panel {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 0.4em;
+    padding: 0.5em 0.6em 0.4em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.45em;
+    /* Floats over the canvas now, so it carries the frame's own opaque panel
+       treatment rather than a translucent inner tint. */
+    background:
+      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.05), transparent 60%),
+      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+    box-shadow:
+      inset 0 1px 0 rgb(236 209 147 / 0.2),
+      0 -0.2em 0.8em rgb(0 0 0 / 0.5);
+  }
+  #hud-to-rule-them-all .hudtra-desc-content {
     display: flex;
+    justify-content: center;
+    max-height: 30vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hudtra-gold-dark) transparent;
+  }
+  /* dnd5e's card is built for a narrow hover tooltip and stretches to whatever it
+     is given, so it gets an explicit reading width here instead of spanning the
+     full bar. Its own huge header art is capped alongside it. */
+  #hud-to-rule-them-all .hudtra-desc-content > * {
+    width: 100%;
+    max-width: 42em;
+  }
+  #hud-to-rule-them-all .hudtra-desc-content img {
+    max-width: 7em;
+    max-height: 7em;
+    object-fit: cover;
+  }
+  /* dnd5e's own "middle-click to lock" footer: meaningless in a pinned panel. */
+  #hud-to-rule-them-all .hudtra-desc-content .hint { display: none; }
+  /* Enriched content links default to a dark ink colour meant for parchment
+     sheets - unreadable on the dark panel, so they follow our text colour. */
+  #hud-to-rule-them-all .hudtra-desc-content :is(a, a.content-link, .content-link) {
+    color: var(--hudtra-text);
+    background: rgb(255 255 255 / 0.07);
+    border-color: rgb(200 163 82 / 0.35);
+    text-decoration-color: var(--hudtra-gold);
+  }
+  #hud-to-rule-them-all .hudtra-desc-content :is(a, a.content-link, .content-link):hover {
+    color: var(--hudtra-gold-bright);
+  }
+  #hud-to-rule-them-all .hudtra-desc-content :is(a, .content-link) i { color: var(--hudtra-gold); }
+
+  /* Collapsing slides the frame down by its own height - which is not enough to
+     clear the out-of-flow panel sitting above it, so the panel gets a matching
+     slide of its own height on top of that. */
+  #hud-to-rule-them-all .hudtra-desc-panel {
+    transition: transform calc(var(--hudtra-anim) * 2.2) ease;
+  }
+  #hud-to-rule-them-all.collapsed .hudtra-desc-panel {
+    transform: translateY(calc(100% + 0.4em));
+  }
+
+  /* Neutralize Foundry's default button chrome inside the bar once, then style
+     each control explicitly. */
+  #hud-to-rule-them-all button {
+    width: auto;
+    background: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+    /* Buttons don't inherit font by default (UA fixes them at ~13px), which would
+       decouple every em-sized control from the --hudtra-scale factor. */
+    font: inherit;
+    color: var(--hudtra-text);
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: none;
+  }
+  #hud-to-rule-them-all button:focus-visible {
+    outline: 2px solid var(--hudtra-gold-bright);
+    outline-offset: 1px;
+  }
+
+  /* ---- portrait & identity ---- */
+  #hud-to-rule-them-all .hudtra-char {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 0.35em;
+    flex: 0 0 auto;
+  }
+  #hud-to-rule-them-all .hudtra-portrait-ring {
+    position: relative;
+    width: 5.2em;
+    height: 5.2em;
+    padding: 0.28em;
+    border-radius: 50%;
+    /* The ring doubles as the HP gauge: gold rim outside, HP arc inside it. */
+    --hudtra-hp-color: color-mix(in oklab,
+      var(--hudtra-hp) calc(var(--hudtra-hp-pct, 100) * 1%),
+      var(--hudtra-danger));
+    background:
+      conic-gradient(var(--hudtra-hp-color) calc(var(--hudtra-hp-pct, 100) * 1%),
+                     rgb(0 0 0 / 0.55) 0);
+    box-shadow:
+      0 0 0 2px var(--hudtra-gold-dark),
+      0 0 0.6em rgb(0 0 0 / 0.6);
+  }
+  #hud-to-rule-them-all .hudtra-portrait-btn {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+  #hud-to-rule-them-all .hudtra-portrait-btn:hover .hudtra-portrait {
+    filter: brightness(1.15);
   }
   #hud-to-rule-them-all .hudtra-portrait {
-    width: 2.4rem;
-    height: 2.4rem;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border: 1px solid var(--hudtra-border);
-    border-radius: 4px;
-  }
-  #hud-to-rule-them-all .hudtra-identity { display: flex; flex-direction: column; }
-  #hud-to-rule-them-all .hudtra-name { font-weight: 600; }
-  #hud-to-rule-them-all .hudtra-vitals {
-    display: flex; gap: 0.6rem; opacity: 0.8; font-size: 0.85em;
-  }
-  #hud-to-rule-them-all .hudtra-header-controls { margin-left: auto; display: flex; gap: 0.25rem; }
-
-  /* ---- economy row ---- */
-  #hud-to-rule-them-all .hudtra-economy {
-    display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;
-  }
-  #hud-to-rule-them-all .hudtra-pool { display: flex; align-items: center; gap: 0.3rem; }
-  #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.15rem; }
-  #hud-to-rule-them-all .hudtra-pip {
-    width: 0.7rem; height: 0.7rem;
+    border: 1px solid rgb(0 0 0 / 0.7);
     border-radius: 50%;
-    background: var(--hudtra-accent);
-    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.5);
   }
-  #hud-to-rule-them-all .hudtra-pip.spent { background: var(--hudtra-spent); }
-  #hud-to-rule-them-all .hudtra-pool-controls { display: flex; opacity: 0; transition: opacity 120ms; }
-  #hud-to-rule-them-all .hudtra-pool:hover .hudtra-pool-controls { opacity: 1; }
-
-  /* ---- movement ---- */
-  #hud-to-rule-them-all .hudtra-movement { display: flex; align-items: center; gap: 0.35rem; }
-  #hud-to-rule-them-all .hudtra-bar {
-    position: relative;
-    width: 9rem; height: 1.1rem;
-    border: 1px solid var(--hudtra-border);
-    border-radius: 3px;
+  /* 0 HP: skull overlay on the portrait; clicking it rolls a death save for PCs. */
+  #hud-to-rule-them-all .hudtra-skull {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.6);
+    color: var(--hudtra-text);
+    font-size: 1.9em;
+    text-shadow: 0 0 6px #000;
+  }
+  #hud-to-rule-them-all .hudtra-portrait-ring.dying {
+    box-shadow:
+      0 0 0 2px var(--hudtra-danger),
+      0 0 0.8em color-mix(in oklab, var(--hudtra-danger) 70%, transparent);
+  }
+  #hud-to-rule-them-all .hudtra-portrait-ring.dying .hudtra-skull:hover {
+    color: var(--hudtra-danger);
+  }
+  #hud-to-rule-them-all .hudtra-hp-label {
+    position: absolute;
+    bottom: -0.5em;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.1em 0.5em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.7em;
+    background: var(--hudtra-leather-lo);
+    font-size: 0.78em;
+    white-space: nowrap;
+  }
+  #hud-to-rule-them-all .hudtra-name {
+    max-width: 9em;
     overflow: hidden;
-    background: rgb(0 0 0 / 0.4);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.3em;
+    font-weight: 600;
+    font-variant: small-caps;
+    letter-spacing: 0.04em;
+    color: var(--hudtra-gold-bright);
+    text-shadow: 0 1px 2px #000;
   }
-  #hud-to-rule-them-all .hudtra-bar-fill {
-    height: 100%; background: var(--hudtra-move); transition: width 150ms ease-out;
+  #hud-to-rule-them-all .hudtra-vitals {
+    display: flex;
+    gap: 0.7em;
+    font-size: 0.82em;
+    color: var(--hudtra-text-dim);
   }
-  #hud-to-rule-them-all .hudtra-movement.over .hudtra-bar-fill { background: var(--hudtra-danger); }
-  #hud-to-rule-them-all .hudtra-bar-label {
-    position: absolute; inset: 0;
-    display: grid; place-items: center;
-    font-size: 0.8em; text-shadow: 0 0 3px #000;
+  #hud-to-rule-them-all .hudtra-vitals i { color: var(--hudtra-gold); }
+
+  /* ---- action economy pools ---- */
+  #hud-to-rule-them-all .hudtra-economy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.45em;
+    flex: 0 0 auto;
+    padding-inline: 0.6em;
+    border-inline: 1px solid rgb(200 163 82 / 0.25);
+  }
+  #hud-to-rule-them-all .hudtra-pool {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+  }
+  #hud-to-rule-them-all .hudtra-pool > i {
+    width: 1.2em;
+    text-align: center;
+    font-size: 0.9em;
+    color: var(--hudtra-gold);
+  }
+  #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.3em; }
+
+  /* BG3-style pool markers: one shape + colour per pool, so a glance at the bar
+     reads the economy without counting icons. */
+  #hud-to-rule-them-all .hudtra-pip {
+    width: 0.95em;
+    height: 0.95em;
+    background: var(--hudtra-pool-c, var(--hudtra-gold));
+    filter: drop-shadow(0 0 3px color-mix(in oklab, var(--hudtra-pool-c, var(--hudtra-gold)) 55%, transparent));
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="action"] {
+    --hudtra-pool-c: var(--hudtra-pool-action);
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="action"] .hudtra-pip { border-radius: 50%; }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="bonus"] {
+    --hudtra-pool-c: var(--hudtra-pool-bonus);
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="bonus"] .hudtra-pip {
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="reaction"] {
+    --hudtra-pool-c: var(--hudtra-pool-reaction);
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="reaction"] .hudtra-pip {
+    transform: rotate(45deg) scale(0.85);
+    border-radius: 0.12em;
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="legendary"] {
+    --hudtra-pool-c: var(--hudtra-pool-legendary);
+  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="legendary"] .hudtra-pip {
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  }
+  #hud-to-rule-them-all .hudtra-pip.spent {
+    background: var(--hudtra-spent);
+    filter: none;
   }
 
-  /* ---- action groups ---- */
+  /* ---- action groups: BG3 hotbar slots, two rows filling column-first ---- */
   #hud-to-rule-them-all .hudtra-groups {
-    display: flex; flex-direction: column; gap: 0.35rem;
-    max-height: 40vh; overflow-y: auto;
+    display: flex;
+    align-items: stretch;
+    gap: 0.8em;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    /* Room for the hover lift/glow so it isn't clipped by the scroll container. */
+    padding: 0.35em 0.2em 0.25em;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hudtra-gold-dark) transparent;
+  }
+  #hud-to-rule-them-all .hudtra-group + .hudtra-group {
+    border-left: 1px solid rgb(200 163 82 / 0.25);
+    padding-left: 0.8em;
   }
   #hud-to-rule-them-all .hudtra-group h4 {
-    margin: 0 0 0.15rem; font-size: 0.8em; text-transform: uppercase;
-    letter-spacing: 0.06em; opacity: 0.7; border: none;
+    margin: 0 0 0.3em;
+    border: none;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    color: var(--hudtra-gold);
+    text-shadow: 0 1px 2px #000;
   }
-  #hud-to-rule-them-all .hudtra-group.exhausted { opacity: 0.45; }
-  #hud-to-rule-them-all .hudtra-entries { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-  #hud-to-rule-them-all .hudtra-entry {
-    display: flex; align-items: center; gap: 0.3rem;
-    width: auto; max-width: 11rem;
-    padding: 0.15rem 0.4rem;
-    background: rgb(255 255 255 / 0.06);
-    border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: 4px;
-    line-height: 1.4;
+  #hud-to-rule-them-all .hudtra-group.exhausted h4 { color: var(--hudtra-text-dim); }
+  /* Exhausted pool: the whole group's slots go dark and colourless. Distinct from
+     .locked below, which brands individual slots with a padlock. */
+  #hud-to-rule-them-all .hudtra-group.exhausted .hudtra-entries {
+    filter: grayscale(0.75) brightness(0.55);
   }
-  #hud-to-rule-them-all .hudtra-entry:hover { background: rgb(255 255 255 / 0.14); }
-  #hud-to-rule-them-all .hudtra-entry.locked { opacity: 0.4; }
-  #hud-to-rule-them-all .hudtra-entry img { width: 1.4rem; height: 1.4rem; border: none; border-radius: 2px; }
-  #hud-to-rule-them-all .hudtra-entry-text { display: flex; flex-direction: column; overflow: hidden; line-height: 1.2; }
-  #hud-to-rule-them-all .hudtra-entry-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #hud-to-rule-them-all .hudtra-entry-subtitle {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-size: 0.78em; opacity: 0.6;
+  #hud-to-rule-them-all .hudtra-entries {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, var(--hudtra-slot));
+    gap: 0.3em;
   }
-  #hud-to-rule-them-all .hudtra-uses { margin-left: auto; opacity: 0.7; font-size: 0.8em; }
 
-  #hud-to-rule-them-all button:focus-visible { outline: 2px solid var(--hudtra-accent); outline-offset: 1px; }
+  #hud-to-rule-them-all .hudtra-slot {
+    position: relative;
+    width: var(--hudtra-slot);
+    height: var(--hudtra-slot);
+    overflow: hidden;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.35em;
+    background: radial-gradient(circle at 30% 25%, #3a322b, #1b1613);
+    box-shadow: inset 0 0 0.5em rgb(0 0 0 / 0.8);
+    transition:
+      transform var(--hudtra-anim),
+      border-color var(--hudtra-anim),
+      box-shadow var(--hudtra-anim);
+  }
+  #hud-to-rule-them-all .hudtra-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+  }
+  #hud-to-rule-them-all .hudtra-slot > i {
+    font-size: 1.35em;
+    color: var(--hudtra-text);
+    text-shadow: 0 1px 2px #000;
+  }
+  #hud-to-rule-them-all .hudtra-slot:hover {
+    transform: translateY(-0.12em);
+    border-color: var(--hudtra-gold-bright);
+    box-shadow:
+      0 0 0.6em rgb(236 209 147 / 0.45),
+      inset 0 0 0.5em rgb(0 0 0 / 0.8);
+    z-index: 1;
+  }
+  /* Passive features are read-only reference cards, not buttons that "do"
+     something - the dashed frame sets them apart from usable slots. */
+  #hud-to-rule-them-all .hudtra-group[data-group="passive"] .hudtra-slot {
+    border-style: dashed;
+    opacity: 0.85;
+  }
+
+  /* Locked mid-Extra-Attack: only attack activities stay live, everything else
+     gets the padlock treatment. */
+  #hud-to-rule-them-all .hudtra-slot.locked {
+    filter: grayscale(0.9) brightness(0.6);
+  }
+  #hud-to-rule-them-all .hudtra-slot.locked:hover {
+    transform: none;
+    border-color: var(--hudtra-gold-dark);
+    box-shadow: inset 0 0 0.5em rgb(0 0 0 / 0.8);
+  }
+  #hud-to-rule-them-all .hudtra-lock {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 0.35);
+    color: var(--hudtra-gold-bright);
+    font-size: 1em;
+    text-shadow: 0 1px 3px #000;
+  }
+  /* Charges/uses: gold, bottom-right. */
+  #hud-to-rule-them-all .hudtra-uses {
+    position: absolute;
+    right: 0.1em;
+    bottom: 0.1em;
+    min-width: 1.3em;
+    padding: 0.1em 0.25em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.3em;
+    background: rgb(0 0 0 / 0.85);
+    font-size: 0.62em;
+    text-align: center;
+    color: var(--hudtra-gold-bright);
+  }
+  /* Attacks left inside this action: action-green with a fist, top-left - so it
+     can't be confused with the gold charge counter in the opposite corner. */
+  #hud-to-rule-them-all .hudtra-attacks {
+    position: absolute;
+    left: 0.1em;
+    top: 0.1em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+    padding: 0.1em 0.25em;
+    border: 1px solid color-mix(in oklab, var(--hudtra-pool-action) 60%, black);
+    border-radius: 0.3em;
+    background: rgb(0 0 0 / 0.85);
+    font-size: 0.62em;
+    color: color-mix(in oklab, var(--hudtra-pool-action) 55%, white);
+  }
+  #hud-to-rule-them-all .hudtra-attacks i { font-size: 0.85em; }
+
+  /* ---- turn controls ---- */
+  #hud-to-rule-them-all .hudtra-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45em;
+    flex: 0 0 auto;
+  }
+  #hud-to-rule-them-all .hudtra-end-turn {
+    width: 3.2em;
+    height: 3.2em;
+    border: 2px solid var(--hudtra-gold);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.18), transparent 55%),
+      linear-gradient(180deg, #8a6a24, #4c3812);
+    color: var(--hudtra-gold-bright);
+    font-size: 1.05em;
+    box-shadow: 0 0.15em 0.5em rgb(0 0 0 / 0.6);
+    transition: border-color var(--hudtra-anim), box-shadow var(--hudtra-anim);
+  }
+  #hud-to-rule-them-all .hudtra-end-turn:hover {
+    border-color: var(--hudtra-gold-bright);
+    box-shadow: 0 0 0.7em rgb(236 209 147 / 0.5);
+  }
+  #hud-to-rule-them-all .hudtra-reset {
+    width: 2em;
+    height: 2em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.35);
+    font-size: 0.85em;
+  }
+  #hud-to-rule-them-all .hudtra-reset:hover { border-color: var(--hudtra-gold-bright); }
 
   @media (prefers-reduced-motion: reduce) {
-    #hud-to-rule-them-all * { transition: none !important; }
+    #hud-to-rule-them-all { --hudtra-anim: 0ms; }
   }
+
+  /* ---- BG3-style hover card (see hud.mjs tooltipFor) ---- */
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip {
+    font-size: var(--font-size-13, 13px);
+    max-width: 24em;
+    padding: 0.6em 0.75em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.5em;
+    background:
+      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.05), transparent 60%),
+      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+    color: var(--hudtra-text);
+    text-align: left;
+    box-shadow:
+      inset 0 1px 0 rgb(236 209 147 / 0.2),
+      0 0.3em 1em rgb(0 0 0 / 0.6);
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt header {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt header img {
+    width: 3.4em;
+    height: 3.4em;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.35em;
+    box-shadow: 0 0 0.4em rgb(0 0 0 / 0.6);
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-name {
+    display: block;
+    font-size: 1.1em;
+    font-weight: 600;
+    font-variant: small-caps;
+    letter-spacing: 0.03em;
+    color: var(--hudtra-gold-bright);
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-meta {
+    display: block;
+    font-size: 0.8em;
+    color: var(--hudtra-text-dim);
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    margin: 0.55em 0 0;
+    padding-top: 0.5em;
+    border-top: 1px solid rgb(200 163 82 / 0.25);
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.2em;
+    font-size: 0.88em;
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-row dt {
+    color: var(--hudtra-text-dim);
+    font-weight: 400;
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-row dd { margin: 0; }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-attacks {
+    width: 100%;
+    text-align: right;
+    color: var(--hudtra-gold);
+    font-style: italic;
+  }
+  :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-hint {
+    margin: 0.55em 0 0;
+    padding-top: 0.5em;
+    border-top: 1px solid rgb(200 163 82 / 0.25);
+    font-size: 0.75em;
+    font-style: italic;
+    color: var(--hudtra-text-dim);
+  }
+
+  /* Fallback body when dnd5e's rich card API is unavailable (see hud.mjs). */
+  #hud-to-rule-them-all .hudtra-desc-body {
+    display: flex;
+    gap: 0.75em;
+    align-items: flex-start;
+  }
+  #hud-to-rule-them-all .hudtra-desc-body img {
+    flex: 0 0 auto;
+    width: 4em;
+    height: 4em;
+    object-fit: cover;
+    border-radius: 0.35em;
+  }
+  #hud-to-rule-them-all .hudtra-desc-text { min-width: 0; }
+
+  /* Foundry's own macro hotbar (#hotbar in v13) is redundant while the combat bar
+     is up and would sit right on top of it. Scoping on the rendered .hudtra-frame
+     (not just the application element) ties this to the exact condition the HUD
+     itself renders under, so the macro bar returns the moment combat ends and the
+     HUD closes. */
+  body:has(#hud-to-rule-them-all .hudtra-frame) #hotbar { display: none; }
 }

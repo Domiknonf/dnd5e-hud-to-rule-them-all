@@ -16,8 +16,6 @@ export function registerSettings() {
   reg("maxAction",   { ...WORLD, type: Number, default: 1 });
   reg("maxBonus",    { ...WORLD, type: Number, default: 1 });
   reg("maxReaction", { ...WORLD, type: Number, default: 1 });
-  reg("maxFree",     { ...WORLD, type: Number, default: 1 });
-  reg("dashCostsAction", { ...WORLD, type: Boolean, default: true });
 
   /* --- Enforcement ------------------------------------------ */
   reg("enforceActions", {
@@ -28,13 +26,11 @@ export function registerSettings() {
       block: `${MODULE_ID}.settings.enforceActions.block`
     }
   });
-  reg("enforceMovement", { ...WORLD, type: Boolean, default: false });
   reg("gmBypass",        { ...WORLD, type: Boolean, default: true });
 
   /* --- Content filters -------------------------------------- */
   reg("hideUnequipped",     { ...WORLD, type: Boolean, default: true });
   reg("hideUnprepared",     { ...WORLD, type: Boolean, default: true });
-  reg("showIntrinsic",      { ...WORLD, type: Boolean, default: true });
 
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });

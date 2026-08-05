@@ -23,9 +23,9 @@ export function getMaxima(combatant) {
     action: Number(game.settings.get(MODULE_ID, "maxAction")),
     bonus: Number(game.settings.get(MODULE_ID, "maxBonus")),
     reaction: Number(game.settings.get(MODULE_ID, "maxReaction")),
-    free: Number(game.settings.get(MODULE_ID, "maxFree")),
     legendary,
-    other: 0
+    other: 0,
+    passive: 0
   };
   return { ...base, ...override };
 }
@@ -54,7 +54,6 @@ export function freshEconomy(combatant) {
     key: turnKey(combatant?.combat),
     used,
     max: getMaxima(combatant),
-    dash: 0,          // number of extra movement pools bought with Dash
     attacksLeft: 0,    // remaining free "attack"-type uses within the current action
     log: []            // audit trail, newest last -> enables undo
   };
@@ -88,10 +87,7 @@ export function canAttack(combatant) {
 }
 
 /**
- * Shared enforcement decision for both real activities (module.mjs's
- * dnd5e.preUseActivity) and the HUD's own intrinsic-action buttons (Dash aside -
- * it has its own dashCostsAction-driven check). Centralized so both call sites read
- * settings/gmBypass/affordability identically instead of drifting apart.
+ * Enforcement decision for activity usage (module.mjs's dnd5e.preUseActivity).
  * Returns "allow" | "warn" | "block".
  */
 export function checkGate(combatant, type, { isAttack = false } = {}) {
@@ -170,44 +166,6 @@ export async function refund(combatant, type = null, amount = 1) {
   }
   econ.used[type] = Math.max(0, (econ.used[type] ?? 0) - amount);
   econ.log = log;
-  await write(combatant, econ);
-  return true;
-}
-
-/** Buy an extra movement pool with the Dash action. */
-export async function dash(combatant) {
-  if (!combatant) return false;
-  if (!combatant.isOwner || !canWriteFlags(combatant)) {
-    return requestFromGM("dash", { combatantUuid: combatant.uuid });
-  }
-  const costsAction = game.settings.get(MODULE_ID, "dashCostsAction");
-  if (costsAction && !canAfford(combatant, "action")) {
-    ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.notify.noAction`));
-    return false;
-  }
-  const econ = getEconomy(combatant);
-  econ.dash = (econ.dash ?? 0) + 1;
-  if (costsAction) {
-    econ.used.action = (econ.used.action ?? 0) + 1;
-    econ.log = [...(econ.log ?? []), { type: "action", amount: 1, label: "Dash", at: Date.now() }].slice(-40);
-  }
-  await write(combatant, econ);
-  return true;
-}
-
-/**
- * Grant the double-movement bonus WITHOUT spending anything - used when a real
- * dnd5e activity (e.g. Cunning Action's "Dash" option) already booked its own
- * cost via the normal spend() path in postUseActivity. dash() above is only for
- * our own intrinsic Dash button, which has no activity of its own to book through.
- */
-export async function grantDashBonus(combatant) {
-  if (!combatant) return false;
-  if (!combatant.isOwner || !canWriteFlags(combatant)) {
-    return requestFromGM("grantDashBonus", { combatantUuid: combatant.uuid });
-  }
-  const econ = getEconomy(combatant);
-  econ.dash = (econ.dash ?? 0) + 1;
   await write(combatant, econ);
   return true;
 }

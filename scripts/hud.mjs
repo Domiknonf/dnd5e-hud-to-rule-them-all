@@ -1,9 +1,37 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
-import { getEconomy, spend, refund, dash, resetTurn, remaining, checkGate, getAttacksPerAction } from "./economy.mjs";
-import { getMovement } from "./movement.mjs";
+import { getEconomy, resetTurn, remaining, getAttacksPerAction } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * BG3-style hover card, injected via data-tooltip-html (core cleans the HTML with
+ * foundry.utils.cleanHTML before display). Pure presentation: big icon, name, a
+ * meta line (pool + spell level) and one row per known detail. All dynamic values
+ * are escaped - item names are user content.
+ */
+function tooltipFor(entry, poolLabel) {
+  const esc = Handlebars.escapeExpression;
+  const img = entry.img ? `<img src="${esc(entry.img)}" alt="">` : "";
+  const spellLevel = entry.itemType === "spell" && entry.level != null
+    ? game.i18n.localize(CONFIG.DND5E?.spellLevels?.[entry.level] ?? "") : "";
+  const meta = [poolLabel, spellLevel].filter(Boolean).map(esc).join(" &middot; ");
+  const rows = [];
+  const row = (key, value) => rows.push(
+    `<div class="hudtra-tt-row"><dt>${esc(game.i18n.localize(`${MODULE_ID}.tooltip.${key}`))}</dt><dd>${esc(value)}</dd></div>`
+  );
+  if (entry.details?.range) row("range", entry.details.range);
+  if (entry.details?.target) row("target", entry.details.target);
+  if (entry.details?.damage) row("damage", entry.details.damage);
+  if (entry.uses) row("uses", `${entry.uses.value}/${entry.uses.max}`);
+  if (entry.attacksBadge) rows.push(`<div class="hudtra-tt-row"><dd class="hudtra-tt-attacks">${esc(entry.attacksBadge.hint)}</dd></div>`);
+  return `<div class="hudtra-tt">`
+    + `<header>${img}<div><span class="hudtra-tt-name">${esc(entry.name)}</span>`
+    + (meta ? `<span class="hudtra-tt-meta">${meta}</span>` : "") + `</div></header>`
+    + (rows.length ? `<dl class="hudtra-tt-rows">${rows.join("")}</dl>` : "")
+    + (entry.description ? `<p class="hudtra-tt-hint">${esc(game.i18n.localize(`${MODULE_ID}.tooltip.middleClick`))}</p>` : "")
+    + `</div>`;
+}
 
 export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
@@ -14,11 +42,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     window: { frame: false, positioned: false },
     actions: {
       use: CombatHUD.#onUse,
-      spendPip: CombatHUD.#onSpendPip,
-      refundPip: CombatHUD.#onRefundPip,
-      dash: CombatHUD.#onDash,
+      describe: CombatHUD.#onShowDescription,
+      collapse: CombatHUD.#onCollapse,
+      portrait: CombatHUD.#onPortrait,
       reset: CombatHUD.#onReset,
-      cycleMode: CombatHUD.#onCycleMode,
       endTurn: CombatHUD.#onEndTurn
     }
   };
@@ -30,6 +57,17 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Which combatant the HUD is showing. Defaults to the active combatant. */
   #combatantId = null;
 
+  /** Item/activity uuid whose description panel is currently expanded, if any. */
+  #descriptionUuid = null;
+
+  /**
+   * Whether the bar is slid down out of view. Tracked here AND as a CSS class on
+   * the persistent root element: toggling the class without a re-render is what
+   * makes the slide transition actually animate, while the field survives future
+   * re-renders (which rebuild the frame) and re-applies the state in _onRender.
+   */
+  #collapsed = false;
+
   get combatant() {
     const combat = game.combat;
     if (!combat) return null;
@@ -39,6 +77,72 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   setCombatant(id) {
     this.#combatantId = id;
     return this.render();
+  }
+
+  /**
+   * DOCUMENTED EXCEPTION to the "declarative click handling only" convention:
+   * ApplicationV2's action dispatcher binds only "click" and "contextmenu", so a
+   * middle click (which fires "auxclick", button 1) can never reach a declared
+   * action. This single delegated listener routes middle clicks on action slots
+   * into the same static-handler pattern everything else uses. The root element
+   * survives re-renders, so binding once on first render is enough.
+   * @override
+   */
+  _onFirstRender(context, options) {
+    super._onFirstRender(context, options);
+    this.element.addEventListener("auxclick", event => {
+      if (event.button !== 1) return;
+      const target = event.target?.closest?.(".hudtra-slot[data-uuid]");
+      if (!target) return;
+      event.preventDefault();
+      // Core's own middle-click behaviour is "pin the active tooltip as a clone"
+      // (TooltipManager#_onLockTooltip, on pointerup - which has already fired by
+      // the time auxclick arrives). A pinned copy of the hover card on top of the
+      // description dialog is just noise: dismiss any freshly pinned hover card
+      // before opening the dialog.
+      for (const el of document.querySelectorAll(".locked-tooltip.hudtra-tooltip")) {
+        game.tooltip?.dismissLockedTooltip?.(el);
+      }
+      CombatHUD.#onShowDescription.call(this, event, target);
+    });
+  }
+
+  /** @override */
+  _onRender(context, options) {
+    super._onRender(context, options);
+    this.element.classList.toggle("collapsed", this.#collapsed);
+  }
+
+  /**
+   * Builds the content for the description panel above the bar. Preferred content
+   * is dnd5e's own rich item card (ItemDataModel#richTooltip - the same card the
+   * inventory shows on hover, complete with property pills), falling back to a
+   * plain enriched description if that API is unavailable.
+   */
+  async #prepareDescription() {
+    if (!this.#descriptionUuid) return null;
+    const doc = await fromUuid(this.#descriptionUuid).catch(() => null);
+    const item = doc?.item ?? doc;   // an Activity uuid resolves to its parent item
+    if (!item) { this.#descriptionUuid = null; return null; }
+
+    if (typeof item.system?.richTooltip === "function") {
+      try {
+        const card = await item.system.richTooltip();
+        const classes = card.classes?.length ? card.classes : ["dnd5e2", "dnd5e-tooltip", "item-tooltip"];
+        return { name: item.name, content: `<div class="${classes.join(" ")}">${card.content}</div>` };
+      } catch (err) {
+        console.warn(`${MODULE_ID} | richTooltip failed, falling back to raw description`, err);
+      }
+    }
+    const esc = Handlebars.escapeExpression;
+    const TE = foundry.applications.ux?.TextEditor?.implementation ?? TextEditor;
+    const enriched = await TE.enrichHTML(item.system?.description?.value ?? "", {
+      relativeTo: item,
+      rollData: item.getRollData?.() ?? {}
+    });
+    const content = `<div class="hudtra-desc-body"><img src="${esc(item.img)}" alt="">`
+      + `<div class="hudtra-desc-text">${enriched}</div></div>`;
+    return { name: item.name, content };
   }
 
   /* -------------------------------------------- */
@@ -75,11 +179,14 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       .map(([key, def]) => {
         // A queued Extra Attack (econ.attacksLeft) keeps the action group usable
         // even once the action pip itself reads as spent - but the action was
-        // already committed to attacking, so only attack activities stay live.
+        // already committed to attacking, so only attack activities (and attack
+        // substitutes like the Dragonborn's Breath Weapon) stay live.
         const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
         const midAttackSequence = hasFreeAttack && remaining(combatant, key) <= 0;
+        const label = game.i18n.localize(`${MODULE_ID}.pool.${key}`);
         const entries = (buckets[key] ?? []).map(entry => {
-          const isAttackEntry = key === "action" && entry.activityType === "attack";
+          const countsAsAttack = entry.activityType === "attack" || entry.attackSubstitute;
+          const isAttackEntry = key === "action" && countsAsAttack;
           // Show "available/total" on attack activities whenever this actor has
           // more than one attack per action configured, so it's visible even before
           // the first attack (not just once mid-sequence) - answers "why can I
@@ -92,18 +199,26 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
               hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: attacksPerAction })
             };
           }
-          return { ...entry, locked: midAttackSequence && entry.activityType !== "attack", attacksBadge };
+          const enriched = { ...entry, locked: midAttackSequence && !countsAsAttack, attacksBadge };
+          enriched.action ??= "use";
+          enriched.tooltipHtml = tooltipFor(enriched, label);
+          return enriched;
         });
         return {
           key,
           icon: def.icon,
-          label: game.i18n.localize(`${MODULE_ID}.pool.${key}`),
-          exhausted: key !== "other" && !hasFreeAttack && remaining(combatant, key) <= 0,
+          label,
+          // Only per-turn pools can exhaust; "other" and "passive" have no budget.
+          exhausted: def.perTurn && !hasFreeAttack && remaining(combatant, key) <= 0,
           entries
         };
       })
       .filter(g => g.entries.length);
 
+    const hp = actor?.system?.attributes?.hp ?? null;
+    const isDying = !!hp && hp.value <= 0;
+    const rollsDeathSave = isDying && actor?.type === "character";
+    const description = await this.#prepareDescription();
     return {
       hasCombat: !!combatant,
       isMine,
@@ -112,12 +227,20 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       combatant,
       name: combatant?.name ?? "",
       img: combatant?.img ?? actor?.img,
-      hp: actor?.system?.attributes?.hp ?? null,
+      hp,
+      // Presentation-only fields: the CSS scales the whole bar off --hudtra-scale
+      // and draws the portrait's HP ring from --hudtra-hp-pct.
+      hpPct: hp?.max > 0 ? Math.round(100 * Math.clamp(hp.value, 0, hp.max) / hp.max) : 0,
+      scale: game.settings.get(MODULE_ID, "scale") ?? 1,
+      isDying,
+      portraitTooltip: game.i18n.localize(`${MODULE_ID}.${rollsDeathSave ? "deathSave" : "openSheet"}`),
       ac: actor?.system?.attributes?.ac?.value ?? null,
       round: game.combat?.round ?? 0,
       pools,
       groups,
-      movement: getMovement(combatant),
+      description,
+      // The handle's first stage depends on what is currently open.
+      collapseTooltip: game.i18n.localize(`${MODULE_ID}.${description ? "closeDescription" : "toggleBar"}`),
       editable: isMine || game.user.isGM
     };
   }
@@ -128,7 +251,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static async #onUse(event, target) {
     const entry = target.dataset;
-    if (entry.kind === "intrinsic") return this.constructor.#useIntrinsic.call(this, entry);
     const doc = await fromUuid(entry.uuid);
     if (!doc) return;
     // entry.kind is "item" for items with several activities in the same economy
@@ -140,58 +262,51 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     return doc.use({ event });
   }
 
-  static async #useIntrinsic(entry) {
-    const combatant = this.combatant;
-    const type = Object.entries(RESOURCES).find(([k]) => k === entry.type)?.[0] ?? "action";
-    // Dash has its own dashCostsAction-driven check inside dash() - unlike the other
-    // intrinsic buttons, it was never gated by enforceActions in the first place, so
-    // leave it as-is rather than double-gating it here.
-    if (entry.handler === "dash") return dash(combatant);
+  /**
+   * Middle click on a slot (or left click on a passive feature): expand the
+   * description panel above the bar for that item, replace its content if a
+   * different item is picked, collapse it again when the same item is clicked
+   * twice. The X in the panel corner routes to #onCloseDescription.
+   */
+  static async #onShowDescription(event, target) {
+    const uuid = target.dataset.uuid;
+    if (!uuid) return;
+    this.#descriptionUuid = this.#descriptionUuid === uuid ? null : uuid;
+    return this.render();
+  }
 
-    const result = checkGate(combatant, type);
-    if (result !== "allow") {
-      const msg = game.i18n.format(`${MODULE_ID}.notify.exhausted`, {
-        pool: game.i18n.localize(`${MODULE_ID}.pool.${type}`)
-      });
-      if (result === "block") { ui.notifications.warn(msg); return; }
-      ui.notifications.info(msg);
+  /**
+   * The single collapse handle works in stages: an open description panel closes
+   * first, and only a second click slides the bar itself away. Closing the
+   * description needs a re-render (the panel is template-driven), while the bar's
+   * slide only toggles a class on the persistent root so the transition animates.
+   */
+  static #onCollapse() {
+    if (this.#descriptionUuid) {
+      this.#descriptionUuid = null;
+      return this.render();
     }
+    this.#collapsed = !this.#collapsed;
+    this.element.classList.toggle("collapsed", this.#collapsed);
+  }
 
-    if (entry.handler === "skill" && entry.skill) {
-      await combatant?.actor?.rollSkill?.({ skill: entry.skill });
+  /**
+   * Portrait click: at 0 HP a Player Character rolls a death save (the skull
+   * overlay advertises this); everyone else just gets their sheet. Opening the
+   * sheet stays permission-gated by Foundry itself.
+   */
+  static async #onPortrait() {
+    const actor = this.combatant?.actor;
+    if (!actor) return;
+    const hp = actor.system?.attributes?.hp;
+    if (actor.type === "character" && (hp?.value ?? 1) <= 0 && actor.rollDeathSave) {
+      return actor.rollDeathSave({});
     }
-    return spend(combatant, type, { label: entry.name });
-  }
-
-  static async #onSpendPip(event, target) {
-    const pool = target.dataset.pool;
-    // Manual "-" has no real event behind it (unlike an over-budget activity use,
-    // which still books via postUseActivity so the log stays accurate) - so there is
-    // no reason to let it push used past max. Once empty it's a no-op.
-    if (remaining(this.combatant, pool) <= 0) return;
-    return spend(this.combatant, pool, { label: game.i18n.localize(`${MODULE_ID}.manual`) });
-  }
-
-  static async #onRefundPip(event, target) {
-    return refund(this.combatant, target.dataset.pool);
-  }
-
-  static async #onDash() {
-    return dash(this.combatant);
+    return actor.sheet?.render(true);
   }
 
   static async #onReset() {
     return resetTurn(this.combatant);
-  }
-
-  static async #onCycleMode(event, target) {
-    const combatant = this.combatant;
-    const { modes, mode } = getMovement(combatant);
-    if (modes.length < 2) return;
-    const idx = modes.findIndex(m => m.key === mode);
-    const next = modes[(idx + 1) % modes.length];
-    await combatant.setFlag(MODULE_ID, "movementMode", next.key);
-    return this.render();
   }
 
   static async #onEndTurn() {
