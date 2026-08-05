@@ -5,13 +5,24 @@ import { getEconomy } from "./economy.mjs";
  * Foundry v13 records token movement itself, including terrain cost, and clears the
  * histories on turn start (Combat#_clearMovementHistoryOnStartTurn). So we DERIVE the
  * remaining movement instead of storing a counter — no drift, no double bookkeeping.
- *
- * VERIFY IN CONSOLE once: `_token.document.movementHistory` and `_token.document.movement`.
- * The shape is { recorded, unrecorded, distance, cost, spaces, diagonals }.
  */
 
+/**
+ * VERIFIED live (Foundry 13.351 / dnd5e 5.3.3), across a turn boundary specifically:
+ * tokenDoc.movementHistory (flat array of waypoints) IS reliably cleared to [] at
+ * turn start, matching Combat#_clearMovementHistoryOnStartTurn. tokenDoc.movement
+ * (singular) is just the data of the last movement OPERATION - it is NOT cleared at
+ * turn start and keeps last turn's cost until a new move overwrites it. Trusting it
+ * first (as this used to) reads a stale "budget already spent" value right after
+ * End Turn, which combined with enforceMovement's hard stop can softlock a token
+ * that ended last turn at 0 left - the very first move needed to refresh the cache
+ * gets blocked by the stale cache. So: sum the flat array, and only fall back to
+ * the cached movement.history if the array itself isn't present at all.
+ */
 function readHistory(tokenDoc) {
-  return tokenDoc?.movementHistory ?? tokenDoc?.movement?.history ?? null;
+  const flat = tokenDoc?.movementHistory;
+  if (Array.isArray(flat)) return { cost: flat.reduce((sum, wp) => sum + Number(wp?.cost ?? 0), 0) };
+  return tokenDoc?.movement?.history ?? null;
 }
 
 export function getMovement(combatant) {
