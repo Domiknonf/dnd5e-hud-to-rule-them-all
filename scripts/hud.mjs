@@ -129,11 +129,15 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onUse(event, target) {
     const entry = target.dataset;
     if (entry.kind === "intrinsic") return this.constructor.#useIntrinsic.call(this, entry);
-    const activity = await fromUuid(entry.uuid);
-    if (!activity) return;
+    const doc = await fromUuid(entry.uuid);
+    if (!doc) return;
+    // entry.kind is "item" for items with several activities in the same economy
+    // bucket (see actions.collectActions) - Item5e#use() shows the same activity
+    // picker the character sheet's own roll button does. Otherwise it's a single
+    // unambiguous activity, used directly.
     // NOTE: we do NOT spend here. scripts/module.mjs listens to dnd5e.postUseActivity,
     // so macros, chat cards and Midi rolls all book through the same code path.
-    return activity.use({ event });
+    return doc.use({ event });
   }
 
   static async #useIntrinsic(entry) {

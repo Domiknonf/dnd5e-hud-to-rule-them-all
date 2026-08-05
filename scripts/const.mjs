@@ -19,6 +19,17 @@ export const FLAGS = {
 export const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 
 /**
+ * Activity names that represent taking the Dash action when granted through a
+ * feature (e.g. Rogue's Cunning Action) rather than clicked via our own intrinsic
+ * Dash button. Name-matched because dnd5e has no structured "this is Dash" marker
+ * on these - verified live, Cunning Action's "Dash" sub-activity has empty
+ * roll/consumption/effects, same as Multiattack's narrative-only pattern, it's
+ * just real this time. English-only SRD phrasing for now; extend for other
+ * languages/homebrew naming as needed.
+ */
+export const DASH_ACTIVITY_NAMES = new Set(["dash"]);
+
+/**
  * The resource pools the HUD tracks. Order = display order.
  * `perTurn: true` means the pool is refilled when the owner's turn starts (RAW for
  * action / bonus action / reaction / free object interaction).
@@ -63,11 +74,6 @@ export const INTRINSIC_ACTIONS = [
   { id: "disengage",  type: "action",   icon: "fa-solid fa-shoe-prints",    handler: "spendOnly" },
   { id: "dodge",      type: "action",   icon: "fa-solid fa-shield-halved",  handler: "spendOnly" },
   { id: "hide",       type: "action",   icon: "fa-solid fa-eye-slash",      handler: "skill", skill: "ste" },
-  { id: "search",     type: "action",   icon: "fa-solid fa-magnifying-glass", handler: "skill", skill: "prc" },
-  { id: "influence",  type: "action",   icon: "fa-solid fa-comments",       handler: "spendOnly" },
-  { id: "study",      type: "action",   icon: "fa-solid fa-book",           handler: "spendOnly" },
-  { id: "utilize",    type: "action",   icon: "fa-solid fa-hand",           handler: "spendOnly" },
-  { id: "ready",      type: "action",   icon: "fa-solid fa-hourglass-half", handler: "spendOnly" },
   { id: "shove",      type: "action",   icon: "fa-solid fa-hand-back-fist", handler: "spendOnly" },
   { id: "grapple",    type: "action",   icon: "fa-solid fa-handshake",      handler: "spendOnly" },
   { id: "offhand",    type: "bonus",    icon: "fa-solid fa-hand-sparkles",  handler: "spendOnly" },

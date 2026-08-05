@@ -1,8 +1,8 @@
-import { MODULE_ID } from "./const.mjs";
+import { MODULE_ID, DASH_ACTIVITY_NAMES } from "./const.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
-import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy } from "./economy.mjs";
+import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy, grantDashBonus } from "./economy.mjs";
 import { getMovement, enforceMovement } from "./movement.mjs";
 import { costOfActivity } from "./actions.mjs";
 
@@ -63,7 +63,7 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
  * Book the cost AFTER a successful usage. This is the single write path — it also
  * catches usages triggered from the character sheet, macros and Midi QoL workflows.
  */
-Hooks.on("dnd5e.postUseActivity", (activity, usageConfig, results) => {
+Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   if (!game.combat?.started) return;
   const type = costOfActivity(activity);
   if (!type || type === "other") return;
@@ -78,11 +78,20 @@ Hooks.on("dnd5e.postUseActivity", (activity, usageConfig, results) => {
   // don't each burn a fresh action pip. NPC Multiattack (descriptive-only utility)
   // never reaches here - costOfActivity() returns null for it (see actions.mjs).
   if (type === "action" && activity.type === "attack") {
-    spendAttack(combatant, { label, uuid: activity.uuid });
+    await spendAttack(combatant, { label, uuid: activity.uuid });
     return;
   }
 
-  spend(combatant, type, { label, uuid: activity.uuid });
+  await spend(combatant, type, { label, uuid: activity.uuid });
+
+  // A feature-granted Dash (e.g. Cunning Action) still doubles movement for the
+  // turn - it just doesn't book its own action cost, since spend() above already
+  // covers whatever pool this activity actually costs (bonus, here). Awaited
+  // sequentially after spend() so both writes land in the right order rather than
+  // racing each other (postUseActivity is not otherwise awaited by dnd5e).
+  if (DASH_ACTIVITY_NAMES.has((activity.name ?? "").trim().toLowerCase())) {
+    await grantDashBonus(combatant);
+  }
 });
 
 /* ------------------------------------------------------------------ */

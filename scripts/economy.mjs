@@ -195,6 +195,23 @@ export async function dash(combatant) {
   return true;
 }
 
+/**
+ * Grant the double-movement bonus WITHOUT spending anything - used when a real
+ * dnd5e activity (e.g. Cunning Action's "Dash" option) already booked its own
+ * cost via the normal spend() path in postUseActivity. dash() above is only for
+ * our own intrinsic Dash button, which has no activity of its own to book through.
+ */
+export async function grantDashBonus(combatant) {
+  if (!combatant) return false;
+  if (!combatant.isOwner || !canWriteFlags(combatant)) {
+    return requestFromGM("grantDashBonus", { combatantUuid: combatant.uuid });
+  }
+  const econ = getEconomy(combatant);
+  econ.dash = (econ.dash ?? 0) + 1;
+  await write(combatant, econ);
+  return true;
+}
+
 /** Refill everything that resets at the start of a turn. */
 export async function resetTurn(combatant) {
   if (!combatant) return false;

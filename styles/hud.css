@@ -112,7 +112,12 @@
   #hud-to-rule-them-all .hudtra-entry:hover { background: rgb(255 255 255 / 0.14); }
   #hud-to-rule-them-all .hudtra-entry.locked { opacity: 0.4; }
   #hud-to-rule-them-all .hudtra-entry img { width: 1.4rem; height: 1.4rem; border: none; border-radius: 2px; }
+  #hud-to-rule-them-all .hudtra-entry-text { display: flex; flex-direction: column; overflow: hidden; line-height: 1.2; }
   #hud-to-rule-them-all .hudtra-entry-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hud-to-rule-them-all .hudtra-entry-subtitle {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 0.78em; opacity: 0.6;
+  }
   #hud-to-rule-them-all .hudtra-uses { margin-left: auto; opacity: 0.7; font-size: 0.8em; }
 
   #hud-to-rule-them-all button:focus-visible { outline: 2px solid var(--hudtra-accent); outline-offset: 1px; }

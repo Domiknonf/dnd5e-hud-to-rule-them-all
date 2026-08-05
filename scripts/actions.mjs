@@ -18,18 +18,20 @@ export function bucketFor(activationType) {
 /**
  * NPC Multiattack (and similar "this feature just describes several attacks")
  * features are utility-type activities with no roll, no consumption and no effects
- * - mechanically inert, just a chat description. Verified against Multiattack
- * (nothing) vs. Second Wind (type "heal", real consumption+healing) live. Filtering
- * on activity.type alone would also hide real utility actions like Second Wind, so
- * check for the absence of any actual mechanical effect instead of the type/name.
+ * - mechanically inert, just a chat description. Verified live, twice over:
+ * - Multiattack (nothing) vs. Second Wind (type "heal", real consumption+healing) -
+ *   filtering on activity.type alone would also hide real utility actions.
+ * - Multiattack vs. Cunning Action's Dash/Disengage sub-activities, which are ALSO
+ *   utility with empty roll/consumption/effects (Dash needs no roll to represent
+ *   "you may take this as a bonus action") but are very much real. The reliable
+ *   difference: item.system.type.value is "monster" for Multiattack and its kin,
+ *   "class" (or race/feat/background) for real granted actions like Cunning
+ *   Action. Only NPC monster features get to be pure chat-flavor text; spells
+ *   don't even have this field, so they were never at risk once this landed.
  */
 export function isDescriptiveOnly(activity) {
   if (activity?.type !== "utility") return false;
-  // Spells always do something real even when it isn't encoded as roll/consumption/
-  // effects data (Misty Step's teleport, Prestidigitation's chosen minor effect are
-  // both manual/narrative) - verified live these silently stopped booking their cost
-  // once this filter existed. Only apply to features (Multiattack and its kin).
-  if (activity.item?.type === "spell") return false;
+  if (activity.item?.system?.type?.value !== "monster") return false;
   const hasRoll = !!activity.roll?.formula;
   const hasConsumption = (activity.consumption?.targets?.length ?? 0) > 0;
   const hasEffects = (activity.effects?.length ?? 0) > 0;
@@ -98,7 +100,7 @@ function isUsable(item) {
 }
 
 function usesFor(activity, item) {
-  const a = activity.uses ?? {};
+  const a = activity?.uses ?? {};
   const i = item.system?.uses ?? {};
   const value = a.max ? a.value : i.max ? i.value : null;
   const max = a.max ? a.max : i.max ? i.max : null;
@@ -116,23 +118,45 @@ export function collectActions(actor, combatant) {
     if (!activities?.size) continue;
     if (!isUsable(item)) continue;
 
-    // dnd5e fills activity.name with the activity's type label ("Cast", "Save",
-    // "Attack") when nobody gave it an explicit name, so `activity.name || item.name`
-    // never falls back. Only reach for the activity name when the item carries
-    // several activities and the item name alone would be ambiguous.
-    const multi = activities.size > 1;
-
+    // Group this item's activities by which economy bucket they land in. An item
+    // with several activities in the SAME bucket (Disguise Self: cast with a slot
+    // vs. free-cast; Cunning Action: Hide/Dash/Disengage/...) collapses into one
+    // item-level button that defers to dnd5e's own activity picker - the same
+    // choice the character sheet's roll button offers - instead of exploding into
+    // one button per activity with dnd5e's often-unhelpful default activity names
+    // ("Use", "(free casting)"). Activities in DIFFERENT buckets (e.g. Net: Attack
+    // = action, Utility = bonus) naturally stay separate, one per HUD section.
+    const byBucket = new Map();
     for (const activity of activities) {
       const bucket = bucketFor(activity.activation?.type);
       if (!bucket) continue;
       if (isDescriptiveOnly(activity)) continue;
-      const name = multi ? (activity.name || item.name) : item.name;
+      if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+      byBucket.get(bucket).push(activity);
+    }
+
+    for (const [bucket, group] of byBucket) {
+      if (group.length > 1) {
+        buckets[bucket].push({
+          kind: "item",
+          uuid: item.uuid,
+          name: item.name,
+          subtitle: "",
+          img: item.img,
+          activityType: null,
+          itemType: item.type,
+          level: item.type === "spell" ? item.system.level : null,
+          uses: usesFor(null, item)
+        });
+        continue;
+      }
+      const activity = group[0];
       const activityImg = activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null;
       buckets[bucket].push({
         kind: "activity",
         uuid: activity.uuid,
-        name,
-        subtitle: multi ? item.name : "",
+        name: item.name,
+        subtitle: "",
         img: activityImg || item.img,
         activityType: activity.type,
         itemType: item.type,

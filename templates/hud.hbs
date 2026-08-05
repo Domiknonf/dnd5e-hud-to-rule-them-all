@@ -68,7 +68,10 @@
                 data-name="{{name}}"
                 data-tooltip="{{name}}{{#if subtitle}} — {{subtitle}}{{/if}}{{#if attacksBadge}} ({{attacksBadge.hint}}){{/if}}">
           {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
-          <span class="hudtra-entry-name">{{name}}</span>
+          <span class="hudtra-entry-text">
+            <span class="hudtra-entry-name">{{name}}</span>
+            {{#if subtitle}}<span class="hudtra-entry-subtitle">{{subtitle}}</span>{{/if}}
+          </span>
           {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
           {{#if attacksBadge}}<span class="hudtra-uses">{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
         </button>
