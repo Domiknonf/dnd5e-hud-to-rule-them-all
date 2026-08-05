@@ -31,10 +31,63 @@ parallel laufen.
 | Entwicklung | zweite lokale Foundry-Instanz, eigener `--dataPath`, Repo per Symlink eingehängt |
 | Lizenz | erlaubt zweite Instanz ausdrücklich, solange nur der Lizenzinhaber darauf zugreift |
 
-Relevanter Modul-Stack in der Produktionswelt (~40 Module): Midi QOL 13.0.64, DAE 13.0.29,
-Times Up 13.1.9, libWrapper 1.13.5.1, socketlib 1.1.4, Argon Combat HUD CORE 4.1.2 /
-DND5E 5.1.5, Carousel Combat Tracker 4.1.8, Plutonium 2.15.2. Die lokale Dev-Instanz läuft
-bewusst mager: nur System plus eigenes Modul, Midi erst später dazu.
+Vollständiger Modul-Stack der Produktionswelt (45 Module, Stand 2026-08-05 — Foundry
+Setup-Screen "Manage Modules" abfotografiert), zum späteren Import über Foundrys
+Export/Import-Modulliste-Funktion:
+
+| Modul | Version |
+| --- | --- |
+| Active Auras | 0.12.7 |
+| Active Token Effects | v1.1.1 |
+| Actor Studio | 2.9.18 |
+| Argon - Combat HUD (CORE) | 4.1.2 |
+| Argon - Combat HUD (DND5E) | 5.1.5 |
+| Aura Effects | 1.5.2 |
+| Automated Animations | 6.8.2 |
+| Bonus Source Attribution (D&D5e) | 0.1.0 |
+| Carousel Combat Tracker | 4.1.8 |
+| Cauldron of Plentiful Resources | 1.5.43 |
+| Chat Log Prune | 1.1.9 |
+| Combat Booster: Turn Marker, Recent Actions and more | 5.0.2 |
+| D&D5e Animations | 3.3.0 |
+| Dice So Nice! | 5.3.4 |
+| Dice Tray | 3.5.6 |
+| Dig Down - Advanced Search | 4.0.8 |
+| Dungeons & Dragons Player's Handbook | 2.2.0 |
+| Dynamic effects using Active Effects (DAE) | 13.0.29 |
+| Gambit's FXMaster | 8.3.3 |
+| Gambit's Premades | 2.1.43 |
+| Item Piles | 3.3.4 |
+| Item Piles: D&D 5e | 1.1.0 |
+| JB2A - Patreon Complete Collection | 0.8.6 |
+| Journal Scaler | 1.1.0 |
+| libWrapper | 1.13.5.1 |
+| Midi Item Showcase - Community | 1.6.13 |
+| Midi QOL | 13.0.64 |
+| Monk's Active Tile Triggers | 13.06 |
+| Ownership Viewer | 14.0 |
+| Plutonium | 2.15.2 |
+| Plutonium Addon: Automation | 0.8.4 |
+| Prime Performance | 0.12.8 |
+| PSFX-Patreon | 0.9.0 |
+| Region Attacher | 1.11.2 |
+| Sequencer | 4.2.3 |
+| Smart Target | 3.0.1 |
+| socketlib | v1.1.4 |
+| Splatter | 5.0.1 |
+| Spotlight Omnisearch | 3.1.5 |
+| Times Up | 13.1.9 |
+| Tomb of Annihilation | 1.2.1 |
+| Universal Battlemap Importer | 5.0.1 |
+| Vision 5e | 3.2.1 |
+| Visual Active Effects | 13.0.6 |
+| World Scripter | 1.0.0 |
+
+Die lokale Dev-Instanz läuft bewusst mager: nur System plus eigenes Modul. Nächster
+Testschritt laut Session vom 2026-08-05: alles außer Argon (CORE + DND5E) in die
+Dev-Welt holen und eine Kampfrunde mit vollem Automatisierungs-Stack (v. a. Midi QoL)
+durchspielen — offene Frage ist die Hook-Reihenfolge zwischen Midi und diesem Modul,
+siehe "Known open problems" in CLAUDE.md.
 
 ## Was bereits existiert
 
