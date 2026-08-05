@@ -25,6 +25,11 @@ export function bucketFor(activationType) {
  */
 export function isDescriptiveOnly(activity) {
   if (activity?.type !== "utility") return false;
+  // Spells always do something real even when it isn't encoded as roll/consumption/
+  // effects data (Misty Step's teleport, Prestidigitation's chosen minor effect are
+  // both manual/narrative) - verified live these silently stopped booking their cost
+  // once this filter existed. Only apply to features (Multiattack and its kin).
+  if (activity.item?.type === "spell") return false;
   const hasRoll = !!activity.roll?.formula;
   const hasConsumption = (activity.consumption?.targets?.length ?? 0) > 0;
   const hasEffects = (activity.effects?.length ?? 0) > 0;
