@@ -1,4 +1,4 @@
-import { MODULE_ID } from "./const.mjs";
+import { MODULE_ID, MOVEMENT_TYPES } from "./const.mjs";
 import { getEconomy } from "./economy.mjs";
 
 /**
@@ -32,7 +32,9 @@ export function getMovement(combatant) {
   const units = speeds.units || canvas?.scene?.grid?.units || "ft";
 
   const preferred = combatant?.getFlag?.(MODULE_ID, "movementMode") || "walk";
-  const mode = Number(speeds[preferred]) > 0 ? preferred : "walk";
+  // A stale flag from before MOVEMENT_TYPES existed (e.g. "max", cycled into
+  // accidentally) must not resolve as a real mode - fall back to walk.
+  const mode = MOVEMENT_TYPES.includes(preferred) && Number(speeds[preferred]) > 0 ? preferred : "walk";
   const base = Number(speeds[mode] ?? 0);
 
   const econ = getEconomy(combatant);
@@ -51,7 +53,7 @@ export function getMovement(combatant) {
     pct: budget > 0 ? Math.min(100, (used / budget) * 100) : 0,
     units,
     modes: Object.entries(speeds)
-      .filter(([k, v]) => Number(v) > 0 && !["units", "hover"].includes(k))
+      .filter(([k, v]) => MOVEMENT_TYPES.includes(k) && Number(v) > 0)
       .map(([k, v]) => ({ key: k, value: v, active: k === mode }))
   };
 }

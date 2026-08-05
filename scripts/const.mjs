@@ -9,6 +9,16 @@ export const FLAGS = {
 };
 
 /**
+ * The actual selectable movement types. actor.system.attributes.movement also
+ * carries derived/computed fields alongside these (verified live, dnd5e 5.3.3):
+ * jump (jump distance), speed and max (aggregate/cap values), slowed (bool),
+ * ignoredDifficultTerrain (object). An allowlist here, rather than blacklisting
+ * those by name, so future dnd5e additions to that object don't leak into the
+ * movement-mode cycle by default.
+ */
+export const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
+
+/**
  * The resource pools the HUD tracks. Order = display order.
  * `perTurn: true` means the pool is refilled when the owner's turn starts (RAW for
  * action / bonus action / reaction / free object interaction).
