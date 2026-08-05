@@ -1,5 +1,5 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
-import { getEconomy, spend, refund, dash, resetTurn, remaining } from "./economy.mjs";
+import { getEconomy, spend, refund, dash, resetTurn, remaining, checkGate, getAttacksPerAction } from "./economy.mjs";
 import { getMovement } from "./movement.mjs";
 import { collectActions } from "./actions.mjs";
 
@@ -69,6 +69,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       .filter(p => !p.hidden);
 
     const buckets = collectActions(actor, combatant);
+    const attacksPerAction = getAttacksPerAction(combatant);
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -77,10 +78,22 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // already committed to attacking, so only attack activities stay live.
         const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
         const midAttackSequence = hasFreeAttack && remaining(combatant, key) <= 0;
-        const entries = (buckets[key] ?? []).map(entry => ({
-          ...entry,
-          locked: midAttackSequence && entry.activityType !== "attack"
-        }));
+        const entries = (buckets[key] ?? []).map(entry => {
+          const isAttackEntry = key === "action" && entry.activityType === "attack";
+          // Show "available/total" on attack activities whenever this actor has
+          // more than one attack per action configured, so it's visible even before
+          // the first attack (not just once mid-sequence) - answers "why can I
+          // still use this" without needing the removed Multiattack description.
+          let attacksBadge = null;
+          if (isAttackEntry && attacksPerAction > 1) {
+            const available = remaining(combatant, "action") > 0 ? attacksPerAction : (econ.attacksLeft ?? 0);
+            attacksBadge = {
+              available, max: attacksPerAction,
+              hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: attacksPerAction })
+            };
+          }
+          return { ...entry, locked: midAttackSequence && entry.activityType !== "attack", attacksBadge };
+        });
         return {
           key,
           icon: def.icon,
@@ -126,7 +139,20 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #useIntrinsic(entry) {
     const combatant = this.combatant;
     const type = Object.entries(RESOURCES).find(([k]) => k === entry.type)?.[0] ?? "action";
+    // Dash has its own dashCostsAction-driven check inside dash() - unlike the other
+    // intrinsic buttons, it was never gated by enforceActions in the first place, so
+    // leave it as-is rather than double-gating it here.
     if (entry.handler === "dash") return dash(combatant);
+
+    const result = checkGate(combatant, type);
+    if (result !== "allow") {
+      const msg = game.i18n.format(`${MODULE_ID}.notify.exhausted`, {
+        pool: game.i18n.localize(`${MODULE_ID}.pool.${type}`)
+      });
+      if (result === "block") { ui.notifications.warn(msg); return; }
+      ui.notifications.info(msg);
+    }
+
     if (entry.handler === "skill" && entry.skill) {
       await combatant?.actor?.rollSkill?.({ skill: entry.skill });
     }

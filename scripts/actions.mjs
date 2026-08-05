@@ -15,6 +15,58 @@ export function bucketFor(activationType) {
   return ACTIVATION_MAP[activationType] ?? "other";
 }
 
+/**
+ * NPC Multiattack (and similar "this feature just describes several attacks")
+ * features are utility-type activities with no roll, no consumption and no effects
+ * - mechanically inert, just a chat description. Verified against Multiattack
+ * (nothing) vs. Second Wind (type "heal", real consumption+healing) live. Filtering
+ * on activity.type alone would also hide real utility actions like Second Wind, so
+ * check for the absence of any actual mechanical effect instead of the type/name.
+ */
+export function isDescriptiveOnly(activity) {
+  if (activity?.type !== "utility") return false;
+  const hasRoll = !!activity.roll?.formula;
+  const hasConsumption = (activity.consumption?.targets?.length ?? 0) > 0;
+  const hasEffects = (activity.effects?.length ?? 0) > 0;
+  return !hasRoll && !hasConsumption && !hasEffects;
+}
+
+const ATTACK_COUNT_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+
+/**
+ * Best-effort read of "how many attacks does Multiattack grant" straight out of the
+ * feature's own description text (SRD phrasing: "makes three attacks", "makes two
+ * Arcane Burst attacks", ...). This is a guess, not a parse of structured data - it
+ * will misread anything that isn't "N (of the same) attacks" (e.g. "one bite and one
+ * claw attack"). That is why config.attacksPerAction (see economy.getAttacksPerAction)
+ * always wins when the GM has set it by hand. Matched against a descriptive-only
+ * utility activity (see isDescriptiveOnly) so it isn't tied to the item being named
+ * "Multiattack" specifically.
+ */
+export function guessAttacksPerAction(actor) {
+  if (!actor) return null;
+  for (const item of actor.items ?? []) {
+    const activities = item.system?.activities;
+    if (!activities?.size) continue;
+    if (!Array.from(activities).some(isDescriptiveOnly)) continue;
+
+    // Strip HTML tags AND Foundry's [[...]]{type} content-link/enricher syntax before
+    // matching - dnd5e statblocks link the attack name via [[/item .someId]], which
+    // is long enough to blow past a naive word-gap window (verified: broke the
+    // Archmage's "makes four [[/item .mmArcaneBurst000]] attacks" but not the
+    // shorter-by-coincidence text that happened to work before).
+    const text = (item.system?.description?.value ?? "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\[\[[^\]]*\]\](\{[^}]*\})?/g, " ")
+      .toLowerCase();
+    const match = text.match(/\b(one|two|three|four|five|six|seven|eight|\d+)\b[^.]{0,25}?\battacks?\b/);
+    if (!match) continue;
+    const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
+    if (Number.isInteger(count) && count > 1) return count;
+  }
+  return null;
+}
+
 /** Cheap availability filter. Extend this — it is where most house rules land. */
 function isUsable(item) {
   // dnd5e caches a real spell Item on the actor for every "cast" activity on a
@@ -68,6 +120,7 @@ export function collectActions(actor, combatant) {
     for (const activity of activities) {
       const bucket = bucketFor(activity.activation?.type);
       if (!bucket) continue;
+      if (isDescriptiveOnly(activity)) continue;
       const name = multi ? (activity.name || item.name) : item.name;
       const activityImg = activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null;
       buckets[bucket].push({
@@ -105,5 +158,6 @@ export function collectActions(actor, combatant) {
 
 /** Used by the economy watcher to know what a used activity costs. */
 export function costOfActivity(activity) {
+  if (isDescriptiveOnly(activity)) return null;
   return bucketFor(activity?.activation?.type);
 }

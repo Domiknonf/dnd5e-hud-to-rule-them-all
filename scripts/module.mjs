@@ -2,7 +2,7 @@ import { MODULE_ID } from "./const.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
-import { spend, spendAttack, refund, resetTurn, canAfford, canAttack, getEconomy } from "./economy.mjs";
+import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy } from "./economy.mjs";
 import { getMovement, enforceMovement } from "./movement.mjs";
 import { costOfActivity } from "./actions.mjs";
 
@@ -43,25 +43,18 @@ function combatantFor(actor) {
  * Runs on the client that initiated the activity, so the check is local and cheap.
  */
 Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
-  const mode = game.settings.get(MODULE_ID, "enforceActions");
-  if (mode === "off") return true;
-  if (!game.combat?.started) return true;
-  if (game.user.isGM && game.settings.get(MODULE_ID, "gmBypass")) return true;
-
   const type = costOfActivity(activity);
-  if (!type || type === "other") return true;
-
   const combatant = combatantFor(activity.actor);
-  if (!combatant) return true;
   // Extra Attack: a queued free attack is always affordable, even once the action
   // pip itself reads as spent.
   const isAttack = type === "action" && activity.type === "attack";
-  if (isAttack ? canAttack(combatant) : canAfford(combatant, type)) return true;
+  const result = checkGate(combatant, type, { isAttack });
+  if (result === "allow") return true;
 
   const msg = game.i18n.format(`${MODULE_ID}.notify.exhausted`, {
     pool: game.i18n.localize(`${MODULE_ID}.pool.${type}`)
   });
-  if (mode === "block") { ui.notifications.warn(msg); return false; }
+  if (result === "block") { ui.notifications.warn(msg); return false; }
   ui.notifications.info(msg);
   return true;
 });
@@ -82,8 +75,8 @@ Hooks.on("dnd5e.postUseActivity", (activity, usageConfig, results) => {
   // no built-in "number of attacks" step (verified live: a level 5 Fighter's second
   // Attack click is its own postUseActivity, not bundled with the first). Route
   // "attack"-type activities through the counter so repeat clicks within one action
-  // don't each burn a fresh action pip. NPC Multiattack is a separate, still-open
-  // problem - it is a "utility" activity, not "attack", so it is unaffected here.
+  // don't each burn a fresh action pip. NPC Multiattack (descriptive-only utility)
+  // never reaches here - costOfActivity() returns null for it (see actions.mjs).
   if (type === "action" && activity.type === "attack") {
     spendAttack(combatant, { label, uuid: activity.uuid });
     return;

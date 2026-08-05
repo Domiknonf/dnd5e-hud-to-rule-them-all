@@ -27,6 +27,8 @@
   "dnd5e-hud-to-rule-them-all.intrinsic.opportunity": "Opportunity Attack",
   "dnd5e-hud-to-rule-them-all.intrinsic.interact": "Interact with Object",
 
+  "dnd5e-hud-to-rule-them-all.attacksAvailable": "{available}/{max} attacks available this action",
+
   "dnd5e-hud-to-rule-them-all.notify.exhausted": "No {pool} left this turn.",
   "dnd5e-hud-to-rule-them-all.notify.noAction": "No action left this turn.",
   "dnd5e-hud-to-rule-them-all.notify.noMovement": "Only {left} movement left.",

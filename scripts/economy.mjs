@@ -1,5 +1,6 @@
 import { MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION } from "./const.mjs";
 import { requestFromGM } from "./socket.mjs";
+import { guessAttacksPerAction } from "./actions.mjs";
 
 /**
  * SINGLE SOURCE OF TRUTH: the economy lives in a flag on the Combatant document.
@@ -31,15 +32,19 @@ export function getMaxima(combatant) {
 
 /**
  * How many "attack"-type activity uses share a single action this turn (Extra
- * Attack). GM-configured per actor; there is no reliable way to derive this from
- * dnd5e's own data without guessing at class/subclass internals (verified: a
- * level 5 Fighter's Attack activity fires postUseActivity once per click, with no
- * built-in "number of attacks" step - see the Extra Attack note in CLAUDE.md).
+ * Attack). Order: GM override (config.attacksPerAction) > best-effort guess from a
+ * Multiattack-shaped feature's own description text (guessAttacksPerAction, see
+ * actions.mjs - only reliable for "makes N attacks" phrasing, not mixed attacks
+ * like "one bite and one claw") > default of 1 (no Extra Attack). PCs generally
+ * need the override (Extra Attack is a class feature with no descriptive text to
+ * parse); NPC Multiattack usually resolves on its own.
  */
 export function getAttacksPerAction(combatant) {
-  const override = combatant?.actor?.getFlag?.(MODULE_ID, FLAGS.ACTOR_CONFIG)?.attacksPerAction;
+  const actor = combatant?.actor;
+  const override = actor?.getFlag?.(MODULE_ID, FLAGS.ACTOR_CONFIG)?.attacksPerAction;
   const n = Number(override);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_ATTACKS_PER_ACTION;
+  if (Number.isFinite(n) && n > 0) return n;
+  return guessAttacksPerAction(actor) ?? DEFAULT_ATTACKS_PER_ACTION;
 }
 
 export function freshEconomy(combatant) {
@@ -80,6 +85,25 @@ export function canAttack(combatant) {
   const econ = getEconomy(combatant);
   if ((econ.attacksLeft ?? 0) > 0) return true;
   return canAfford(combatant, "action");
+}
+
+/**
+ * Shared enforcement decision for both real activities (module.mjs's
+ * dnd5e.preUseActivity) and the HUD's own intrinsic-action buttons (Dash aside -
+ * it has its own dashCostsAction-driven check). Centralized so both call sites read
+ * settings/gmBypass/affordability identically instead of drifting apart.
+ * Returns "allow" | "warn" | "block".
+ */
+export function checkGate(combatant, type, { isAttack = false } = {}) {
+  const mode = game.settings.get(MODULE_ID, "enforceActions");
+  if (mode === "off") return "allow";
+  if (!game.combat?.started) return "allow";
+  if (game.user.isGM && game.settings.get(MODULE_ID, "gmBypass")) return "allow";
+  if (!type || type === "other") return "allow";
+  if (!combatant) return "allow";
+
+  const affordable = isAttack ? canAttack(combatant) : canAfford(combatant, type);
+  return affordable ? "allow" : mode;
 }
 
 async function write(combatant, econ) {

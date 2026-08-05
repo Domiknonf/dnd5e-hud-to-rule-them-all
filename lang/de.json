@@ -24,6 +24,8 @@
   "dnd5e-hud-to-rule-them-all.intrinsic.offhand": "Angriff mit zweiter Waffe",
   "dnd5e-hud-to-rule-them-all.intrinsic.opportunity": "Gelegenheitsangriff",
   "dnd5e-hud-to-rule-them-all.intrinsic.interact": "Mit Objekt interagieren",
+  "dnd5e-hud-to-rule-them-all.attacksAvailable": "{available}/{max} Angriffe in dieser Aktion verfügbar",
+
   "dnd5e-hud-to-rule-them-all.notify.exhausted": "Keine {pool} mehr in diesem Zug.",
   "dnd5e-hud-to-rule-them-all.notify.noAction": "Keine Aktion mehr in diesem Zug.",
   "dnd5e-hud-to-rule-them-all.notify.noMovement": "Nur noch {left} Bewegung übrig.",
