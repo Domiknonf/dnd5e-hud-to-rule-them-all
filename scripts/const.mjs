@@ -61,8 +61,10 @@ export const INTRINSIC_ACTIONS = [
   { id: "shove",      type: "action",   icon: "fa-solid fa-hand-back-fist", handler: "spendOnly" },
   { id: "grapple",    type: "action",   icon: "fa-solid fa-handshake",      handler: "spendOnly" },
   { id: "offhand",    type: "bonus",    icon: "fa-solid fa-hand-sparkles",  handler: "spendOnly" },
-  { id: "opportunity",type: "reaction", icon: "fa-solid fa-crosshairs",     handler: "spendOnly" },
-  { id: "interact",   type: "free",     icon: "fa-solid fa-arrow-pointer",  handler: "spendOnly" }
+  { id: "opportunity",type: "reaction", icon: "fa-solid fa-crosshairs",     handler: "spendOnly" }
+  // "interact" (free object interaction) deliberately omitted - DM's call whether
+  // one happened, not a trackable button. The Free Interaction pool/pips stay
+  // available for manual bookkeeping via the header row.
 ];
 
 /**
