@@ -71,11 +71,20 @@ generic actions (Dash, Dodge, Hide, …).
 **Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
 
 Per-actor overrides for pool sizes are read from the actor flag
-`flags.dnd5e-hud-to-rule-them-all.config.max`. Extra Attack is handled the same way:
-`flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction` (default `1`) sets how many
-"attack"-type activity uses share a single action for that actor — dnd5e has no
-reliable built-in signal for this, so it's GM-configured per character rather than
-guessed at.
+`flags.dnd5e-hud-to-rule-them-all.config.max`. Extra Attack works the same way, but is
+usually auto-detected and needs no setup: `flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction`
+sets how many "attack"-type activity uses share a single action for that actor, and if
+it isn't set, the module guesses:
+
+- **Player Characters** — by matching the feature's name against the three known
+  English SRD names ("Extra Attack", "Two Extra Attacks", "Three Extra Attacks").
+  **English compendium content only** — a translated or renamed feature (homebrew,
+  non-English compendiums) won't be picked up and needs the manual override.
+- **NPCs** — by reading the count straight out of a Multiattack-shaped feature's own
+  description text ("makes three attacks"). This is freeform monster text with no
+  fixed vocabulary, so it's a best-effort parse, not exact for every phrasing (e.g.
+  "one bite and one claw attack" won't parse correctly) — the manual override always
+  wins over the guess either way.
 
 ## Public API
 

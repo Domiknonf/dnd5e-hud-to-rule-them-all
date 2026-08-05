@@ -41,37 +41,67 @@ export function isDescriptiveOnly(activity) {
 const ATTACK_COUNT_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
 
 /**
- * Best-effort read of "how many attacks does Multiattack grant" straight out of the
- * feature's own description text (SRD phrasing: "makes three attacks", "makes two
- * Arcane Burst attacks", ...). This is a guess, not a parse of structured data - it
- * will misread anything that isn't "N (of the same) attacks" (e.g. "one bite and one
- * claw attack"). That is why config.attacksPerAction (see economy.getAttacksPerAction)
- * always wins when the GM has set it by hand. Matched against a descriptive-only
- * utility activity (see isDescriptiveOnly) so it isn't tied to the item being named
- * "Multiattack" specifically.
+ * PC "Extra Attack"-style feature names, English SRD content only (this module
+ * assumes English compendiums - see README). Deliberately a plain name lookup, not
+ * a text parser: the vocabulary is small, fixed and only ever appears on Player
+ * Characters (Fighter/Barbarian/Paladin/Ranger all use the same three names as they
+ * level up), so parsing freeform description text would be needless complexity for
+ * zero extra robustness. Homebrew or translated content needs the manual
+ * config.attacksPerAction override instead.
+ */
+const PC_EXTRA_ATTACK_NAMES = {
+  "extra attack": 2,
+  "two extra attacks": 3,
+  "three extra attacks": 4
+};
+
+function stripEnrichers(text) {
+  // Strip HTML tags AND Foundry's [[...]]{type} content-link/enricher syntax before
+  // matching - dnd5e statblocks link things via [[/item .someId]], which is long
+  // enough to blow past a naive word-gap window (verified: broke the Archmage's
+  // "makes four [[/item .mmArcaneBurst000]] attacks" but not the shorter-by-
+  // coincidence text that happened to work before).
+  return (text ?? "").replace(/<[^>]+>/g, " ").replace(/\[\[[^\]]*\]\](\{[^}]*\})?/g, " ").toLowerCase();
+}
+
+/**
+ * Best-effort read of "how many attacks does this actor get per Attack action".
+ * Two independent, deliberately different strategies:
+ * - PCs: fixed name lookup (PC_EXTRA_ATTACK_NAMES) - the feature only exists on
+ *   Player Characters and always uses one of three known English names.
+ * - NPCs: freeform text match on a Multiattack-shaped feature's own description
+ *   (SRD phrasing: "makes three attacks"), matched against a descriptive-only
+ *   utility activity (see isDescriptiveOnly) so it isn't tied to the item being
+ *   named "Multiattack" specifically - monster text has no fixed vocabulary, so
+ *   this one genuinely needs to parse content rather than match a name.
+ * Both are guesses, not structured data - config.attacksPerAction (see
+ * economy.getAttacksPerAction) always wins when the GM has set it by hand.
  */
 export function guessAttacksPerAction(actor) {
   if (!actor) return null;
+  // Take the highest match, not the first: a Fighter past level 11 may carry both
+  // the base "Extra Attack" and an upgrade feature like "Two Extra Attacks" at
+  // once, and iteration order isn't guaranteed to put the current tier first.
+  let best = null;
+
+  if (actor.type === "character") {
+    for (const item of actor.items ?? []) {
+      const count = PC_EXTRA_ATTACK_NAMES[item.name?.trim().toLowerCase()];
+      if (count) best = Math.max(best ?? 0, count);
+    }
+  }
+
   for (const item of actor.items ?? []) {
     const activities = item.system?.activities;
-    if (!activities?.size) continue;
-    if (!Array.from(activities).some(isDescriptiveOnly)) continue;
-
-    // Strip HTML tags AND Foundry's [[...]]{type} content-link/enricher syntax before
-    // matching - dnd5e statblocks link the attack name via [[/item .someId]], which
-    // is long enough to blow past a naive word-gap window (verified: broke the
-    // Archmage's "makes four [[/item .mmArcaneBurst000]] attacks" but not the
-    // shorter-by-coincidence text that happened to work before).
-    const text = (item.system?.description?.value ?? "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\[\[[^\]]*\]\](\{[^}]*\})?/g, " ")
-      .toLowerCase();
+    if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
+    const text = stripEnrichers(item.system?.description?.value);
     const match = text.match(/\b(one|two|three|four|five|six|seven|eight|\d+)\b[^.]{0,25}?\battacks?\b/);
     if (!match) continue;
     const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
-    if (Number.isInteger(count) && count > 1) return count;
+    if (Number.isInteger(count) && count > 1) best = Math.max(best ?? 0, count);
   }
-  return null;
+
+  return best;
 }
 
 /** Cheap availability filter. Extend this — it is where most house rules land. */
