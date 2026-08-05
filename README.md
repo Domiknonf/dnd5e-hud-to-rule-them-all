@@ -1,10 +1,10 @@
 # A DnD 5e HUD To Rule Them All
 
-A combat HUD for Foundry VTT that does three things at once: show every activity a
-creature can actually use, grouped by action type — track the action / bonus action /
-reaction economy — and show how much movement is left.
+A combat HUD for Foundry VTT that does two things at once: show every activity a creature
+can actually use, grouped by action type — and track the action / bonus action / reaction
+economy. Styled as a Baldur's Gate 3-like hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `0.1.0` (pre-alpha)
+**Foundry v13** · **dnd5e 5.x** · MIT · `0.3.0` (pre-alpha)
 
 ---
 
@@ -12,7 +12,7 @@ reaction economy — and show how much movement is left.
 
 Existing HUDs are good at *listing* what a creature can do. They are much weaker at
 answering the question that actually slows a table down: *have I already used my bonus
-action this turn, and how far can I still move?*
+action this turn?*
 
 This module treats the action economy as the primary feature and the button grid as the
 thing wrapped around it.
@@ -24,17 +24,23 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
 - **Activity-aware action list.** Walks every activity on every item, not just items, so
   a weapon with an attack plus a utility activity shows up in both the action and the
   bonus action group.
-- **Economy tracking.** Action, bonus action, reaction, free object interaction and
-  legendary actions, tracked per combatant — including reactions spent on other
-  creatures' turns.
-- **Movement budget.** Derived from Foundry v13's own movement history, so difficult
-  terrain and Dash are accounted for without a second bookkeeping system.
+- **Economy tracking.** Action, bonus action, reaction and legendary actions, tracked per
+  combatant — including reactions spent on other creatures' turns.
 - **One write path.** Costs are booked in `dnd5e.postUseActivity`, so a click in the HUD,
   a click on the character sheet, a macro and a Midi QoL workflow all count identically
   and none of them double-count.
 - **Three enforcement levels.** Track silently, warn, or block the usage outright.
-- **Manual correction.** Every pool can be adjusted by hand, and the last booking can be
-  undone — because no automation survives contact with a real table.
+- **Extra Attack.** Several attacks share one action instead of each burning their own.
+  The Dragonborn's Breath Weapon counts as one of those attacks, per the 2024 rules.
+- **BG3-style bar.** Bottom-anchored hotbar with square icon slots, a portrait HP ring and
+  per-pool markers. Collapses out of view when you need the screen. Foundry's own macro
+  hotbar hides itself while it is up.
+- **Descriptions in place.** Middle-click any slot to expand dnd5e's own item card above
+  the bar, without opening a sheet or a window.
+- **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
+  get their own section as read-only reference cards.
+- **Portrait shortcuts.** Click for the character sheet; at 0 HP it turns into a skull that
+  rolls a death saving throw.
 
 ## Compatibility
 
@@ -59,14 +65,11 @@ https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all/releases/latest/download
 
 Settings live under *Configure Settings → Module Settings*.
 
-**Rules** — pool sizes for action, bonus action, reaction and free interaction, and
-whether Dash costs an action.
+**Rules** — pool sizes for action, bonus action and reaction.
 
-**Enforcement** — `Track only`, `Warn`, or `Block the usage`. Plus a separate toggle for
-movement, and a GM bypass.
+**Enforcement** — `Track only`, `Warn`, or `Block the usage`, plus a GM bypass.
 
-**Content filters** — hide unequipped gear, hide unprepared spells, show or hide the
-generic actions (Dash, Dodge, Hide, …).
+**Content filters** — hide unequipped gear, hide unprepared spells.
 
 **Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
 
@@ -91,8 +94,7 @@ it isn't set, the module guesses:
 ```js
 const api = game.modules.get("dnd5e-hud-to-rule-them-all").api;
 
-api.getEconomy(combatant);            // { used, max, dash, log }
-api.getMovement(combatant);           // { base, budget, used, left, units, modes }
+api.getEconomy(combatant);            // { used, max, attacksLeft, log }
 await api.spend(combatant, "bonus", { label: "Cunning Action" });
 await api.refund(combatant);          // undoes the last booking
 await api.resetTurn(combatant);
@@ -116,17 +118,20 @@ Releases are cut by pushing a tag — the workflow stamps `module.json` and publ
 zip:
 
 ```bash
-git tag v0.2.0 && git push --tags
+git tag v0.3.0 && git push --tags
 ```
 
 ## Roadmap
 
 - [x] **M0** — scaffold, HUD renders for the active combatant
-- [ ] **M1** — economy correct across a full round, manual correction, undo
-- [ ] **M2** — movement incl. Dash and movement modes, optional hard stop
+- [ ] **M1** — economy correct across a full round, undo
 - [ ] **M3** — configurability: layout, filters, rule toggles, per-actor overrides
 - [ ] **M4** — parity: spell slots, item uses, concentration, targeting, Extra Attack
-- [ ] **M5** — polish: keybindings, repositioning, theming, docs
+- [x] **M5** — BG3-style theming; keybindings and repositioning still open
+
+Movement tracking (former **M2**), the generic intrinsic actions (Dash, Dodge, Hide, …)
+and the Free Interaction pool shipped in early versions and were **deliberately removed**
+again — they are not coming back.
 
 ## Acknowledgements
 
