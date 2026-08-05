@@ -65,4 +65,18 @@ export const INTRINSIC_ACTIONS = [
   { id: "interact",   type: "free",     icon: "fa-solid fa-arrow-pointer",  handler: "spendOnly" }
 ];
 
+/**
+ * dnd5e seeds activity.img with a generic per-type placeholder
+ * (systems/dnd5e/icons/svg/activity/<type>.svg) whenever nobody set a custom icon.
+ * Same trap as the activity-name fallback: never trust it over the item's own art.
+ */
+export const GENERIC_ACTIVITY_ICON = /^systems\/dnd5e\/icons\/svg\/activity\//;
+
+/**
+ * Default number of "attack"-type activity uses that share a single action.
+ * 1 = no Extra Attack. Per-actor override lives at
+ * flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction (see economy.mjs).
+ */
+export const DEFAULT_ATTACKS_PER_ACTION = 1;
+
 export const DEBOUNCE_MS = 60;

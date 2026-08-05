@@ -2,7 +2,7 @@ import { MODULE_ID } from "./const.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
-import { spend, refund, resetTurn, canAfford, getEconomy } from "./economy.mjs";
+import { spend, spendAttack, refund, resetTurn, canAfford, canAttack, getEconomy } from "./economy.mjs";
 import { getMovement, enforceMovement } from "./movement.mjs";
 import { costOfActivity } from "./actions.mjs";
 
@@ -30,7 +30,12 @@ Hooks.once("ready", () => {
 
 function combatantFor(actor) {
   if (!actor || !game.combat) return null;
-  return game.combat.combatants.find(c => c.actor?.id === actor.id) ?? null;
+  // actor.id alone collides for unlinked tokens sharing one prototype (e.g. five
+  // identical goblins) — match on the token first, same as movement.mjs.
+  const tokenId = actor.token?.id ?? actor.getActiveTokens?.(false, true)?.[0]?.id;
+  return game.combat.combatants.find(c => c.tokenId === tokenId)
+      ?? game.combat.combatants.find(c => c.actor?.uuid === actor.uuid)
+      ?? null;
 }
 
 /**
@@ -48,7 +53,10 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
 
   const combatant = combatantFor(activity.actor);
   if (!combatant) return true;
-  if (canAfford(combatant, type)) return true;
+  // Extra Attack: a queued free attack is always affordable, even once the action
+  // pip itself reads as spent.
+  const isAttack = type === "action" && activity.type === "attack";
+  if (isAttack ? canAttack(combatant) : canAfford(combatant, type)) return true;
 
   const msg = game.i18n.format(`${MODULE_ID}.notify.exhausted`, {
     pool: game.i18n.localize(`${MODULE_ID}.pool.${type}`)
@@ -69,12 +77,19 @@ Hooks.on("dnd5e.postUseActivity", (activity, usageConfig, results) => {
   const combatant = combatantFor(activity.actor);
   if (!combatant) return;
 
-  // TODO: Extra Attack. One Attack action can contain several attack rolls; if you
-  // ever move the booking to the attack roll hooks, guard with a per-turn counter.
-  spend(combatant, type, {
-    label: activity.name || activity.item?.name || "",
-    uuid: activity.uuid
-  });
+  const label = activity.name || activity.item?.name || "";
+  // Extra Attack: dnd5e fires postUseActivity once per Attack-activity click, with
+  // no built-in "number of attacks" step (verified live: a level 5 Fighter's second
+  // Attack click is its own postUseActivity, not bundled with the first). Route
+  // "attack"-type activities through the counter so repeat clicks within one action
+  // don't each burn a fresh action pip. NPC Multiattack is a separate, still-open
+  // problem - it is a "utility" activity, not "attack", so it is unaffected here.
+  if (type === "action" && activity.type === "attack") {
+    spendAttack(combatant, { label, uuid: activity.uuid });
+    return;
+  }
+
+  spend(combatant, type, { label, uuid: activity.uuid });
 });
 
 /* ------------------------------------------------------------------ */

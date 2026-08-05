@@ -71,13 +71,24 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const buckets = collectActions(actor, combatant);
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
-      .map(([key, def]) => ({
-        key,
-        icon: def.icon,
-        label: game.i18n.localize(`${MODULE_ID}.pool.${key}`),
-        exhausted: key !== "other" && remaining(combatant, key) <= 0,
-        entries: buckets[key] ?? []
-      }))
+      .map(([key, def]) => {
+        // A queued Extra Attack (econ.attacksLeft) keeps the action group usable
+        // even once the action pip itself reads as spent - but the action was
+        // already committed to attacking, so only attack activities stay live.
+        const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
+        const midAttackSequence = hasFreeAttack && remaining(combatant, key) <= 0;
+        const entries = (buckets[key] ?? []).map(entry => ({
+          ...entry,
+          locked: midAttackSequence && entry.activityType !== "attack"
+        }));
+        return {
+          key,
+          icon: def.icon,
+          label: game.i18n.localize(`${MODULE_ID}.pool.${key}`),
+          exhausted: key !== "other" && !hasFreeAttack && remaining(combatant, key) <= 0,
+          entries
+        };
+      })
       .filter(g => g.entries.length);
 
     return {
@@ -123,7 +134,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   static async #onSpendPip(event, target) {
-    return spend(this.combatant, target.dataset.pool, { label: game.i18n.localize(`${MODULE_ID}.manual`) });
+    const pool = target.dataset.pool;
+    // Manual "-" has no real event behind it (unlike an over-budget activity use,
+    // which still books via postUseActivity so the log stays accurate) - so there is
+    // no reason to let it push used past max. Once empty it's a no-op.
+    if (remaining(this.combatant, pool) <= 0) return;
+    return spend(this.combatant, pool, { label: game.i18n.localize(`${MODULE_ID}.manual`) });
   }
 
   static async #onRefundPip(event, target) {

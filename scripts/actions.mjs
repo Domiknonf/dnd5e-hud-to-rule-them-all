@@ -1,5 +1,6 @@
 import {
-  MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS, INTRINSIC_ACTIONS
+  MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS, INTRINSIC_ACTIONS,
+  GENERIC_ACTIVITY_ICON
 } from "./const.mjs";
 
 /**
@@ -16,12 +17,26 @@ export function bucketFor(activationType) {
 
 /** Cheap availability filter. Extend this — it is where most house rules land. */
 function isUsable(item) {
+  // dnd5e caches a real spell Item on the actor for every "cast" activity on a
+  // feature (NPC Spellcasting, Innate Spellcasting). Both would surface, so the
+  // cached copy is dropped and the activity on the parent feature wins.
+  if (item.getFlag?.("dnd5e", "cachedFor")) return false;
+
   if (item.system?.equipped === false && game.settings.get(MODULE_ID, "hideUnequipped")) return false;
+
   if (item.type === "spell" && game.settings.get(MODULE_ID, "hideUnprepared")) {
-    const prep = item.system?.preparation ?? {};
-    const alwaysAvailable = ["always", "atwill", "innate", "pact", "ritual"];
-    if (!alwaysAvailable.includes(prep.mode) && prep.prepared === false && (item.system.level ?? 0) > 0) return false;
+    const sys = item.system ?? {};
+    // NPC statblocks list what the creature can cast; preparation does not apply.
+    if (item.actor?.type === "character") {
+      const method = sys.method ?? sys.preparation?.mode;
+      // dnd5e 5.1+: system.prepared is numeric (0 unprepared, 1 prepared, 2 always).
+      // Older schema used a boolean on preparation.prepared.
+      const raw = sys.prepared ?? sys.preparation?.prepared;
+      const prepared = raw === true || Number(raw) > 0;
+      if (method === "spell" && (sys.level ?? 0) > 0 && !prepared) return false;
+    }
   }
+
   return true;
 }
 
@@ -44,16 +59,24 @@ export function collectActions(actor, combatant) {
     if (!activities?.size) continue;
     if (!isUsable(item)) continue;
 
+    // dnd5e fills activity.name with the activity's type label ("Cast", "Save",
+    // "Attack") when nobody gave it an explicit name, so `activity.name || item.name`
+    // never falls back. Only reach for the activity name when the item carries
+    // several activities and the item name alone would be ambiguous.
+    const multi = activities.size > 1;
+
     for (const activity of activities) {
       const bucket = bucketFor(activity.activation?.type);
       if (!bucket) continue;
-      const name = activity.name || item.name;
+      const name = multi ? (activity.name || item.name) : item.name;
+      const activityImg = activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null;
       buckets[bucket].push({
         kind: "activity",
         uuid: activity.uuid,
         name,
-        subtitle: name === item.name ? "" : item.name,
-        img: activity.img || item.img,
+        subtitle: multi ? item.name : "",
+        img: activityImg || item.img,
+        activityType: activity.type,
         itemType: item.type,
         level: item.type === "spell" ? item.system.level : null,
         uses: usesFor(activity, item)

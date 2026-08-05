@@ -14,7 +14,8 @@ export function registerSocket() {
     const combatant = await fromUuid(data?.combatantUuid);
     if (!combatant) return;
     switch (action) {
-      case "spend":     return handlers.spend(combatant, data.type, data);
+      case "spend":       return handlers.spend(combatant, data.type, data);
+      case "spendAttack": return handlers.spendAttack(combatant, data);
       case "refund":    return handlers.refund(combatant, data.type, data.amount ?? 1);
       case "dash":      return handlers.dash(combatant);
       case "resetTurn": return handlers.resetTurn(combatant);

@@ -1,4 +1,4 @@
-import { MODULE_ID, FLAGS, RESOURCES } from "./const.mjs";
+import { MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION } from "./const.mjs";
 import { requestFromGM } from "./socket.mjs";
 
 /**
@@ -29,6 +29,19 @@ export function getMaxima(combatant) {
   return { ...base, ...override };
 }
 
+/**
+ * How many "attack"-type activity uses share a single action this turn (Extra
+ * Attack). GM-configured per actor; there is no reliable way to derive this from
+ * dnd5e's own data without guessing at class/subclass internals (verified: a
+ * level 5 Fighter's Attack activity fires postUseActivity once per click, with no
+ * built-in "number of attacks" step - see the Extra Attack note in CLAUDE.md).
+ */
+export function getAttacksPerAction(combatant) {
+  const override = combatant?.actor?.getFlag?.(MODULE_ID, FLAGS.ACTOR_CONFIG)?.attacksPerAction;
+  const n = Number(override);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_ATTACKS_PER_ACTION;
+}
+
 export function freshEconomy(combatant) {
   const used = {};
   for (const key of Object.keys(RESOURCES)) used[key] = 0;
@@ -36,8 +49,9 @@ export function freshEconomy(combatant) {
     key: turnKey(combatant?.combat),
     used,
     max: getMaxima(combatant),
-    dash: 0,      // number of extra movement pools bought with Dash
-    log: []       // audit trail, newest last -> enables undo
+    dash: 0,          // number of extra movement pools bought with Dash
+    attacksLeft: 0,    // remaining free "attack"-type uses within the current action
+    log: []            // audit trail, newest last -> enables undo
   };
 }
 
@@ -60,6 +74,14 @@ export function canAfford(combatant, type, amount = 1) {
   return remaining(combatant, type) >= amount;
 }
 
+/** Gate for "attack"-type activities: a queued Extra Attack is always affordable. */
+export function canAttack(combatant) {
+  if (!combatant) return true;
+  const econ = getEconomy(combatant);
+  if ((econ.attacksLeft ?? 0) > 0) return true;
+  return canAfford(combatant, "action");
+}
+
 async function write(combatant, econ) {
   return combatant.setFlag(MODULE_ID, FLAGS.ECONOMY, econ);
 }
@@ -78,6 +100,35 @@ export async function spend(combatant, type, { amount = 1, label = "", uuid = nu
   return true;
 }
 
+/**
+ * Book an "attack"-type activity use. Extra Attack lets several such uses share one
+ * action: only the first spends the action pip, the rest draw down `attacksLeft`
+ * (from getAttacksPerAction). Still funnels through the same flag write as spend()
+ * - this is a second booking function, not a second write path (decision 3 intact).
+ */
+export async function spendAttack(combatant, { label = "", uuid = null } = {}) {
+  if (!combatant) return false;
+  if (!combatant.isOwner || !canWriteFlags(combatant)) {
+    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid });
+  }
+  const econ = getEconomy(combatant);
+  const attacksLeftBefore = econ.attacksLeft ?? 0;
+  let amount;
+  if (attacksLeftBefore > 0) {
+    econ.attacksLeft = attacksLeftBefore - 1;
+    amount = 0;
+  } else {
+    econ.attacksLeft = Math.max(0, getAttacksPerAction(combatant) - 1);
+    econ.used.action = (econ.used.action ?? 0) + 1;
+    amount = 1;
+  }
+  econ.key = turnKey(combatant.combat);
+  // attacksLeft snapshot (pre-spend) rides along so refund() can restore it exactly.
+  econ.log = [...(econ.log ?? []), { type: "action", amount, label, uuid, attacksLeft: attacksLeftBefore, at: Date.now() }].slice(-40);
+  await write(combatant, econ);
+  return true;
+}
+
 /** Give back one pip (or the last logged entry if type is omitted). */
 export async function refund(combatant, type = null, amount = 1) {
   if (!combatant) return false;
@@ -91,6 +142,7 @@ export async function refund(combatant, type = null, amount = 1) {
     if (!last) return false;
     type = last.type;
     amount = last.amount ?? 1;
+    if (last.attacksLeft !== undefined) econ.attacksLeft = last.attacksLeft;
   }
   econ.used[type] = Math.max(0, (econ.used[type] ?? 0) - amount);
   econ.log = log;

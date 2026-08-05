@@ -62,7 +62,7 @@
       <h4><i class="{{icon}}"></i> {{label}}</h4>
       <div class="hudtra-entries">
         {{#each entries}}
-        <button type="button" class="hudtra-entry" data-action="use"
+        <button type="button" class="hudtra-entry {{#if locked}}locked{{/if}}" data-action="use"
                 data-kind="{{kind}}" data-uuid="{{uuid}}" data-id="{{id}}"
                 data-type="{{../key}}" data-handler="{{handler}}" data-skill="{{skill}}"
                 data-name="{{name}}"
