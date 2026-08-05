@@ -1,0 +1,137 @@
+import { MODULE_ID, FLAGS, RESOURCES } from "./const.mjs";
+import { requestFromGM } from "./socket.mjs";
+
+/**
+ * SINGLE SOURCE OF TRUTH: the economy lives in a flag on the Combatant document.
+ * - Combatant flags are synced to every client for free.
+ * - They die with the encounter, so no stale junk on the Actor.
+ * - Players usually cannot write them -> writes are relayed to the active GM (socket.mjs).
+ */
+
+/** Debug/staleness marker so you can see in the flag which turn it belongs to. */
+export function turnKey(combat) {
+  return `${combat?.round ?? 0}:${combat?.turn ?? 0}`;
+}
+
+/** Maximum pool sizes for a combatant. Actor flag overrides world settings. */
+export function getMaxima(combatant) {
+  const actor = combatant?.actor;
+  const override = actor?.getFlag?.(MODULE_ID, FLAGS.ACTOR_CONFIG)?.max ?? {};
+  const legendary = Number(actor?.system?.resources?.legact?.max ?? 0);
+  const base = {
+    action: Number(game.settings.get(MODULE_ID, "maxAction")),
+    bonus: Number(game.settings.get(MODULE_ID, "maxBonus")),
+    reaction: Number(game.settings.get(MODULE_ID, "maxReaction")),
+    free: Number(game.settings.get(MODULE_ID, "maxFree")),
+    legendary,
+    other: 0
+  };
+  return { ...base, ...override };
+}
+
+export function freshEconomy(combatant) {
+  const used = {};
+  for (const key of Object.keys(RESOURCES)) used[key] = 0;
+  return {
+    key: turnKey(combatant?.combat),
+    used,
+    max: getMaxima(combatant),
+    dash: 0,      // number of extra movement pools bought with Dash
+    log: []       // audit trail, newest last -> enables undo
+  };
+}
+
+export function getEconomy(combatant) {
+  const stored = combatant?.getFlag?.(MODULE_ID, FLAGS.ECONOMY);
+  const fresh = freshEconomy(combatant);
+  if (!stored) return fresh;
+  // Always recompute maxima (level ups, effects, settings changes) but keep `used`.
+  return foundry.utils.mergeObject(fresh, { ...stored, max: { ...fresh.max, ...(stored.max ?? {}) } }, { inplace: false });
+}
+
+export function remaining(combatant, type) {
+  const econ = getEconomy(combatant);
+  return (econ.max[type] ?? 0) - (econ.used[type] ?? 0);
+}
+
+export function canAfford(combatant, type, amount = 1) {
+  if (!combatant) return true;
+  if (type === "other" || type === null) return true;
+  return remaining(combatant, type) >= amount;
+}
+
+async function write(combatant, econ) {
+  return combatant.setFlag(MODULE_ID, FLAGS.ECONOMY, econ);
+}
+
+/** Spend from a pool. Safe to call as a player: falls back to a GM relay. */
+export async function spend(combatant, type, { amount = 1, label = "", uuid = null } = {}) {
+  if (!combatant || !RESOURCES[type]) return false;
+  if (!combatant.isOwner || !canWriteFlags(combatant)) {
+    return requestFromGM("spend", { combatantUuid: combatant.uuid, type, amount, label, uuid });
+  }
+  const econ = getEconomy(combatant);
+  econ.used[type] = (econ.used[type] ?? 0) + amount;
+  econ.key = turnKey(combatant.combat);
+  econ.log = [...(econ.log ?? []), { type, amount, label, uuid, at: Date.now() }].slice(-40);
+  await write(combatant, econ);
+  return true;
+}
+
+/** Give back one pip (or the last logged entry if type is omitted). */
+export async function refund(combatant, type = null, amount = 1) {
+  if (!combatant) return false;
+  if (!combatant.isOwner || !canWriteFlags(combatant)) {
+    return requestFromGM("refund", { combatantUuid: combatant.uuid, type, amount });
+  }
+  const econ = getEconomy(combatant);
+  const log = [...(econ.log ?? [])];
+  if (!type) {
+    const last = log.pop();
+    if (!last) return false;
+    type = last.type;
+    amount = last.amount ?? 1;
+  }
+  econ.used[type] = Math.max(0, (econ.used[type] ?? 0) - amount);
+  econ.log = log;
+  await write(combatant, econ);
+  return true;
+}
+
+/** Buy an extra movement pool with the Dash action. */
+export async function dash(combatant) {
+  if (!combatant) return false;
+  if (!combatant.isOwner || !canWriteFlags(combatant)) {
+    return requestFromGM("dash", { combatantUuid: combatant.uuid });
+  }
+  const costsAction = game.settings.get(MODULE_ID, "dashCostsAction");
+  if (costsAction && !canAfford(combatant, "action")) {
+    ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.notify.noAction`));
+    return false;
+  }
+  const econ = getEconomy(combatant);
+  econ.dash = (econ.dash ?? 0) + 1;
+  if (costsAction) {
+    econ.used.action = (econ.used.action ?? 0) + 1;
+    econ.log = [...(econ.log ?? []), { type: "action", amount: 1, label: "Dash", at: Date.now() }].slice(-40);
+  }
+  await write(combatant, econ);
+  return true;
+}
+
+/** Refill everything that resets at the start of a turn. */
+export async function resetTurn(combatant) {
+  if (!combatant) return false;
+  if (!game.user.isActiveGM) return requestFromGM("resetTurn", { combatantUuid: combatant.uuid });
+  const econ = freshEconomy(combatant);
+  await write(combatant, econ);
+  return true;
+}
+
+/**
+ * Players own their Actor but usually not the Combatant document, so a direct
+ * setFlag would throw. Cheap capability probe instead of guessing.
+ */
+export function canWriteFlags(combatant) {
+  return game.user.isGM || combatant?.testUserPermission?.(game.user, "OWNER") === true;
+}

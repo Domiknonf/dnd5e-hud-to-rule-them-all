@@ -1,0 +1,122 @@
+/* v13 uses CSS layers. Declaring our own layer keeps core styles from winning
+   specificity fights without resorting to !important. */
+@layer modules {
+
+  #hud-to-rule-them-all {
+    --hudtra-bg: color-mix(in oklab, var(--color-cool-5, #1c1c22) 88%, transparent);
+    --hudtra-border: var(--color-border-dark-primary, #000);
+    --hudtra-text: var(--color-text-primary, #eee);
+    --hudtra-accent: #c9a227;
+    --hudtra-spent: #55555f;
+    --hudtra-move: #4f8ac9;
+    --hudtra-danger: #b83f3f;
+
+    position: fixed;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 60;
+    max-width: min(46rem, 60vw);
+    color: var(--hudtra-text);
+    font-size: var(--font-size-13, 13px);
+    pointer-events: none;
+  }
+
+  #hud-to-rule-them-all .hudtra-frame {
+    pointer-events: all;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--hudtra-bg);
+    border: 1px solid var(--hudtra-border);
+    border-radius: 6px;
+    backdrop-filter: blur(6px);
+  }
+
+  /* ---- header ---- */
+  #hud-to-rule-them-all .hudtra-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  #hud-to-rule-them-all .hudtra-portrait {
+    width: 2.4rem;
+    height: 2.4rem;
+    object-fit: cover;
+    border: 1px solid var(--hudtra-border);
+    border-radius: 4px;
+  }
+  #hud-to-rule-them-all .hudtra-identity { display: flex; flex-direction: column; }
+  #hud-to-rule-them-all .hudtra-name { font-weight: 600; }
+  #hud-to-rule-them-all .hudtra-vitals {
+    display: flex; gap: 0.6rem; opacity: 0.8; font-size: 0.85em;
+  }
+  #hud-to-rule-them-all .hudtra-header-controls { margin-left: auto; display: flex; gap: 0.25rem; }
+
+  /* ---- economy row ---- */
+  #hud-to-rule-them-all .hudtra-economy {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+  }
+  #hud-to-rule-them-all .hudtra-pool { display: flex; align-items: center; gap: 0.3rem; }
+  #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.15rem; }
+  #hud-to-rule-them-all .hudtra-pip {
+    width: 0.7rem; height: 0.7rem;
+    border-radius: 50%;
+    background: var(--hudtra-accent);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.5);
+  }
+  #hud-to-rule-them-all .hudtra-pip.spent { background: var(--hudtra-spent); }
+  #hud-to-rule-them-all .hudtra-pool-controls { display: flex; opacity: 0; transition: opacity 120ms; }
+  #hud-to-rule-them-all .hudtra-pool:hover .hudtra-pool-controls { opacity: 1; }
+
+  /* ---- movement ---- */
+  #hud-to-rule-them-all .hudtra-movement { display: flex; align-items: center; gap: 0.35rem; }
+  #hud-to-rule-them-all .hudtra-bar {
+    position: relative;
+    width: 9rem; height: 1.1rem;
+    border: 1px solid var(--hudtra-border);
+    border-radius: 3px;
+    overflow: hidden;
+    background: rgb(0 0 0 / 0.4);
+  }
+  #hud-to-rule-them-all .hudtra-bar-fill {
+    height: 100%; background: var(--hudtra-move); transition: width 150ms ease-out;
+  }
+  #hud-to-rule-them-all .hudtra-movement.over .hudtra-bar-fill { background: var(--hudtra-danger); }
+  #hud-to-rule-them-all .hudtra-bar-label {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-size: 0.8em; text-shadow: 0 0 3px #000;
+  }
+
+  /* ---- action groups ---- */
+  #hud-to-rule-them-all .hudtra-groups {
+    display: flex; flex-direction: column; gap: 0.35rem;
+    max-height: 40vh; overflow-y: auto;
+  }
+  #hud-to-rule-them-all .hudtra-group h4 {
+    margin: 0 0 0.15rem; font-size: 0.8em; text-transform: uppercase;
+    letter-spacing: 0.06em; opacity: 0.7; border: none;
+  }
+  #hud-to-rule-them-all .hudtra-group.exhausted { opacity: 0.45; }
+  #hud-to-rule-them-all .hudtra-entries { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  #hud-to-rule-them-all .hudtra-entry {
+    display: flex; align-items: center; gap: 0.3rem;
+    width: auto; max-width: 11rem;
+    padding: 0.15rem 0.4rem;
+    background: rgb(255 255 255 / 0.06);
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 4px;
+    line-height: 1.4;
+  }
+  #hud-to-rule-them-all .hudtra-entry:hover { background: rgb(255 255 255 / 0.14); }
+  #hud-to-rule-them-all .hudtra-entry img { width: 1.4rem; height: 1.4rem; border: none; border-radius: 2px; }
+  #hud-to-rule-them-all .hudtra-entry-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hud-to-rule-them-all .hudtra-uses { margin-left: auto; opacity: 0.7; font-size: 0.8em; }
+
+  #hud-to-rule-them-all button:focus-visible { outline: 2px solid var(--hudtra-accent); outline-offset: 1px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #hud-to-rule-them-all * { transition: none !important; }
+  }
+}

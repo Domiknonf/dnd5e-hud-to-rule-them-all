@@ -1,0 +1,81 @@
+{{#if hasCombat}}
+<div class="hudtra-frame">
+
+  <header class="hudtra-header">
+    <img class="hudtra-portrait" src="{{img}}" alt="{{name}}">
+    <div class="hudtra-identity">
+      <span class="hudtra-name">{{name}}</span>
+      <span class="hudtra-vitals">
+        {{#if hp}}<span><i class="fa-solid fa-heart"></i> {{hp.value}}/{{hp.max}}</span>{{/if}}
+        {{#if ac}}<span><i class="fa-solid fa-shield"></i> {{ac}}</span>{{/if}}
+        <span class="hudtra-round">{{localize "dnd5e-hud-to-rule-them-all.round"}} {{round}}</span>
+      </span>
+    </div>
+    {{#if editable}}
+    <div class="hudtra-header-controls">
+      <button type="button" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
+        <i class="fa-solid fa-rotate-left"></i>
+      </button>
+      <button type="button" data-action="endTurn" data-tooltip="dnd5e-hud-to-rule-them-all.endTurn">
+        <i class="fa-solid fa-forward-step"></i>
+      </button>
+    </div>
+    {{/if}}
+  </header>
+
+  <div class="hudtra-economy">
+    {{#each pools}}
+    <div class="hudtra-pool" data-pool="{{key}}" data-tooltip="{{label}}: {{left}}/{{max}}">
+      <i class="{{icon}}"></i>
+      <div class="hudtra-pips">
+        {{#each pips}}<span class="hudtra-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
+      </div>
+      {{#if @root.editable}}
+      <div class="hudtra-pool-controls">
+        <button type="button" data-action="spendPip" data-pool="{{key}}" aria-label="-"><i class="fa-solid fa-minus"></i></button>
+        <button type="button" data-action="refundPip" data-pool="{{key}}" aria-label="+"><i class="fa-solid fa-plus"></i></button>
+      </div>
+      {{/if}}
+    </div>
+    {{/each}}
+
+    <div class="hudtra-movement {{#if movement.over}}over{{/if}}">
+      <button type="button" class="hudtra-mode" data-action="cycleMode"
+              data-tooltip="{{localize "dnd5e-hud-to-rule-them-all.cycleMode"}}">
+        <i class="fa-solid fa-person-running"></i> {{movement.mode}}
+      </button>
+      <div class="hudtra-bar">
+        <div class="hudtra-bar-fill" style="width: {{movement.pct}}%"></div>
+        <span class="hudtra-bar-label">{{movement.left}} / {{movement.budget}} {{movement.units}}</span>
+      </div>
+      {{#if editable}}
+      <button type="button" data-action="dash" data-tooltip="dnd5e-hud-to-rule-them-all.intrinsic.dash">
+        <i class="fa-solid fa-angles-right"></i>
+      </button>
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="hudtra-groups">
+    {{#each groups}}
+    <section class="hudtra-group {{#if exhausted}}exhausted{{/if}}" data-group="{{key}}">
+      <h4><i class="{{icon}}"></i> {{label}}</h4>
+      <div class="hudtra-entries">
+        {{#each entries}}
+        <button type="button" class="hudtra-entry" data-action="use"
+                data-kind="{{kind}}" data-uuid="{{uuid}}" data-id="{{id}}"
+                data-type="{{../key}}" data-handler="{{handler}}" data-skill="{{skill}}"
+                data-name="{{name}}"
+                data-tooltip="{{name}}{{#if subtitle}} — {{subtitle}}{{/if}}">
+          {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
+          <span class="hudtra-entry-name">{{name}}</span>
+          {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
+        </button>
+        {{/each}}
+      </div>
+    </section>
+    {{/each}}
+  </div>
+
+</div>
+{{/if}}
