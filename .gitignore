@@ -2,3 +2,5 @@ node_modules/
 module.zip
 .DS_Store
 .idea/
+deploy.sh
+Thumbs.db
