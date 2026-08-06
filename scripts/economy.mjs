@@ -48,7 +48,7 @@ export function getAttacksPerAction(combatant) {
   const actor = combatant?.actor;
   const n = Number(getActorConfig(actor).attacksPerAction);
   if (Number.isFinite(n) && n > 0) return n;
-  return attackSuggestion(actor) ?? DEFAULT_ATTACKS_PER_ACTION;
+  return attackSuggestion(actor)?.count ?? DEFAULT_ATTACKS_PER_ACTION;
 }
 
 export function freshEconomy(combatant) {

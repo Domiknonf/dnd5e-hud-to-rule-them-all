@@ -10,6 +10,7 @@
             data-action="pickActor" data-actor-uuid="{{uuid}}">
       <img src="{{img}}" alt="">
       <span>{{name}}</span>
+      {{#if notice}}<i class="hudtra-config-mark fa-solid fa-circle-exclamation"></i>{{/if}}
     </button>
     {{else}}
     <p class="hudtra-config-empty">{{localize "dnd5e-hud-to-rule-them-all.config.noActors"}}</p>
@@ -19,6 +20,27 @@
   <section class="hudtra-config-panel">
     {{#if actor}}
     <h3 class="hudtra-config-heading">{{actor.name}}</h3>
+
+    {{!-- Raised when detection disagrees with the configured count, typically after
+         a level-up. Two explicit outs, no silent rewrite: take the number, or keep
+         yours and never hear about THIS number again. --}}
+    {{#if notice}}
+    <div class="hudtra-config-notice">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      <div class="hudtra-config-notice-text">
+        <strong>{{localize "dnd5e-hud-to-rule-them-all.config.notice.title"}}</strong>
+        <p>{{notice.body}}</p>
+      </div>
+      <div class="hudtra-config-notice-buttons">
+        <button type="button" data-action="applyNotice">
+          <i class="fa-solid fa-check"></i> {{notice.apply}}
+        </button>
+        <button type="button" data-action="dismissNotice">
+          <i class="fa-solid fa-xmark"></i> {{notice.dismiss}}
+        </button>
+      </div>
+    </div>
+    {{/if}}
 
     <div class="form-group">
       <label for="hudtra-cfg-attacks">

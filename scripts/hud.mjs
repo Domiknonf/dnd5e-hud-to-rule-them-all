@@ -1,7 +1,7 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import { getEconomy, resetTurn, remaining, getAttacksPerAction } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
-import { openConfig, configDivergence } from "./config.mjs";
+import { openConfig, attackNotice } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -258,9 +258,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const description = await this.#prepareDescription();
 
     // A level-up can change what the detection would suggest without changing
-    // anything visible in the bar (Extra Attack adds no new entry), so a divergence
-    // marks the gear instead of silently overwriting the configured value.
-    const divergence = actor ? configDivergence(actor) : null;
+    // anything visible in the bar (Extra Attack adds no new entry), so a new
+    // suggestion marks the gear instead of silently overwriting what was configured.
+    // Cleared from inside the dialog, per suggested value (see config.attackNotice).
+    const notice = actor ? attackNotice(actor) : null;
     return {
       hasSubject: !!actor,
       inCombat,
@@ -284,9 +285,9 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       description,
       // The handle's first stage depends on what is currently open.
       collapseTooltip: game.i18n.localize(`${MODULE_ID}.${description ? "closeDescription" : "toggleBar"}`),
-      configDiverged: !!divergence,
-      configTooltip: divergence
-        ? game.i18n.format(`${MODULE_ID}.config.diverged`, divergence)
+      configNotice: !!notice,
+      configTooltip: notice
+        ? game.i18n.format(`${MODULE_ID}.config.notice.gear`, notice)
         : game.i18n.localize(`${MODULE_ID}.config.open`),
       editable: isMine || game.user.isGM
     };

@@ -69,7 +69,15 @@ Consequences to respect:
 - Players own their Actor, so they write config directly — no `socket.mjs` relay here.
   The GM owns every Actor, which is what lets one dialog configure the whole party.
 - Do not add automation that silently overwrites a configured value. When detection and
-  configuration disagree, the HUD shows a dot on the gear and says nothing else.
+  configuration disagree, the gear gets a mark (`config.attackNotice`) and the dialog
+  offers the change with the feature that caused it quoted by name. The player decides.
+- **Dismissal stores the dismissed value, not a boolean.** `config.seenAttackSuggestion`
+  holds the count that was waved away, so silencing "3" is permanent for 3 while a later
+  tier suggesting 4 raises the mark again on its own. A boolean would swallow every
+  future level-up and would have to be reset by hand — which defeats the feature.
+- Whatever the dialog does not render has to be carried across in `#onSubmit`: the write
+  replaces the whole config object, so an unlisted field is a field that gets deleted on
+  the next save.
 - When you extend this, add a field to the dialog rather than a new heuristic.
 
 ### The bar's lifecycle

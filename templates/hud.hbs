@@ -82,11 +82,13 @@
 
   {{#if editable}}
   <div class="hudtra-controls">
-    {{!-- The dot appears when the automatic detection disagrees with what is
-         configured (typically after a level-up). Hint only - nothing is rewritten. --}}
-    <button type="button" class="hudtra-config-btn {{#if configDiverged}}diverged{{/if}}"
+    {{!-- The mark appears when detection suggests a different attack count than the
+         configured one (typically after a level-up) and is cleared from inside the
+         dialog. Hint only - nothing is rewritten behind the player's back. --}}
+    <button type="button" class="hudtra-config-btn {{#if configNotice}}has-notice{{/if}}"
             data-action="config" data-tooltip-text="{{configTooltip}}">
       <i class="fa-solid fa-gear"></i>
+      {{#if configNotice}}<i class="hudtra-config-mark fa-solid fa-exclamation"></i>{{/if}}
     </button>
     {{#if inCombat}}
     <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">

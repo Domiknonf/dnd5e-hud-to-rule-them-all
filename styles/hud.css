@@ -552,19 +552,39 @@
   }
   #hud-to-rule-them-all .hudtra-config-btn:hover { border-color: var(--hudtra-gold-bright); }
 
-  /* Divergence marker: the detection would suggest a different number of attacks
-     than what is configured (see config.mjs configDivergence). Deliberately quiet -
-     it is a "worth a look after your level-up" nudge, not a warning. */
-  #hud-to-rule-them-all .hudtra-config-btn.diverged::after {
-    content: "";
+  /* New-suggestion mark: detection proposes a different attack count than the one
+     configured (see config.mjs attackNotice). A badge rather than a plain dot, so it
+     reads as "there is something to decide" - it is cleared from inside the dialog,
+     per suggested value, never by the module itself. */
+  #hud-to-rule-them-all .hudtra-config-mark {
     position: absolute;
-    top: -0.1em;
-    right: -0.1em;
-    width: 0.55em;
-    height: 0.55em;
+    top: -0.35em;
+    right: -0.35em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15em;
+    height: 1.15em;
     border-radius: 50%;
     background: var(--hudtra-pool-bonus);
-    box-shadow: 0 0 0.35em var(--hudtra-pool-bonus);
+    color: #1a1206;
+    font-size: 0.8em;
+    font-weight: bold;
+    box-shadow: 0 0 0.4em rgb(224 134 43 / 0.8);
+  }
+  #hud-to-rule-them-all .hudtra-config-btn.has-notice {
+    border-color: var(--hudtra-pool-bonus);
+  }
+  /* The pulse is the only thing asking for attention here, so it goes away entirely
+     for anyone who asked for less motion - the badge itself still shows. */
+  @media (prefers-reduced-motion: no-preference) {
+    #hud-to-rule-them-all .hudtra-config-mark {
+      animation: hudtra-notice-pulse 2.4s ease-in-out infinite;
+    }
+  }
+  @keyframes hudtra-notice-pulse {
+    0%, 70%, 100% { transform: scale(1); }
+    80%           { transform: scale(1.18); }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -726,6 +746,36 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  #hudtra-config .hudtra-config-actor { position: relative; }
+  #hudtra-config .hudtra-config-actor .hudtra-config-mark {
+    margin-left: auto;
+    flex: 0 0 auto;
+    color: #b8651a;
+  }
+
+  /* Suggestion banner. Themed off core variables like the rest of this dialog, with
+     one hardcoded accent so it reads as "decide something" in light and dark alike. */
+  #hudtra-config .hudtra-config-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid #b8651a;
+    border-left-width: 0.25rem;
+    border-radius: 0.35rem;
+    background: rgb(184 101 26 / 0.12);
+  }
+  #hudtra-config .hudtra-config-notice > i { margin-top: 0.15rem; color: #b8651a; }
+  #hudtra-config .hudtra-config-notice-text { flex: 1 1 auto; min-width: 0; }
+  #hudtra-config .hudtra-config-notice-text p { margin: 0.15rem 0 0; }
+  #hudtra-config .hudtra-config-notice-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+  }
+  #hudtra-config .hudtra-config-notice-buttons button { white-space: nowrap; }
 
   #hudtra-config .hudtra-config-panel {
     flex: 1 1 auto;

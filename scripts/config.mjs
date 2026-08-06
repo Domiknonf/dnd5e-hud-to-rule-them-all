@@ -66,25 +66,43 @@ export async function setActorConfig(actor, config) {
 /*  Suggestions                                                        */
 /* ------------------------------------------------------------------ */
 
-/** What the automatic detection would say. null when it has no opinion. */
+/**
+ * What the automatic detection would say: `{ count, feature }` or null. The feature
+ * name is what lets the notice below quote the actual cause back at the player.
+ */
 export function attackSuggestion(actor) {
   return guessAttacksPerAction(actor) ?? null;
 }
 
 /**
- * Set of pools whose configured size differs from the world default, plus the
- * attack divergence. Drives the small dot on the HUD's gear: a level-up can change
- * what the detection would suggest without changing anything visible in the bar
- * (Extra Attack at level 11 adds no new hotbar entry), so the dot is the only hint
- * that a character's configuration is worth another look. Passive by design - it
- * never overwrites what was configured.
+ * The "something changed, take a look" notice behind the mark on the HUD's gear.
+ * Returns `{ count, feature, configured }` or null.
+ *
+ * A level-up can change what detection suggests without changing anything visible
+ * in the bar - Extra Attack adds no new hotbar entry - so this mark is the only
+ * hint a player gets. It never rewrites the configured value; the dialog offers the
+ * change and the player decides.
+ *
+ * Three ways to have no notice, in order:
+ * 1. Nothing configured. Detection is already in force, so there is nothing to
+ *    report - this is the normal state for NPCs and it keeps them silent.
+ * 2. The suggestion matches what is configured. Nothing to change.
+ * 3. That exact suggestion was dismissed before (`seenAttackSuggestion`).
+ *
+ * Note what (3) stores: the dismissed COUNT, not a boolean. Dismissing "3" silences
+ * 3 forever, but the next tier suggesting 4 raises the mark again on its own. A
+ * boolean would have to be reset by hand and would silently swallow every later
+ * level-up - which is the whole thing this is meant to catch.
  */
-export function configDivergence(actor) {
-  const configured = Number(getActorConfig(actor).attacksPerAction);
+export function attackNotice(actor) {
+  const suggestion = attackSuggestion(actor);
+  if (!suggestion) return null;
+  const config = getActorConfig(actor);
+  const configured = Number(config.attacksPerAction);
   if (!Number.isFinite(configured) || configured <= 0) return null;
-  const suggested = attackSuggestion(actor);
-  if (!suggested || suggested === configured) return null;
-  return { suggested, configured };
+  if (configured === suggestion.count) return null;
+  if (Number(config.seenAttackSuggestion) === suggestion.count) return null;
+  return { ...suggestion, configured };
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,6 +146,8 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     form: { handler: HudConfig.#onSubmit, submitOnChange: false, closeOnSubmit: false },
     actions: {
       pickActor: HudConfig.#onPickActor,
+      applyNotice: HudConfig.#onApplyNotice,
+      dismissNotice: HudConfig.#onDismissNotice,
       clear: HudConfig.#onClear
     }
   };
@@ -153,7 +173,8 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   async _prepareContext() {
     const actor = this.actor;
     const config = actor ? getActorConfig(actor) : {};
-    const suggested = actor ? attackSuggestion(actor) : null;
+    const suggestion = actor ? attackSuggestion(actor) : null;
+    const notice = actor ? attackNotice(actor) : null;
 
     const pools = Object.entries(CONFIGURABLE_POOLS).map(([key, def]) => ({
       key,
@@ -164,13 +185,23 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
 
     return {
       actors: configurableActors().map(a => ({
-        uuid: a.uuid, name: a.name, img: a.img, selected: a.uuid === actor?.uuid
+        uuid: a.uuid, name: a.name, img: a.img,
+        selected: a.uuid === actor?.uuid,
+        notice: !!attackNotice(a)
       })),
       actor,
+      // The banner quotes the feature that caused the suggestion, so the player can
+      // check it against their sheet instead of trusting a bare number.
+      notice: notice && {
+        ...notice,
+        body: game.i18n.format(`${MODULE_ID}.config.notice.body`, notice),
+        apply: game.i18n.format(`${MODULE_ID}.config.notice.apply`, notice),
+        dismiss: game.i18n.format(`${MODULE_ID}.config.notice.dismiss`, notice)
+      },
       attacksPerAction: config.attacksPerAction ?? "",
-      attacksPlaceholder: String(suggested ?? DEFAULT_ATTACKS_PER_ACTION),
-      attacksHint: suggested
-        ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested })
+      attacksPlaceholder: String(suggestion?.count ?? DEFAULT_ATTACKS_PER_ACTION),
+      attacksHint: suggestion
+        ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested: suggestion.count })
         : game.i18n.format(`${MODULE_ID}.config.attacksPerAction.none`, { fallback: DEFAULT_ATTACKS_PER_ACTION }),
       pools,
       limits: CONFIG_LIMITS
@@ -183,7 +214,16 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const actor = this.actor;
     if (!actor) return;
     const raw = foundry.utils.expandObject(formData.object);
+    const previous = getActorConfig(actor);
     const config = {};
+
+    // The write replaces the whole object (see setActorConfig), so anything the form
+    // does not render has to be carried across by hand. seenAttackSuggestion is the
+    // only such field today - losing it would resurrect a dismissed notice on the
+    // next save.
+    if (previous.seenAttackSuggestion !== undefined) {
+      config.seenAttackSuggestion = previous.seenAttackSuggestion;
+    }
 
     const attacks = toInt(raw.attacksPerAction, CONFIG_LIMITS.attacksPerAction);
     if (attacks !== null) config.attacksPerAction = attacks;
@@ -202,6 +242,34 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static async #onPickActor(event, target) {
     this.#actorUuid = target.dataset.actorUuid ?? null;
+    return this.render();
+  }
+
+  /** Take the suggestion: the configured count becomes the suggested one. */
+  static async #onApplyNotice() {
+    const actor = this.actor;
+    const notice = actor ? attackNotice(actor) : null;
+    if (!notice) return;
+    await setActorConfig(actor, { ...getActorConfig(actor), attacksPerAction: notice.count });
+    ui.notifications.info(game.i18n.format(`${MODULE_ID}.config.notice.applied`, {
+      name: actor.name, count: notice.count
+    }));
+    return this.render();
+  }
+
+  /**
+   * Keep the configured value and silence this suggestion - by remembering the
+   * COUNT that was dismissed, not a flag. A later level-up suggesting a different
+   * number raises the mark again without anything having to be reset.
+   */
+  static async #onDismissNotice() {
+    const actor = this.actor;
+    const notice = actor ? attackNotice(actor) : null;
+    if (!notice) return;
+    await setActorConfig(actor, { ...getActorConfig(actor), seenAttackSuggestion: notice.count });
+    ui.notifications.info(game.i18n.format(`${MODULE_ID}.config.notice.dismissed`, {
+      name: actor.name, configured: notice.configured
+    }));
     return this.render();
   }
 

@@ -74,8 +74,12 @@ function stripEnrichers(text) {
  *   utility activity (see isDescriptiveOnly) so it isn't tied to the item being
  *   named "Multiattack" specifically - monster text has no fixed vocabulary, so
  *   this one genuinely needs to parse content rather than match a name.
- * Both are guesses, not structured data - config.attacksPerAction (see
- * economy.getAttacksPerAction) always wins when the GM has set it by hand.
+ *
+ * Returns `{ count, feature }` or null. The feature NAME rides along because the
+ * config dialog quotes it back ("New feature: Two Extra Attacks -> 3 attacks
+ * recommended") - a bare number gives the player nothing to check against their
+ * character sheet. Both strategies are guesses, not structured data:
+ * config.attacksPerAction (see economy.getAttacksPerAction) always wins.
  */
 export function guessAttacksPerAction(actor) {
   if (!actor) return null;
@@ -83,11 +87,14 @@ export function guessAttacksPerAction(actor) {
   // the base "Extra Attack" and an upgrade feature like "Two Extra Attacks" at
   // once, and iteration order isn't guaranteed to put the current tier first.
   let best = null;
+  const consider = (count, item) => {
+    if (!Number.isInteger(count) || count <= (best?.count ?? 0)) return;
+    best = { count, feature: item.name ?? "" };
+  };
 
   if (actor.type === "character") {
     for (const item of actor.items ?? []) {
-      const count = PC_EXTRA_ATTACK_NAMES[item.name?.trim().toLowerCase()];
-      if (count) best = Math.max(best ?? 0, count);
+      consider(PC_EXTRA_ATTACK_NAMES[item.name?.trim().toLowerCase()], item);
     }
   }
 
@@ -98,7 +105,7 @@ export function guessAttacksPerAction(actor) {
     const match = text.match(/\b(one|two|three|four|five|six|seven|eight|\d+)\b[^.]{0,25}?\battacks?\b/);
     if (!match) continue;
     const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
-    if (Number.isInteger(count) && count > 1) best = Math.max(best ?? 0, count);
+    if (count > 1) consider(count, item);
   }
 
   return best;
