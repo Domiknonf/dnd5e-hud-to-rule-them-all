@@ -1,0 +1,63 @@
+{{!-- Per-actor HUD configuration. The application's tag is <form>, so everything
+     below already sits inside it - the submit button needs no form attribute. --}}
+<div class="hudtra-config-body">
+
+  {{!-- Left column: every actor this user may configure. A player sees their own
+       characters, the GM sees the whole encounter plus the party. --}}
+  <nav class="hudtra-config-actors">
+    {{#each actors}}
+    <button type="button" class="hudtra-config-actor {{#if selected}}selected{{/if}}"
+            data-action="pickActor" data-actor-uuid="{{uuid}}">
+      <img src="{{img}}" alt="">
+      <span>{{name}}</span>
+    </button>
+    {{else}}
+    <p class="hudtra-config-empty">{{localize "dnd5e-hud-to-rule-them-all.config.noActors"}}</p>
+    {{/each}}
+  </nav>
+
+  <section class="hudtra-config-panel">
+    {{#if actor}}
+    <h3 class="hudtra-config-heading">{{actor.name}}</h3>
+
+    <div class="form-group">
+      <label for="hudtra-cfg-attacks">
+        {{localize "dnd5e-hud-to-rule-them-all.config.attacksPerAction.name"}}
+      </label>
+      <div class="form-fields">
+        <input type="number" id="hudtra-cfg-attacks" name="attacksPerAction"
+               min="{{limits.attacksPerAction.min}}" max="{{limits.attacksPerAction.max}}" step="1"
+               value="{{attacksPerAction}}" placeholder="{{attacksPlaceholder}}">
+      </div>
+      <p class="hint">{{attacksHint}}</p>
+    </div>
+
+    <fieldset class="hudtra-config-pools">
+      <legend>{{localize "dnd5e-hud-to-rule-them-all.config.pools.name"}}</legend>
+      {{#each pools}}
+      <div class="form-group">
+        <label for="hudtra-cfg-max-{{key}}">{{label}}</label>
+        <div class="form-fields">
+          <input type="number" id="hudtra-cfg-max-{{key}}" name="max.{{key}}"
+                 min="{{../limits.poolMax.min}}" max="{{../limits.poolMax.max}}" step="1"
+                 value="{{value}}" placeholder="{{placeholder}}">
+        </div>
+      </div>
+      {{/each}}
+      <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.pools.hint"}}</p>
+    </fieldset>
+
+    <footer class="hudtra-config-footer">
+      <button type="submit" class="hudtra-config-save">
+        <i class="fa-solid fa-floppy-disk"></i>
+        {{localize "dnd5e-hud-to-rule-them-all.config.save"}}
+      </button>
+      <button type="button" data-action="clear">
+        <i class="fa-solid fa-eraser"></i>
+        {{localize "dnd5e-hud-to-rule-them-all.config.clear"}}
+      </button>
+    </footer>
+    {{/if}}
+  </section>
+
+</div>

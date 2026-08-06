@@ -1,6 +1,6 @@
 import { MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION } from "./const.mjs";
 import { requestFromGM } from "./socket.mjs";
-import { guessAttacksPerAction } from "./actions.mjs";
+import { getActorConfig, attackSuggestion } from "./config.mjs";
 
 /**
  * SINGLE SOURCE OF TRUTH: the economy lives in a flag on the Combatant document.
@@ -17,7 +17,7 @@ export function turnKey(combat) {
 /** Maximum pool sizes for a combatant. Actor flag overrides world settings. */
 export function getMaxima(combatant) {
   const actor = combatant?.actor;
-  const override = actor?.getFlag?.(MODULE_ID, FLAGS.ACTOR_CONFIG)?.max ?? {};
+  const override = getActorConfig(actor).max ?? {};
   const legendary = Number(actor?.system?.resources?.legact?.max ?? 0);
   const base = {
     action: Number(game.settings.get(MODULE_ID, "maxAction")),
@@ -32,19 +32,23 @@ export function getMaxima(combatant) {
 
 /**
  * How many "attack"-type activity uses share a single action this turn (Extra
- * Attack). Order: GM override (config.attacksPerAction) > best-effort guess from a
- * Multiattack-shaped feature's own description text (guessAttacksPerAction, see
+ * Attack). Order: what was configured for this actor (config.mjs, set by the owner
+ * or the GM in the HUD's gear dialog) > best-effort suggestion from a
+ * Multiattack-shaped feature's own description text (attackSuggestion, see
  * actions.mjs - only reliable for "makes N attacks" phrasing, not mixed attacks
- * like "one bite and one claw") > default of 1 (no Extra Attack). PCs generally
- * need the override (Extra Attack is a class feature with no descriptive text to
- * parse); NPC Multiattack usually resolves on its own.
+ * like "one bite and one claw") > default of 1 (no Extra Attack).
+ *
+ * The suggestion stays in the chain on purpose even though configuration is the
+ * intended path now: it is what keeps a freshly dropped pack of NPCs correct
+ * without configuring each statblock first, and NPC statblocks are exactly where
+ * the text parsing works. Player characters are the opposite case - Extra Attack
+ * is a class feature with no parseable text - so those get configured by hand.
  */
 export function getAttacksPerAction(combatant) {
   const actor = combatant?.actor;
-  const override = actor?.getFlag?.(MODULE_ID, FLAGS.ACTOR_CONFIG)?.attacksPerAction;
-  const n = Number(override);
+  const n = Number(getActorConfig(actor).attacksPerAction);
   if (Number.isFinite(n) && n > 0) return n;
-  return guessAttacksPerAction(actor) ?? DEFAULT_ATTACKS_PER_ACTION;
+  return attackSuggestion(actor) ?? DEFAULT_ATTACKS_PER_ACTION;
 }
 
 export function freshEconomy(combatant) {
@@ -124,7 +128,7 @@ export async function spend(combatant, type, { amount = 1, label = "", uuid = nu
  * Book an "attack"-type activity use. Extra Attack lets several such uses share one
  * action: only the first spends the action pip, the rest draw down `attacksLeft`
  * (from getAttacksPerAction). Still funnels through the same flag write as spend()
- * - this is a second booking function, not a second write path (decision 3 intact).
+ * - this is a second booking function, not a second write path (decision 2 intact).
  */
 export async function spendAttack(combatant, { label = "", uuid = null } = {}) {
   if (!combatant) return false;

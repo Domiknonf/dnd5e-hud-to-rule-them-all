@@ -513,6 +513,32 @@
   }
   #hud-to-rule-them-all .hudtra-reset:hover { border-color: var(--hudtra-gold-bright); }
 
+  #hud-to-rule-them-all .hudtra-config-btn {
+    position: relative;
+    width: 2em;
+    height: 2em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.35);
+    font-size: 0.85em;
+  }
+  #hud-to-rule-them-all .hudtra-config-btn:hover { border-color: var(--hudtra-gold-bright); }
+
+  /* Divergence marker: the detection would suggest a different number of attacks
+     than what is configured (see config.mjs configDivergence). Deliberately quiet -
+     it is a "worth a look after your level-up" nudge, not a warning. */
+  #hud-to-rule-them-all .hudtra-config-btn.diverged::after {
+    content: "";
+    position: absolute;
+    top: -0.1em;
+    right: -0.1em;
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 50%;
+    background: var(--hudtra-pool-bonus);
+    box-shadow: 0 0 0.35em var(--hudtra-pool-bonus);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     #hud-to-rule-them-all { --hudtra-anim: 0ms; }
   }
@@ -615,4 +641,87 @@
      itself renders under, so the macro bar returns the moment combat ends and the
      HUD closes. */
   body:has(#hud-to-rule-them-all .hudtra-frame) #hotbar { display: none; }
+
+  /* ---- Per-actor config dialog (config.mjs) ----
+     Unlike the bar, this is an ordinary windowed application, so it follows the
+     module's usual convention and derives everything from Foundry's theme
+     variables - it has to look right in light and dark mode. */
+  #hudtra-config .hudtra-config-body {
+    display: flex;
+    gap: 0.75rem;
+    align-items: stretch;
+    min-height: 16rem;
+  }
+
+  #hudtra-config .hudtra-config-actors {
+    flex: 0 0 12rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    overflow-y: auto;
+    max-height: 26rem;
+    padding-right: 0.5rem;
+    border-right: 1px solid var(--color-border-light-tertiary, rgb(128 128 128 / 0.35));
+  }
+
+  #hudtra-config .hudtra-config-actor {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 0.3rem;
+    background: none;
+    text-align: left;
+    line-height: 1.2;
+  }
+  #hudtra-config .hudtra-config-actor:hover {
+    border-color: var(--color-border-highlight, currentColor);
+  }
+  #hudtra-config .hudtra-config-actor.selected {
+    background: var(--color-bg-option, rgb(128 128 128 / 0.2));
+    border-color: var(--color-border-highlight, currentColor);
+    font-weight: bold;
+  }
+  #hudtra-config .hudtra-config-actor img {
+    flex: 0 0 auto;
+    width: 1.9rem;
+    height: 1.9rem;
+    object-fit: cover;
+    border: none;
+    border-radius: 0.25rem;
+  }
+  #hudtra-config .hudtra-config-actor span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #hudtra-config .hudtra-config-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  #hudtra-config .hudtra-config-heading {
+    margin: 0;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--color-border-light-tertiary, rgb(128 128 128 / 0.35));
+  }
+  #hudtra-config .hudtra-config-pools .form-group { margin: 0.2rem 0; }
+  #hudtra-config .hudtra-config-empty {
+    padding: 0.5rem;
+    opacity: 0.75;
+    font-style: italic;
+  }
+
+  #hudtra-config .hudtra-config-footer {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.5rem;
+  }
+  #hudtra-config .hudtra-config-save { font-weight: bold; }
 }

@@ -76,6 +76,12 @@
 
   {{#if editable}}
   <div class="hudtra-controls">
+    {{!-- The dot appears when the automatic detection disagrees with what is
+         configured (typically after a level-up). Hint only - nothing is rewritten. --}}
+    <button type="button" class="hudtra-config-btn {{#if configDiverged}}diverged{{/if}}"
+            data-action="config" data-tooltip-text="{{configTooltip}}">
+      <i class="fa-solid fa-gear"></i>
+    </button>
     <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
       <i class="fa-solid fa-rotate-left"></i>
     </button>

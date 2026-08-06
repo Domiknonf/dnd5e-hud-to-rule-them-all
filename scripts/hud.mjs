@@ -1,6 +1,7 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import { getEconomy, resetTurn, remaining, getAttacksPerAction } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
+import { openConfig, configDivergence } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -45,6 +46,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       describe: CombatHUD.#onShowDescription,
       collapse: CombatHUD.#onCollapse,
       portrait: CombatHUD.#onPortrait,
+      config: CombatHUD.#onConfig,
       reset: CombatHUD.#onReset,
       endTurn: CombatHUD.#onEndTurn
     }
@@ -219,6 +221,11 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const isDying = !!hp && hp.value <= 0;
     const rollsDeathSave = isDying && actor?.type === "character";
     const description = await this.#prepareDescription();
+
+    // A level-up can change what the detection would suggest without changing
+    // anything visible in the bar (Extra Attack adds no new entry), so a divergence
+    // marks the gear instead of silently overwriting the configured value.
+    const divergence = actor ? configDivergence(actor) : null;
     return {
       hasCombat: !!combatant,
       isMine,
@@ -241,6 +248,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       description,
       // The handle's first stage depends on what is currently open.
       collapseTooltip: game.i18n.localize(`${MODULE_ID}.${description ? "closeDescription" : "toggleBar"}`),
+      configDiverged: !!divergence,
+      configTooltip: divergence
+        ? game.i18n.format(`${MODULE_ID}.config.diverged`, divergence)
+        : game.i18n.localize(`${MODULE_ID}.config.open`),
       editable: isMine || game.user.isGM
     };
   }
@@ -303,6 +314,15 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       return actor.rollDeathSave({});
     }
     return actor.sheet?.render(true);
+  }
+
+  /**
+   * Opens the per-actor config on whoever the bar is currently showing. The dialog
+   * itself lists every actor this user may configure, so a GM who opened it on a
+   * goblin can switch to a player character without waiting for their turn.
+   */
+  static async #onConfig() {
+    return openConfig(this.combatant?.actor ?? null);
   }
 
   static async #onReset() {

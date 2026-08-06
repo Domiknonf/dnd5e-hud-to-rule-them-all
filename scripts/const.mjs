@@ -67,8 +67,27 @@ export const GENERIC_ACTIVITY_ICON = /^systems\/dnd5e\/icons\/svg\/activity\//;
 /**
  * Default number of "attack"-type activity uses that share a single action.
  * 1 = no Extra Attack. Per-actor override lives at
- * flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction (see economy.mjs).
+ * flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction (see config.mjs).
  */
 export const DEFAULT_ATTACKS_PER_ACTION = 1;
+
+/**
+ * Pools whose size the per-actor config dialog may override, mapped to the world
+ * setting that supplies the fallback. Only the three pools that HAVE a world
+ * default are listed: `legendary` is derived from the actor's own
+ * system.resources.legact.max (overriding it here would fight the sheet), and
+ * `other`/`passive` have no budget at all.
+ */
+export const CONFIGURABLE_POOLS = {
+  action:   { setting: "maxAction" },
+  bonus:    { setting: "maxBonus" },
+  reaction: { setting: "maxReaction" }
+};
+
+/** Upper bounds for the config dialog's number inputs. Sanity rails, not rules. */
+export const CONFIG_LIMITS = {
+  attacksPerAction: { min: 1, max: 10 },
+  poolMax: { min: 0, max: 9 }
+};
 
 export const DEBOUNCE_MS = 60;

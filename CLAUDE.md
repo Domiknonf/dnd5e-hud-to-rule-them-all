@@ -33,12 +33,13 @@ reading the code, say so rather than claiming it works.
 | --- | --- |
 | `scripts/const.mjs` | Every runtime assumption: pool definitions, activation-type map |
 | `scripts/economy.mjs` | State model. The **only** place that reads or writes the economy flag |
+| `scripts/config.mjs` | Per-actor configuration. The **only** place that reads or writes the config flag, plus the dialog that edits it |
 | `scripts/actions.mjs` | Walks actor items, buckets their activities |
 | `scripts/hud.mjs` | The `ApplicationV2` and its action handlers |
 | `scripts/socket.mjs` | Relays player writes to the active GM |
 | `scripts/module.mjs` | Hook wiring only. No business logic belongs here |
 
-### Two load-bearing decisions
+### Three load-bearing decisions
 
 **1. The economy lives in a flag on the Combatant document.**
 Key: `flags["dnd5e-hud-to-rule-them-all"].economy`. Combatant flags replicate to all
@@ -50,6 +51,26 @@ outside `economy.mjs`.
 `dnd5e.postUseActivity` books them. HUD buttons only call `activity.use()`. This is why
 sheet clicks, macros and Midi QoL workflows all count correctly and none double-count. Do
 not add a second booking site.
+
+**3. Configuration beats detection. Detection is only ever a suggestion.**
+Key: `flags["dnd5e-hud-to-rule-them-all"].config`, on the **Actor** (not the Combatant —
+this has to outlive the encounter). Everything this module cannot know for certain is
+answered by whoever owns the character, in the gear dialog: how many attacks an Attack
+action grants, how big the pools are. The heuristics in `actions.mjs`
+(`guessAttacksPerAction` and friends) still run, but only to prefill that dialog and as
+the fallback while nothing has been configured — that fallback is what keeps a freshly
+dropped pack of NPCs usable without configuring six statblocks first.
+
+Consequences to respect:
+
+- Never write that flag outside `config.mjs`, the same rule the economy flag has.
+- Config is stored on the **base** Actor (`configTarget`), so five unlinked goblins from
+  one prototype share it instead of needing five identical dialogs.
+- Players own their Actor, so they write config directly — no `socket.mjs` relay here.
+  The GM owns every Actor, which is what lets one dialog configure the whole party.
+- Do not add automation that silently overwrites a configured value. When detection and
+  configuration disagree, the HUD shows a dot on the gear and says nothing else.
+- When you extend this, add a field to the dialog rather than a new heuristic.
 
 ## Domain model
 
@@ -102,9 +123,10 @@ game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
 
 Do not "fix" these casually — each needs a design decision.
 
-- **Extra Attack.** One Attack action contains several attack rolls, but costs are booked
-  per activity use, so the second attack currently eats a second action. Needs a per-turn
-  "attacks remaining inside this Attack action" counter.
+- **Extra Attack.** Handled: `economy.spendAttack` runs the per-action counter, and the
+  count itself is configured per actor (`config.mjs`) with detection as the fallback. What
+  is still open is the *mixed* Multiattack — "one bite and two claws" is not a single
+  number, and neither the counter nor the dialog can express it today.
 - **Reactions off-turn.** Tracked correctly, but the HUD must stay visible and switchable
   during other creatures' turns for that to be usable.
 - **Missed hooks.** If the GM client misses a turn change, no reset happens. The flag's

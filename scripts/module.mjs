@@ -4,6 +4,7 @@ import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy } from "./economy.mjs";
 import { costOfActivity, isAttackSubstitute } from "./actions.mjs";
+import { openConfig, getActorConfig } from "./config.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -13,12 +14,17 @@ Hooks.once("init", () => {
   registerSettings();
   registerSocket();
   const { loadTemplates } = foundry.applications.handlebars;
-  loadTemplates([`modules/${MODULE_ID}/templates/hud.hbs`]);
+  loadTemplates([
+    `modules/${MODULE_ID}/templates/hud.hbs`,
+    `modules/${MODULE_ID}/templates/config.hbs`
+  ]);
 });
 
 Hooks.once("ready", () => {
   game.modules.get(MODULE_ID).api = {
-    hud: getHUD(), spend, refund, resetTurn, getEconomy
+    hud: getHUD(), spend, refund, resetTurn, getEconomy,
+    // Macro entry point: openConfig(actor) for a hotkey or a token-HUD button.
+    openConfig, getActorConfig
   };
   if (game.combat?.started) getHUD().render({ force: true });
 });
