@@ -72,6 +72,27 @@ Consequences to respect:
   configuration disagree, the HUD shows a dot on the gear and says nothing else.
 - When you extend this, add a field to the dialog rather than a new heuristic.
 
+### The bar's lifecycle
+
+The HUD is **not** combat-scoped. It renders whenever there is anyone to show —
+`CombatHUD#subjectActor`: the combatant in an encounter, otherwise a controlled token,
+otherwise `game.user.character` — and only closes when that is null.
+
+- Ending an encounter **collapses** it (`deleteCombat` → `collapse(true)`); starting one
+  pulls it back up. Both are just the slide the handle does, so it can always be brought
+  back by hand.
+- Outside an encounter there is no Combatant, so nothing is booked and the economy row is
+  hidden. `_prepareContext` keeps `combatant` null in that case, which is what makes every
+  economy call inert instead of needing branches.
+- **Two collapse handles exist on purpose.** The one inside `.hudtra-frame` rides the
+  frame's collapse transform; a transformed element becomes the containing block for its
+  positioned descendants, so it cannot be pinned to the viewport. `.hudtra-reopen` is a
+  sibling of the frame for exactly that reason, and sits in the bottom-right corner to
+  stay clear of Foundry's centred macro bar.
+- The macro bar (`#hotbar`) is hidden only while the bar is **expanded**
+  (`:not(.collapsed)`), so collapsing gives it back. The class is toggled without a
+  re-render and `:has()` tracks that live.
+
 ## Domain model
 
 In dnd5e 4.x+ the unit of "a thing you do" is an **Activity**, not an Item. One item can
@@ -127,8 +148,11 @@ Do not "fix" these casually — each needs a design decision.
   count itself is configured per actor (`config.mjs`) with detection as the fallback. What
   is still open is the *mixed* Multiattack — "one bite and two claws" is not a single
   number, and neither the counter nor the dialog can express it today.
-- **Reactions off-turn.** Tracked correctly, but the HUD must stay visible and switchable
-  during other creatures' turns for that to be usable.
+- **Reactions off-turn.** Tracked correctly. Visibility is solved — the bar no longer
+  closes with the encounter, it collapses (see below) — but it is still not *switchable*:
+  `CombatHUD#setCombatant` exists and nothing calls it, so during someone else's turn you
+  see their bar, not yours. The client setting `showOnOthersTurn` is registered in
+  `settings.mjs` and read nowhere; decide whether it drives that switch or gets removed.
 - **Missed hooks.** If the GM client misses a turn change, no reset happens. The flag's
   `key` field records `round:turn` as the hook for a future staleness guard.
 - **Midi QoL** wraps activity usage. The dnd5e hooks still fire; verify ordering before

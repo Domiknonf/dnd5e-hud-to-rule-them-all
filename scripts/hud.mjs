@@ -76,9 +76,40 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     return combat.combatants.get(this.#combatantId) ?? combat.combatant ?? null;
   }
 
+  /**
+   * Whose abilities the bar shows. In a running encounter that is the combatant.
+   * Outside one there is no combatant at all, so it falls back to whatever the user
+   * is effectively playing: a controlled token first (the GM poking at a monster),
+   * then their assigned character. Null means there is nothing worth showing and
+   * the bar closes entirely.
+   */
+  get subjectActor() {
+    if (game.combat?.started) {
+      const fromCombat = this.combatant?.actor;
+      if (fromCombat) return fromCombat;
+    }
+    const controlled = canvas?.tokens?.controlled?.find(t => t.actor?.isOwner)?.actor;
+    return controlled ?? game.user.character ?? null;
+  }
+
+  get hasSubject() {
+    return !!this.subjectActor;
+  }
+
   setCombatant(id) {
     this.#combatantId = id;
     return this.render();
+  }
+
+  /**
+   * Programmatic slide, used when an encounter starts or ends. Same two-part state
+   * as the handle itself: the field survives re-renders, the class drives the
+   * transition. Safe before the first render - `element` is null until then.
+   */
+  collapse(state = true) {
+    if (state) this.#descriptionUuid = null;
+    this.#collapsed = state;
+    this.element?.classList.toggle("collapsed", state);
   }
 
   /**
@@ -150,8 +181,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /* -------------------------------------------- */
 
   async _prepareContext(options) {
-    const combatant = this.combatant;
-    const actor = combatant?.actor ?? null;
+    // Outside an encounter the bar is a plain ability hotbar: there is no combatant,
+    // so nothing is booked and the economy row is hidden. `combatant` stays null in
+    // that case, which is exactly what keeps every economy call below inert.
+    const inCombat = !!game.combat?.started;
+    const combatant = inCombat ? this.combatant : null;
+    const actor = combatant?.actor ?? this.subjectActor;
     const econ = getEconomy(combatant);
     const isMine = actor?.isOwner === true;
 
@@ -227,12 +262,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // marks the gear instead of silently overwriting the configured value.
     const divergence = actor ? configDivergence(actor) : null;
     return {
-      hasCombat: !!combatant,
+      hasSubject: !!actor,
+      inCombat,
       isMine,
       isGM: game.user.isGM,
       actor,
       combatant,
-      name: combatant?.name ?? "",
+      name: combatant?.name ?? actor?.name ?? "",
       img: combatant?.img ?? actor?.img,
       hp,
       // Presentation-only fields: the CSS scales the whole bar off --hudtra-scale
@@ -340,7 +376,9 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 let instance = null;
 const refresh = foundry.utils.debounce(() => {
   if (!instance) return;
-  if (!game.combat?.started) return instance.close();
+  // The bar outlives the encounter now (it collapses instead of closing), so the
+  // close condition is "nobody to show", not "no combat".
+  if (!instance.hasSubject) return instance.close();
   instance.render({ force: true });
 }, DEBOUNCE_MS);
 

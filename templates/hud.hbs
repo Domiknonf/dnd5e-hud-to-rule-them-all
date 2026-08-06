@@ -1,4 +1,4 @@
-{{#if hasCombat}}
+{{#if hasSubject}}
 {{!-- --hudtra-scale drives the whole bar's em-based sizing (per-user "HUD scale"
      setting); --hudtra-hp-pct feeds the portrait's conic-gradient HP ring. Both are
      presentation-only context fields. --}}
@@ -36,10 +36,15 @@
     <span class="hudtra-name">{{name}}</span>
     <span class="hudtra-vitals">
       {{#if ac}}<span class="hudtra-ac"><i class="fa-solid fa-shield"></i> {{ac}}</span>{{/if}}
+      {{#if inCombat}}
       <span class="hudtra-round">{{localize "dnd5e-hud-to-rule-them-all.round"}} {{round}}</span>
+      {{/if}}
     </span>
   </div>
 
+  {{!-- Economy only exists inside an encounter: outside one there is no combatant
+       to book against, so showing pips would promise tracking that isn't happening. --}}
+  {{#if inCombat}}
   <div class="hudtra-economy">
     {{#each pools}}
     <div class="hudtra-pool" data-pool="{{key}}" data-tooltip-text="{{label}}: {{left}}/{{max}}">
@@ -50,6 +55,7 @@
     </div>
     {{/each}}
   </div>
+  {{/if}}
 
   {{!-- data-tooltip-class/-direction are looked up on ancestors by core's
        TooltipManager, so they're declared once here for every slot. --}}
@@ -82,16 +88,29 @@
             data-action="config" data-tooltip-text="{{configTooltip}}">
       <i class="fa-solid fa-gear"></i>
     </button>
+    {{#if inCombat}}
     <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
       <i class="fa-solid fa-rotate-left"></i>
     </button>
     <button type="button" class="hudtra-end-turn" data-action="endTurn" data-tooltip="dnd5e-hud-to-rule-them-all.endTurn">
       <i class="fa-solid fa-forward-step"></i>
     </button>
+    {{/if}}
   </div>
   {{/if}}
 
   </div>
 
 </div>
+
+{{!-- Re-open handle for the collapsed bar. Deliberately a SECOND handle outside
+     .hudtra-frame: the frame's collapse transform drags its own tab down to the
+     screen edge wherever the bar happens to be centred, which is right where
+     Foundry's macro bar lives. This one is positioned against the viewport's right
+     corner instead, so the macro bar - visible again while the bar is away - keeps
+     the middle to itself. --}}
+<button type="button" class="hudtra-reopen" data-action="collapse"
+        data-tooltip="dnd5e-hud-to-rule-them-all.toggleBar">
+  <i class="fa-solid fa-chevron-up"></i>
+</button>
 {{/if}}

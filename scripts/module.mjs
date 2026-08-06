@@ -26,7 +26,10 @@ Hooks.once("ready", () => {
     // Macro entry point: openConfig(actor) for a hotkey or a token-HUD button.
     openConfig, getActorConfig
   };
-  if (game.combat?.started) getHUD().render({ force: true });
+  // Starts collapsed outside combat: the bar is available, but it does not shove
+  // the macro bar aside until someone actually pulls it up (or combat starts).
+  if (!game.combat?.started) getHUD().collapse(true);
+  refreshHUD();
 });
 
 /* ------------------------------------------------------------------ */
@@ -101,6 +104,9 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
 
 Hooks.on("combatStart", async (combat) => {
   if (game.user.isActiveGM) for (const c of combat.combatants) await resetTurn(c);
+  // Symmetric to deleteCombat below: an encounter starting pulls the bar back up
+  // even if it was manually slid away out of combat.
+  getHUD().collapse(false);
   refreshHUD();
 });
 
@@ -112,7 +118,9 @@ Hooks.on("combatTurnChange", async (combat, prior, current) => {
 });
 
 Hooks.on("updateCombat", refreshHUD);
-Hooks.on("deleteCombat", () => getHUD().close());
+// The bar survives the encounter as a plain ability hotbar. Ending combat slides it
+// away rather than destroying it, so it can be pulled back up from the corner tab.
+Hooks.on("deleteCombat", () => { getHUD().collapse(true); refreshHUD(); });
 Hooks.on("updateCombatant", refreshHUD);
 Hooks.on("createCombatant", refreshHUD);
 Hooks.on("deleteCombatant", refreshHUD);
@@ -120,6 +128,11 @@ Hooks.on("deleteCombatant", refreshHUD);
 /* ------------------------------------------------------------------ */
 /*  Keep the action list current                                       */
 /* ------------------------------------------------------------------ */
+
+// Outside combat the bar follows the selected token / assigned character, so both
+// of those have to re-render it (see CombatHUD#subjectActor).
+Hooks.on("controlToken", refreshHUD);
+Hooks.on("updateUser", refreshHUD);
 
 Hooks.on("updateActor", refreshHUD);
 Hooks.on("createItem", refreshHUD);

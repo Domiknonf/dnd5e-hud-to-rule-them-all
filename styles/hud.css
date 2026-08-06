@@ -99,6 +99,34 @@
   }
   #hud-to-rule-them-all.collapsed .hudtra-collapse i { transform: rotate(180deg); }
 
+  /* ---- re-open handle for the collapsed bar (see hud.hbs) ----
+     Sibling of .hudtra-frame, so the frame's collapse transform doesn't move it -
+     and, just as importantly, doesn't make it the containing block. Pinned to the
+     viewport's bottom-right corner, clear of Foundry's centred macro bar. Sized
+     from a core variable rather than the bar's own em scale, which lives on the
+     frame and is out of reach from here. */
+  #hud-to-rule-them-all .hudtra-reopen { display: none; }
+  #hud-to-rule-them-all.collapsed .hudtra-reopen {
+    display: block;
+    pointer-events: all;
+    position: absolute;
+    right: 0.8rem;
+    bottom: 0;
+    height: 1.5rem;
+    padding: 0 0.9rem;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-bottom: none;
+    border-radius: 0.4rem 0.4rem 0 0;
+    background: linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+    color: var(--hudtra-gold);
+    font-size: var(--font-size-13, 13px);
+    box-shadow: 0 -0.15rem 0.5rem rgb(0 0 0 / 0.5);
+  }
+  #hud-to-rule-them-all.collapsed .hudtra-reopen:hover { color: var(--hudtra-gold-bright); }
+
+  /* The frame's own tab would otherwise sit at the screen edge next to this one. */
+  #hud-to-rule-them-all.collapsed .hudtra-collapse { visibility: hidden; }
+
   /* ---- description panel above the bar (middle click / passive features) ----
      Absolutely positioned ON PURPOSE: as a normal column child its content would
      feed into the frame's intrinsic width and opening a description would resize
@@ -636,11 +664,12 @@
   #hud-to-rule-them-all .hudtra-desc-text { min-width: 0; }
 
   /* Foundry's own macro hotbar (#hotbar in v13) is redundant while the combat bar
-     is up and would sit right on top of it. Scoping on the rendered .hudtra-frame
-     (not just the application element) ties this to the exact condition the HUD
-     itself renders under, so the macro bar returns the moment combat ends and the
-     HUD closes. */
-  body:has(#hud-to-rule-them-all .hudtra-frame) #hotbar { display: none; }
+     is up and would sit right on top of it. The bar no longer closes when combat
+     ends - it collapses - so the condition is "expanded", not "rendered": the macro
+     bar comes back the moment the bar slides away and disappears again when it is
+     pulled back up. The class is toggled on the application element without a
+     re-render, and :has() re-evaluates on that, so this stays in sync for free. */
+  body:has(#hud-to-rule-them-all:not(.collapsed) .hudtra-frame) #hotbar { display: none; }
 
   /* ---- Per-actor config dialog (config.mjs) ----
      Unlike the bar, this is an ordinary windowed application, so it follows the
