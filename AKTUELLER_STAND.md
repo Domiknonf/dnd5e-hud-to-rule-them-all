@@ -107,7 +107,7 @@ scripts/socket.mjs          Relay für Spieler-Schreibzugriffe an den GM
 scripts/module.mjs          nur Hook-Verdrahtung, keine Logik
 templates/hud.hbs           Handlebars-Template
 styles/hud.css              CSS in @layer modules, nutzt Foundrys CSS-Variablen
-lang/en.json, lang/de.json  Lokalisierung
+lang/en.json               Lokalisierung (nur Englisch)
 .github/workflows/release.yml  stempelt module.json beim Tag-Push und baut das Release
 ```
 

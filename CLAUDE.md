@@ -130,7 +130,9 @@ Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
 - **CSS lives in `@layer modules`** and uses Foundry's CSS variables so light and dark
   theme both work. No `!important`.
 - **All user-facing strings are i18n keys** under `dnd5e-hud-to-rule-them-all.*`, added to
-  both `lang/en.json` and `lang/de.json`. Never hardcode display text.
+  `lang/en.json`. Never hardcode display text. **English is the only shipped locale** —
+  the table plays in English and the compendiums are English, which is also what the
+  detection in `actions.mjs` matches against. Do not add a second language file.
 - **Defensive reads.** Optional chaining and fallbacks around system and core APIs, e.g.
   `token?.movementHistory ?? token?.movement?.history`. This codebase runs against a
   moving target.
