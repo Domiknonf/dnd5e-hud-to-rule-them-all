@@ -1,5 +1,5 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
-import { getEconomy, resetTurn, remaining, getAttacksPerAction } from "./economy.mjs";
+import { getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 
@@ -77,19 +77,44 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Whose abilities the bar shows. In a running encounter that is the combatant.
-   * Outside one there is no combatant at all, so it falls back to whatever the user
-   * is effectively playing: a controlled token first (the GM poking at a monster),
-   * then their assigned character. Null means there is nothing worth showing and
-   * the bar closes entirely.
+   * Whose abilities the bar shows. Null means there is nothing to show and the bar
+   * closes entirely.
+   *
+   * A SELECTED TOKEN ALWAYS WINS, for everyone - clicking a token is a deliberate
+   * "show me this one", and deselecting hands the bar back to the fallback. Only
+   * the fallback differs, and that difference matters:
+   *
+   * - The GM runs the encounter, so theirs is whoever is currently acting.
+   * - A PLAYER falls back to their OWN character, never to the acting creature.
+   *   Following the turn pointer meant that while a goblin acted, every player's
+   *   bar filled up with that goblin - useless during someone else's turn, and it
+   *   printed the monster's entire ability list into their UI. It also hid their
+   *   own reaction pips at exactly the moment a reaction is worth spending.
    */
   get subjectActor() {
-    if (game.combat?.started) {
-      const fromCombat = this.combatant?.actor;
-      if (fromCombat) return fromCombat;
-    }
     const controlled = canvas?.tokens?.controlled?.find(t => t.actor?.isOwner)?.actor;
-    return controlled ?? game.user.character ?? null;
+    if (controlled) return controlled;
+
+    if (game.user.isGM) {
+      const acting = game.combat?.started ? this.combatant?.actor : null;
+      return acting ?? game.user.character ?? null;
+    }
+
+    // A player without an assigned character still gets their own creature if one
+    // of theirs is in the fight (a summon, a swapped-in NPC).
+    return game.user.character
+      ?? game.combat?.combatants.find(c => c.actor?.isOwner)?.actor
+      ?? null;
+  }
+
+  /**
+   * The subject's OWN combatant, not the acting one. This is what makes the economy
+   * row belong to the creature in the bar - otherwise a player would see their own
+   * character wearing the active monster's pips.
+   */
+  get subjectCombatant() {
+    if (!game.combat?.started) return null;
+    return combatantFor(this.subjectActor);
   }
 
   get hasSubject() {
@@ -181,12 +206,14 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /* -------------------------------------------- */
 
   async _prepareContext(options) {
-    // Outside an encounter the bar is a plain ability hotbar: there is no combatant,
-    // so nothing is booked and the economy row is hidden. `combatant` stays null in
-    // that case, which is exactly what keeps every economy call below inert.
-    const inCombat = !!game.combat?.started;
-    const combatant = inCombat ? this.combatant : null;
-    const actor = combatant?.actor ?? this.subjectActor;
+    // The combatant is the SUBJECT'S own, never the acting one, so the economy row
+    // always belongs to the creature actually in the bar. Outside an encounter - or
+    // for someone watching a creature that isn't in the fight - it stays null, which
+    // is exactly what keeps every economy call below inert.
+    const actor = this.subjectActor;
+    const combatant = this.subjectCombatant;
+    const inCombat = !!combatant;
+    const isMyTurn = !!combatant && game.combat?.combatant?.id === combatant.id;
     const econ = getEconomy(combatant);
     const isMine = actor?.isOwner === true;
 
@@ -265,6 +292,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     return {
       hasSubject: !!actor,
       inCombat,
+      isMyTurn,
       isMine,
       isGM: game.user.isGM,
       actor,
@@ -344,7 +372,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * sheet stays permission-gated by Foundry itself.
    */
   static async #onPortrait() {
-    const actor = this.combatant?.actor;
+    const actor = this.subjectActor;
     if (!actor) return;
     const hp = actor.system?.attributes?.hp;
     if (actor.type === "character" && (hp?.value ?? 1) <= 0 && actor.rollDeathSave) {
@@ -359,15 +387,18 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * goblin can switch to a player character without waiting for their turn.
    */
   static async #onConfig() {
-    return openConfig(this.combatant?.actor ?? null);
+    return openConfig(this.subjectActor);
   }
 
   static async #onReset() {
-    return resetTurn(this.combatant);
+    return resetTurn(this.subjectCombatant);
   }
 
   static async #onEndTurn() {
-    if (game.combat?.combatant?.id !== this.combatant?.id) return;
+    // Only ever ends the turn of whoever is shown, and only when it is theirs -
+    // the button is hidden otherwise, but a stale render must not skip someone
+    // else's turn either.
+    if (game.combat?.combatant?.id !== this.subjectCombatant?.id) return;
     return game.combat.nextTurn();
   }
 }

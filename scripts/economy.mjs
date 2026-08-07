@@ -15,6 +15,22 @@ export function turnKey(combat) {
   return `${combat?.round ?? 0}:${combat?.turn ?? 0}`;
 }
 
+/**
+ * The combatant an actor is fighting as, or null. Lives here because two callers
+ * need the exact same answer: the booking path (module.mjs) and the HUD, which has
+ * to show the bar's subject their OWN economy rather than the acting creature's.
+ *
+ * actor.id alone collides for unlinked tokens sharing one prototype (five identical
+ * goblins), so the token is matched first.
+ */
+export function combatantFor(actor) {
+  if (!actor || !game.combat) return null;
+  const tokenId = actor.token?.id ?? actor.getActiveTokens?.(false, true)?.[0]?.id;
+  return game.combat.combatants.find(c => c.tokenId === tokenId)
+      ?? game.combat.combatants.find(c => c.actor?.uuid === actor.uuid)
+      ?? null;
+}
+
 /** Maximum pool sizes for a combatant. Actor flag overrides world settings. */
 export function getMaxima(combatant) {
   const actor = combatant?.actor;

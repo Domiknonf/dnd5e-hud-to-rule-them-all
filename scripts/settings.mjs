@@ -51,5 +51,4 @@ export function registerSettings() {
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
   reg("scale",              { ...CLIENT, type: Number, default: 1, range: { min: 0.6, max: 1.6, step: 0.05 } });
-  reg("showOnOthersTurn",   { ...CLIENT, type: Boolean, default: true });
 }

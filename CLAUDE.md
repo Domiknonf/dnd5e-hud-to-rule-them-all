@@ -120,9 +120,22 @@ Consequences to respect:
 
 ### The bar's lifecycle
 
-The HUD is **not** combat-scoped. It renders whenever there is anyone to show —
-`CombatHUD#subjectActor`: the combatant in an encounter, otherwise a controlled token,
-otherwise `game.user.character` — and only closes when that is null.
+The HUD is **not** combat-scoped. It renders whenever there is anyone to show
+(`CombatHUD#subjectActor`) and only closes when that is null.
+
+**Who the bar shows is a permission question, not just a convenience one.** A selected
+token always wins, for everyone. The fallback differs:
+
+- **GM** → whoever is currently acting. They run the encounter.
+- **Player** → their *own* character, never the acting creature. Following the turn
+  pointer meant a player's bar filled up with the acting goblin — which hid their own
+  reaction pips at the one moment a reaction matters, and printed the monster's whole
+  ability list into their UI.
+
+`subjectCombatant` is the subject's **own** combatant, never `combat.combatant`. That is
+what keeps the economy row attached to the creature in the bar; using the active one
+would show a player their character wearing the monster's pips. Everything turn-bound
+(`isMyTurn`, End Turn, reset) hangs off it too.
 
 - Ending an encounter **collapses** it (`deleteCombat` → `collapse(true)`); starting one
   pulls it back up. Both are just the slide the handle does, so it can always be brought
@@ -203,15 +216,10 @@ Do not "fix" these casually — each needs a design decision.
   is configured per actor, and which entries draw from it is a per-entry `attack` rule.
   What is still open is the *mixed* Multiattack — "one bite and two claws" is not a single
   number, and neither the counter nor the dialog can express it today.
-- **Entry order.** Still only sheet order or A–Z (`sortAlphabetically`). Manual ordering
-  needs drag & drop, which means `foundry.applications.ux.DragDrop` via
-  `DEFAULT_OPTIONS.dragDrop` — the sanctioned ApplicationV2 route, but it does bind its
-  own listeners, so it needs a documented exception like the `auxclick` one.
-- **Reactions off-turn.** Tracked correctly. Visibility is solved — the bar no longer
-  closes with the encounter, it collapses (see below) — but it is still not *switchable*:
-  `CombatHUD#setCombatant` exists and nothing calls it, so during someone else's turn you
-  see their bar, not yours. The client setting `showOnOthersTurn` is registered in
-  `settings.mjs` and read nowhere; decide whether it drives that switch or gets removed.
+- **Reactions off-turn.** Solved. A player's bar stays on their own character all
+  encounter, so their reaction pip is visible and clickable during someone else's turn.
+  `setCombatant` still exists and nothing calls it — it is now only a GM convenience
+  (pin a combatant instead of following the turn), not a gap.
 - **Missed hooks.** If the GM client misses a turn change, no reset happens. The flag's
   `key` field records `round:turn` as the hook for a future staleness guard.
 - **Midi QoL** wraps activity usage. The dnd5e hooks still fire; verify ordering before

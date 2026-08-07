@@ -2,7 +2,7 @@ import { MODULE_ID } from "./const.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
-import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy } from "./economy.mjs";
+import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor } from "./economy.mjs";
 import { costOfActivity, countsAsAttack } from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
@@ -36,16 +36,6 @@ Hooks.once("ready", () => {
 /* ------------------------------------------------------------------ */
 /*  Economy bookkeeping                                                */
 /* ------------------------------------------------------------------ */
-
-function combatantFor(actor) {
-  if (!actor || !game.combat) return null;
-  // actor.id alone collides for unlinked tokens sharing one prototype (e.g. five
-  // identical goblins) — match on the token first.
-  const tokenId = actor.token?.id ?? actor.getActiveTokens?.(false, true)?.[0]?.id;
-  return game.combat.combatants.find(c => c.tokenId === tokenId)
-      ?? game.combat.combatants.find(c => c.actor?.uuid === actor.uuid)
-      ?? null;
-}
 
 /**
  * Gate: block/warn when the pool is empty. Returning false cancels the usage.

@@ -101,9 +101,11 @@
     <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
       <i class="fa-solid fa-rotate-left"></i>
     </button>
+    {{#if isMyTurn}}
     <button type="button" class="hudtra-end-turn" data-action="endTurn" data-tooltip="dnd5e-hud-to-rule-them-all.endTurn">
       <i class="fa-solid fa-forward-step"></i>
     </button>
+    {{/if}}
     {{/if}}
   </div>
   {{/if}}
