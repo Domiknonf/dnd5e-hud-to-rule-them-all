@@ -387,12 +387,35 @@ export function collectConfigurable(actor) {
 
   for (const item of actor.items) {
     const activities = [...(item.system?.activities ?? [])].filter(a => !isDescriptiveOnly(a));
-    if (!activities.length) {
-      if (item.type !== "feat") continue;
-      rows.push({
-        key: entryKey(item), name: item.name, img: item.img, detail: "",
-        auto: { pool: "passive", attack: false }, passive: true
-      });
+    // Only pools something could actually land in. An activity whose activation type
+    // is out-of-combat or missing entirely contributes nothing here, exactly as it
+    // contributes nothing to collectActions' buckets.
+    const pools = new Set(activities.map(a => bucketFor(a.activation?.type)).filter(Boolean));
+
+    if (!pools.size) {
+      // Nothing bucketable. MIRROR collectActions' fallback: a feat drops through to
+      // the passive section - whether it carries unusable activities (Cunning Strike,
+      // Sneak Attack) or none at all (Dwarven Resilience) makes no difference to
+      // where it is shown, and pretending otherwise put half the passives in the
+      // wrong place here while the bar showed them together.
+      //
+      // `usable` is the distinction that DOES matter, and it only governs whether
+      // this can be dragged into a pool: something with no activity at all has
+      // nothing to fire, so a pool would be a lie.
+      if (item.type === "feat") {
+        rows.push({
+          key: entryKey(item), name: item.name, img: item.img, detail: "",
+          auto: { pool: "passive", attack: false },
+          passive: true, usable: activities.length > 0
+        });
+      } else if (activities.length) {
+        // Not a feat and nothing bucketable (a scroll with a 1-minute cast): the bar
+        // drops it, but it stays configurable so it can be pulled on deliberately.
+        rows.push({
+          key: entryKey(item), name: item.name, img: item.img, detail: "",
+          auto: { pool: null, attack: false }, usable: true
+        });
+      }
       continue;
     }
 
@@ -403,10 +426,10 @@ export function collectConfigurable(actor) {
     // item that genuinely splits across pools (Net: Attack = action, Utility =
     // bonus) needs a row per activity, because there one rule must not drag the
     // other half along.
-    const pools = new Set(activities.map(a => bucketFor(a.activation?.type)));
     if (pools.size === 1) {
       rows.push({
         key: entryKey(item), name: item.name, img: item.img, detail: "",
+        usable: true,
         auto: {
           pool: [...pools][0],
           attack: activities.some(a => a.type === "attack") || isAttackSubstituteItem(item)
@@ -424,6 +447,7 @@ export function collectConfigurable(actor) {
         name: item.name,
         detail: label,
         img: (activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null) || item.img,
+        usable: true,
         auto: {
           pool: bucketFor(activity.activation?.type),
           attack: activity.type === "attack" || isAttackSubstituteItem(item)

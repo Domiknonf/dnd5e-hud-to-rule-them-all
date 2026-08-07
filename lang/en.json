@@ -68,15 +68,15 @@
   "dnd5e-hud-to-rule-them-all.settings.showOnOthersTurn.hint": "Keeps the HUD visible so you can spend reactions.",
   "dnd5e-hud-to-rule-them-all.config.zones.hint": "Drag entries between zones to change which pool they use, or drag an item straight from the character sheet. Drag within a zone to set the order the bar shows.",
   "dnd5e-hud-to-rule-them-all.config.zones.hidden": "Not on the bar",
-  "dnd5e-hud-to-rule-them-all.config.zones.hiddenHint": "Nothing hidden. Drop something here to keep it off the bar.",
+  "dnd5e-hud-to-rule-them-all.config.zones.hiddenHint": "Nothing here. Drop something to keep it off the bar.",
   "dnd5e-hud-to-rule-them-all.config.zones.empty": "Nothing here. Drop an entry to add it.",
   "dnd5e-hud-to-rule-them-all.config.zones.confirmTitle": "Detection disagrees",
   "dnd5e-hud-to-rule-them-all.config.zones.confirmBody": "You are moving \"{name}\" to {target}, but it is detected as {detected}. Move it anyway?",
   "dnd5e-hud-to-rule-them-all.config.zones.attackToggle": "Counts as one attack within the Attack action",
   "dnd5e-hud-to-rule-them-all.config.zones.hideToggle": "Show or hide on the bar",
   "dnd5e-hud-to-rule-them-all.config.zones.resetEntry": "Reset this entry to automatic",
-  "dnd5e-hud-to-rule-them-all.config.zones.passiveOnly": "A passive feature cannot be used, so it can only be shown or hidden.",
-  "dnd5e-hud-to-rule-them-all.config.zones.notPassive": "Only features without a usable activity belong in Passive.",
+  "dnd5e-hud-to-rule-them-all.config.zones.notPassive": "Only features the bar shows as passive belong here.",
   "dnd5e-hud-to-rule-them-all.config.zones.foreignItem": "That item belongs to a different character.",
-  "dnd5e-hud-to-rule-them-all.config.zones.splitItem": "\"{name}\" has activities in different pools — drag its individual entries instead."
+  "dnd5e-hud-to-rule-them-all.config.zones.splitItem": "\"{name}\" has activities in different pools — drag its individual entries instead.",
+  "dnd5e-hud-to-rule-them-all.config.zones.notUsable": "\"{name}\" has no usable activity, so there is nothing to put on the bar."
 }

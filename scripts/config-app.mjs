@@ -175,7 +175,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         // need. The mark means "a rule was set", not "this was touched".
         overridden: !!set.pool || typeof set.attack === "boolean" || set.hidden === true,
         // Only the action pool cares, and only usable entries can consume an attack.
-        showAttack: zone === "action" && !row.passive
+        showAttack: zone === "action"
       });
     }
 
@@ -343,14 +343,17 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const row = collectConfigurable(actor).find(r => r.key === key);
     if (!row) return;
 
-    if (row.passive && zone !== "passive" && zone !== HIDDEN_ZONE) {
-      return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.passiveOnly`));
+    const auto = row.auto.pool;
+
+    // Being shown as passive is NOT what decides this - a passive feat that carries
+    // activities (Cunning Strike) can perfectly well be put on the bar. What decides
+    // it is whether there is anything to fire at all.
+    if (ASSIGNABLE_POOLS.includes(zone) && !row.usable) {
+      return ui.notifications.warn(game.i18n.format(`${MODULE_ID}.config.zones.notUsable`, { name: row.name }));
     }
-    if (!row.passive && zone === "passive") {
+    if (zone === "passive" && auto !== "passive") {
       return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.notPassive`));
     }
-
-    const auto = row.auto.pool;
     const mismatch = zone !== HIDDEN_ZONE && zone !== "passive" && auto && zone !== auto;
     if (mismatch) {
       const esc = Handlebars.escapeExpression;
