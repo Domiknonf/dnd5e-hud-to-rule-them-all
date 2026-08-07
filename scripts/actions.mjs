@@ -299,7 +299,8 @@ export function collectActions(actor, combatant) {
           description: plainDescription(item),
           // The button fires dnd5e's activity picker, so any attack in the group
           // makes the whole button behave as one for affordability purposes.
-          countsAsAttack: group.some(countsAsAttack)
+          countsAsAttack: group.some(countsAsAttack),
+          sort: entryConfig(actor, item, group[0]).sort ?? null
         });
         continue;
       }
@@ -317,7 +318,8 @@ export function collectActions(actor, combatant) {
         uses: usesFor(activity, item),
         details: detailsFor(activity),
         description: plainDescription(item),
-        countsAsAttack: countsAsAttack(activity)
+        countsAsAttack: countsAsAttack(activity),
+        sort: entryConfig(actor, item, activity).sort ?? null
       });
     }
   }
@@ -344,8 +346,19 @@ export function collectActions(actor, combatant) {
     });
   }
 
-  const sort = game.settings.get(MODULE_ID, "sortAlphabetically");
-  if (sort) for (const key of Object.keys(buckets)) buckets[key].sort((a, b) => a.name.localeCompare(b.name));
+  // A configured position always wins, and only over entries that have one - anything
+  // never placed by hand keeps its previous relative order behind them, so arranging
+  // three favourites does not scramble the other forty. Array#sort is stable, which is
+  // what makes "return 0" mean "leave in sheet order".
+  const alphabetical = game.settings.get(MODULE_ID, "sortAlphabetically");
+  for (const key of Object.keys(buckets)) {
+    buckets[key].sort((a, b) => {
+      const as = a.sort ?? Infinity;
+      const bs = b.sort ?? Infinity;
+      if (as !== bs) return as - bs;
+      return alphabetical ? a.name.localeCompare(b.name) : 0;
+    });
+  }
   return buckets;
 }
 
