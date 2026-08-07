@@ -1,6 +1,6 @@
 import { MODULE_ID } from "./const.mjs";
 import { refreshHUD } from "./hud.mjs";
-import { HudConfig } from "./config.mjs";
+import { HudConfig } from "./config-app.mjs";
 
 const WORLD = { scope: "world", config: true, requiresReload: false };
 const CLIENT = { scope: "client", config: true, requiresReload: false };

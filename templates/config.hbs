@@ -69,6 +69,38 @@
       <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.pools.hint"}}</p>
     </fieldset>
 
+    {{!-- Per-entry rules. Every dropdown keeps an "auto" option that names what the
+         detection would pick, so a rule can always be taken back off again. --}}
+    <fieldset class="hudtra-config-entries">
+      <legend>{{localize "dnd5e-hud-to-rule-them-all.config.entries.name"}}</legend>
+      <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.entries.hint"}}</p>
+      <div class="hudtra-config-entry-list">
+        <div class="hudtra-config-entry-head">
+          <span></span>
+          <span>{{localize "dnd5e-hud-to-rule-them-all.config.entries.pool"}}</span>
+          <span>{{localize "dnd5e-hud-to-rule-them-all.config.entries.attack"}}</span>
+          <span>{{localize "dnd5e-hud-to-rule-them-all.config.entries.hide"}}</span>
+        </div>
+        {{#each entries}}
+        <div class="hudtra-config-entry {{#if hidden}}is-hidden{{/if}}">
+          <span class="hudtra-config-entry-name">
+            <img src="{{img}}" alt="">
+            <span>{{name}}{{#if detail}} <em>{{detail}}</em>{{/if}}</span>
+          </span>
+          <select name="entries.{{key}}.pool" {{#if passive}}disabled{{/if}}>
+            {{#each pools}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+          <select name="entries.{{key}}.attack" {{#if passive}}disabled{{/if}}>
+            {{#each attacks}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+          <input type="checkbox" name="entries.{{key}}.hidden" {{#if hidden}}checked{{/if}}>
+        </div>
+        {{else}}
+        <p class="hudtra-config-empty">{{localize "dnd5e-hud-to-rule-them-all.config.entries.none"}}</p>
+        {{/each}}
+      </div>
+    </fieldset>
+
     <footer class="hudtra-config-footer">
       <button type="submit" class="hudtra-config-save">
         <i class="fa-solid fa-floppy-disk"></i>

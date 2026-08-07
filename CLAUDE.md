@@ -24,6 +24,13 @@ node --check scripts/*.mjs     # syntax check, the only automated check that exi
 git tag vX.Y.Z && git push --tags   # cuts a release via .github/workflows/release.yml
 ```
 
+Two things `node --check` cannot see, both of which have already broken this module
+once. Check them by hand after touching templates or imports:
+
+- **Every `PARTS` template renders exactly one root element** — count roots with a depth
+  counter, not by balancing tags. Two siblings and zero roots both throw.
+- **No import cycles between `scripts/*.mjs`** — walk the `from "./x.mjs"` graph.
+
 Verification is manual, in a running Foundry world. If a change cannot be verified by
 reading the code, say so rather than claiming it works.
 
@@ -33,8 +40,9 @@ reading the code, say so rather than claiming it works.
 | --- | --- |
 | `scripts/const.mjs` | Every runtime assumption: pool definitions, activation-type map |
 | `scripts/economy.mjs` | State model. The **only** place that reads or writes the economy flag |
-| `scripts/config.mjs` | Per-actor configuration. The **only** place that reads or writes the config flag, plus the dialog that edits it |
-| `scripts/actions.mjs` | Walks actor items, buckets their activities |
+| `scripts/config.mjs` | Per-actor configuration, storage only. The **only** place that reads or writes the config flag. Imports nothing but `const.mjs` — see below |
+| `scripts/config-app.mjs` | The dialog that edits that config, plus the suggestion/notice logic |
+| `scripts/actions.mjs` | Walks actor items, buckets their activities, applies per-entry rules |
 | `scripts/hud.mjs` | The `ApplicationV2` and its action handlers |
 | `scripts/socket.mjs` | Relays player writes to the active GM |
 | `scripts/module.mjs` | Hook wiring only. No business logic belongs here |
@@ -64,6 +72,21 @@ dropped pack of NPCs usable without configuring six statblocks first.
 Consequences to respect:
 
 - Never write that flag outside `config.mjs`, the same rule the economy flag has.
+- **`config.mjs` imports nothing but `const.mjs`, on purpose.** `actions.mjs` asks it what
+  an entry was configured to be, while the dialog asks `actions.mjs` what to suggest.
+  Keeping storage free of the detection is what stops that from being an import cycle;
+  the dialog lives in `config-app.mjs` for the same reason. There is a cycle check in the
+  verification snippet below — run it after moving imports around.
+- **Per-entry rules live under `config.entries`, keyed by document ID, never by uuid.** A
+  synthetic token actor's uuid carries its scene and token, so a uuid key written for one
+  goblin would never match the base Actor the config is stored on. `entryKey()` builds
+  `itemId` or `itemId:activityId`; the activity rule wins over the item rule.
+- Three things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
+  the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `hidden`. All are
+  resolved in `actions.mjs` (`poolFor`, `countsAsAttack`), so the HUD, the gate and the
+  booking path all see the same answer — including usages from the sheet or a macro.
+- `hidden` removes an entry from the bar. It does **not** make it free: `costOfActivity`
+  deliberately ignores the flag.
 - Config is stored on the **base** Actor (`configTarget`), so five unlinked goblins from
   one prototype share it instead of needing five identical dialogs.
 - Players own their Actor, so they write config directly — no `socket.mjs` relay here.
@@ -159,10 +182,14 @@ game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
 
 Do not "fix" these casually — each needs a design decision.
 
-- **Extra Attack.** Handled: `economy.spendAttack` runs the per-action counter, and the
-  count itself is configured per actor (`config.mjs`) with detection as the fallback. What
-  is still open is the *mixed* Multiattack — "one bite and two claws" is not a single
+- **Extra Attack.** Handled: `economy.spendAttack` runs the per-action counter, the count
+  is configured per actor, and which entries draw from it is a per-entry `attack` rule.
+  What is still open is the *mixed* Multiattack — "one bite and two claws" is not a single
   number, and neither the counter nor the dialog can express it today.
+- **Entry order.** Still only sheet order or A–Z (`sortAlphabetically`). Manual ordering
+  needs drag & drop, which means `foundry.applications.ux.DragDrop` via
+  `DEFAULT_OPTIONS.dragDrop` — the sanctioned ApplicationV2 route, but it does bind its
+  own listeners, so it needs a documented exception like the `auxclick` one.
 - **Reactions off-turn.** Tracked correctly. Visibility is solved — the bar no longer
   closes with the encounter, it collapses (see below) — but it is still not *switchable*:
   `CombatHUD#setCombatant` exists and nothing calls it, so during someone else's turn you

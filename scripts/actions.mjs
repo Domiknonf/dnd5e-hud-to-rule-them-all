@@ -2,6 +2,7 @@ import {
   MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS,
   GENERIC_ACTIVITY_ICON, ATTACK_SUBSTITUTE_NAMES
 } from "./const.mjs";
+import { entryConfig, entryKey } from "./config.mjs";
 
 /**
  * In dnd5e 4.x+ the unit of "a thing you do" is an Activity, not an Item.
@@ -115,15 +116,31 @@ export function guessAttacksPerAction(actor) {
  * Whether this item's activities may replace one attack inside the Attack action
  * (see ATTACK_SUBSTITUTE_NAMES). Player Characters only: the substitute rule is a
  * PC racial trait, while an NPC's breath weapon is its own full action.
+ *
+ * This is now only the DEFAULT for countsAsAttack() below - a hardcoded English name
+ * list can never cover homebrew, so the per-entry override is the real answer and
+ * this just keeps SRD content right out of the box.
  */
 export function isAttackSubstituteItem(item) {
   if (item?.actor?.type !== "character") return false;
   return ATTACK_SUBSTITUTE_NAMES.has((item.name ?? "").trim().toLowerCase());
 }
 
-/** Activity-level view of isAttackSubstituteItem, for the usage hooks. */
-export function isAttackSubstitute(activity) {
-  return isAttackSubstituteItem(activity?.item);
+/**
+ * Does using this consume one attack within the Attack action (rather than a fresh
+ * action of its own)? Configuration wins; detection is the fallback.
+ */
+export function countsAsAttack(activity) {
+  const override = entryConfig(activity?.actor, activity?.item, activity).attack;
+  if (typeof override === "boolean") return override;
+  return activity?.type === "attack" || isAttackSubstituteItem(activity?.item);
+}
+
+/** Which pool an activity draws from. Configuration wins over ACTIVATION_MAP. */
+export function poolFor(activity) {
+  const override = entryConfig(activity?.actor, activity?.item, activity).pool;
+  if (override && RESOURCES[override]) return override;
+  return bucketFor(activity?.activation?.type);
 }
 
 /** Cheap availability filter. Extend this — it is where most house rules land. */
@@ -250,11 +267,18 @@ export function collectActions(actor, combatant) {
     // one button per activity with dnd5e's often-unhelpful default activity names
     // ("Use", "(free casting)"). Activities in DIFFERENT buckets (e.g. Net: Attack
     // = action, Utility = bonus) naturally stay separate, one per HUD section.
+    // Hiding the item hides everything on it; a per-activity flag is checked below.
+    if (entryConfig(actor, item).hidden) continue;
+
     const byBucket = new Map();
     for (const activity of activities) {
-      const bucket = bucketFor(activity.activation?.type);
-      if (!bucket) continue;
       if (isDescriptiveOnly(activity)) continue;
+      if (entryConfig(actor, item, activity).hidden) continue;
+      // poolFor(), not bucketFor(): a configured pool overrides ACTIVATION_MAP, and
+      // it does so here so the entry lands in the right HUD section AND is grouped
+      // with whatever else the item puts in that same section.
+      const bucket = poolFor(activity);
+      if (!bucket) continue;
       if (!byBucket.has(bucket)) byBucket.set(bucket, []);
       byBucket.get(bucket).push(activity);
     }
@@ -273,7 +297,9 @@ export function collectActions(actor, combatant) {
           level: item.type === "spell" ? item.system.level : null,
           uses: usesFor(null, item),
           description: plainDescription(item),
-          attackSubstitute: isAttackSubstituteItem(item)
+          // The button fires dnd5e's activity picker, so any attack in the group
+          // makes the whole button behave as one for affordability purposes.
+          countsAsAttack: group.some(countsAsAttack)
         });
         continue;
       }
@@ -291,7 +317,7 @@ export function collectActions(actor, combatant) {
         uses: usesFor(activity, item),
         details: detailsFor(activity),
         description: plainDescription(item),
-        attackSubstitute: isAttackSubstituteItem(item)
+        countsAsAttack: countsAsAttack(activity)
       });
     }
   }
@@ -302,6 +328,7 @@ export function collectActions(actor, combatant) {
   // middle click open the description card ("describe" instead of "use").
   for (const item of actor.items) {
     if (item.type !== "feat" || bucketedItems.has(item.id)) continue;
+    if (entryConfig(actor, item).hidden) continue;
     buckets.passive.push({
       kind: "passive",
       action: "describe",
@@ -322,8 +349,55 @@ export function collectActions(actor, combatant) {
   return buckets;
 }
 
-/** Used by the economy watcher to know what a used activity costs. */
+/**
+ * Used by the economy watcher to know what a used activity costs. Goes through
+ * poolFor(), so a reassigned entry books against the pool it was moved to no matter
+ * where it was used from - sheet, macro or HUD.
+ *
+ * Note this deliberately ignores the `hidden` flag: hiding something removes it from
+ * the bar, it does not make it free.
+ */
 export function costOfActivity(activity) {
   if (isDescriptiveOnly(activity)) return null;
-  return bucketFor(activity?.activation?.type);
+  return poolFor(activity);
+}
+
+/**
+ * Everything on this actor the config dialog can offer a rule for, including what is
+ * currently hidden (otherwise nothing could ever be un-hidden) and what the world
+ * filters drop. One row per activity, plus one per activity-less feat so passive
+ * entries can be hidden too.
+ */
+export function collectConfigurable(actor) {
+  const rows = [];
+  if (!actor) return rows;
+
+  for (const item of actor.items) {
+    const activities = [...(item.system?.activities ?? [])].filter(a => !isDescriptiveOnly(a));
+    if (!activities.length) {
+      if (item.type !== "feat") continue;
+      rows.push({
+        key: entryKey(item), name: item.name, img: item.img,
+        detail: game.i18n.localize(`${MODULE_ID}.pool.passive`),
+        auto: { pool: "passive", attack: false }, passive: true
+      });
+      continue;
+    }
+    for (const activity of activities) {
+      // Only name the activity when it adds something: dnd5e seeds a lot of them
+      // with the item's own name, and "Longsword - Longsword" helps nobody.
+      const label = activity.name && activity.name !== item.name ? activity.name : "";
+      rows.push({
+        key: entryKey(item, activity),
+        name: item.name,
+        detail: label,
+        img: (activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null) || item.img,
+        auto: {
+          pool: bucketFor(activity.activation?.type),
+          attack: activity.type === "attack" || isAttackSubstituteItem(item)
+        }
+      });
+    }
+  }
+  return rows.sort((a, b) => a.name.localeCompare(b.name) || a.detail.localeCompare(b.detail));
 }

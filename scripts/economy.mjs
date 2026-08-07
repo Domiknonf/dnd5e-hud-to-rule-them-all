@@ -1,6 +1,7 @@
 import { MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION } from "./const.mjs";
 import { requestFromGM } from "./socket.mjs";
-import { getActorConfig, attackSuggestion } from "./config.mjs";
+import { getActorConfig } from "./config.mjs";
+import { guessAttacksPerAction } from "./actions.mjs";
 
 /**
  * SINGLE SOURCE OF TRUTH: the economy lives in a flag on the Combatant document.
@@ -34,7 +35,7 @@ export function getMaxima(combatant) {
  * How many "attack"-type activity uses share a single action this turn (Extra
  * Attack). Order: what was configured for this actor (config.mjs, set by the owner
  * or the GM in the HUD's gear dialog) > best-effort suggestion from a
- * Multiattack-shaped feature's own description text (attackSuggestion, see
+ * Multiattack-shaped feature's own description text (guessAttacksPerAction, see
  * actions.mjs - only reliable for "makes N attacks" phrasing, not mixed attacks
  * like "one bite and one claw") > default of 1 (no Extra Attack).
  *
@@ -48,7 +49,7 @@ export function getAttacksPerAction(combatant) {
   const actor = combatant?.actor;
   const n = Number(getActorConfig(actor).attacksPerAction);
   if (Number.isFinite(n) && n > 0) return n;
-  return attackSuggestion(actor)?.count ?? DEFAULT_ATTACKS_PER_ACTION;
+  return guessAttacksPerAction(actor)?.count ?? DEFAULT_ATTACKS_PER_ACTION;
 }
 
 export function freshEconomy(combatant) {

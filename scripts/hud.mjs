@@ -1,7 +1,7 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import { getEconomy, resetTurn, remaining, getAttacksPerAction } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
-import { openConfig, attackNotice } from "./config.mjs";
+import { openConfig, attackNotice } from "./config-app.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -222,8 +222,8 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         const midAttackSequence = hasFreeAttack && remaining(combatant, key) <= 0;
         const label = game.i18n.localize(`${MODULE_ID}.pool.${key}`);
         const entries = (buckets[key] ?? []).map(entry => {
-          const countsAsAttack = entry.activityType === "attack" || entry.attackSubstitute;
-          const isAttackEntry = key === "action" && countsAsAttack;
+          // Resolved in collectActions, so a per-entry override is already folded in.
+          const isAttackEntry = key === "action" && entry.countsAsAttack;
           // Show "available/total" on attack activities whenever this actor has
           // more than one attack per action configured, so it's visible even before
           // the first attack (not just once mid-sequence) - answers "why can I
@@ -236,7 +236,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
               hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: attacksPerAction })
             };
           }
-          const enriched = { ...entry, locked: midAttackSequence && !countsAsAttack, attacksBadge };
+          const enriched = { ...entry, locked: midAttackSequence && !entry.countsAsAttack, attacksBadge };
           enriched.action ??= "use";
           enriched.tooltipHtml = tooltipFor(enriched, label);
           return enriched;

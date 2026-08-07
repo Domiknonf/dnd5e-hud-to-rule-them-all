@@ -3,8 +3,9 @@ import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy } from "./economy.mjs";
-import { costOfActivity, isAttackSubstitute } from "./actions.mjs";
-import { openConfig, getActorConfig } from "./config.mjs";
+import { costOfActivity, countsAsAttack } from "./actions.mjs";
+import { openConfig } from "./config-app.mjs";
+import { getActorConfig } from "./config.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -56,7 +57,7 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
   // Extra Attack: a queued free attack is always affordable, even once the action
   // pip itself reads as spent. Attack substitutes (Dragonborn Breath Weapon) may
   // stand in for one of those attacks, so they pass the same gate.
-  const isAttack = type === "action" && (activity.type === "attack" || isAttackSubstitute(activity));
+  const isAttack = type === "action" && countsAsAttack(activity);
   const result = checkGate(combatant, type, { isAttack });
   if (result === "allow") return true;
 
@@ -90,7 +91,7 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   // Breath Weapon still means "took the Attack action, replaced one attack", so
   // spendAttack()'s first-use branch (spend the action, queue the rest) is exactly
   // the RAW behaviour.
-  if (type === "action" && (activity.type === "attack" || isAttackSubstitute(activity))) {
+  if (type === "action" && countsAsAttack(activity)) {
     await spendAttack(combatant, { label, uuid: activity.uuid });
     return;
   }

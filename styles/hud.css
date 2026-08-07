@@ -807,6 +807,68 @@
     font-style: italic;
   }
 
+  /* ---- per-entry rules table ----
+     Four columns on a grid rather than a <table>: the name cell has to be the one
+     that shrinks when the dialog narrows, and the three control columns must stay
+     wide enough to read. The list scrolls on its own so the footer stays reachable
+     on a character with forty items. */
+  #hudtra-config .hudtra-config-entries {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  #hudtra-config .hudtra-config-entry-list {
+    overflow-y: auto;
+    min-height: 6rem;
+    padding-right: 0.35rem;
+  }
+  #hudtra-config .hudtra-config-entry-head,
+  #hudtra-config .hudtra-config-entry {
+    display: grid;
+    grid-template-columns: minmax(6rem, 1fr) 9rem 9rem 3rem;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  #hudtra-config .hudtra-config-entry-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-bottom: 0.2rem;
+    background: var(--color-bg, var(--color-bg-option, Canvas));
+    font-size: var(--font-size-12, 0.85em);
+    font-weight: bold;
+    text-align: center;
+  }
+  #hudtra-config .hudtra-config-entry-head > span:first-child { text-align: left; }
+  #hudtra-config .hudtra-config-entry { padding: 0.1rem 0; }
+  #hudtra-config .hudtra-config-entry.is-hidden { opacity: 0.55; }
+  #hudtra-config .hudtra-config-entry-name {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+  #hudtra-config .hudtra-config-entry-name img {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    object-fit: cover;
+    border: none;
+    border-radius: 0.2rem;
+  }
+  #hudtra-config .hudtra-config-entry-name > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #hudtra-config .hudtra-config-entry-name em {
+    opacity: 0.7;
+    font-size: var(--font-size-12, 0.85em);
+  }
+  #hudtra-config .hudtra-config-entry select { width: 100%; }
+  #hudtra-config .hudtra-config-entry input[type="checkbox"] { justify-self: center; }
+
   #hudtra-config .hudtra-config-footer {
     display: flex;
     gap: 0.5rem;

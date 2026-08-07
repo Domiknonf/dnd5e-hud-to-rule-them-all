@@ -84,6 +84,15 @@ export const CONFIGURABLE_POOLS = {
   reaction: { setting: "maxReaction" }
 };
 
+/**
+ * Pools an individual entry may be reassigned to in the config dialog, overriding
+ * ACTIVATION_MAP. Order = display order in the dropdown. `passive` is missing on
+ * purpose: it is not a pool but the bucket for features that cannot be used at all,
+ * and moving a usable activity there would hide it from booking entirely - that is
+ * what the per-entry "hidden" flag is for.
+ */
+export const ASSIGNABLE_POOLS = ["action", "bonus", "reaction", "legendary", "other"];
+
 /** Upper bounds for the config dialog's number inputs. Sanity rails, not rules. */
 export const CONFIG_LIMITS = {
   attacksPerAction: { min: 1, max: 10 },
