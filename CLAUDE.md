@@ -87,10 +87,19 @@ Consequences to respect:
   synthetic token actor's uuid carries its scene and token, so a uuid key written for one
   goblin would never match the base Actor the config is stored on. `entryKey()` builds
   `itemId` or `itemId:activityId`; the activity rule wins over the item rule.
-- Three things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
-  the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `hidden`. All are
-  resolved in `actions.mjs` (`poolFor`, `countsAsAttack`), so the HUD, the gate and the
-  booking path all see the same answer — including usages from the sheet or a macro.
+- Four things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
+  the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `hidden`, and
+  `sort` (position within its pool). The first three are resolved in `actions.mjs`
+  (`poolFor`, `countsAsAttack`), so the HUD, the gate and the booking path all see the
+  same answer — including usages from the sheet or a macro.
+- **The zones are seeded by detection, not empty.** That is what makes the dialog a
+  correction surface instead of something you must fill in before the bar works, and it
+  is what gives the mismatch confirmation something to compare against. Dropping an
+  entry back where detection wanted it *removes* the rule rather than pinning the same
+  value — otherwise "auto" could never be restored by dragging.
+- Reordering writes a `sort` onto every tile in the touched zone. `sort` therefore does
+  **not** count towards an entry's "overridden" mark, or a single reorder would light up
+  the whole zone.
 - `hidden` removes an entry from the bar. It does **not** make it free: `costOfActivity`
   deliberately ignores the flag.
 - Config is stored on the **base** Actor (`configTarget`), so five unlinked goblins from
@@ -155,10 +164,12 @@ Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
   bare global, and likewise for other v13-namespaced helpers. If you are unsure whether a
   global is deprecated, check the console for deprecation warnings rather than guessing.
 - **Declarative click handling.** `data-action="name"` in the template, static handler in
-  `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery. One documented
-  exception: ApplicationV2 only binds `click`/`contextmenu`, so the middle-click
-  description popup needs a single delegated `auxclick` listener in
-  `hud.mjs -> _onFirstRender`. Do not add further listeners.
+  `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery. Two documented
+  exceptions, both because ApplicationV2 only binds `click`/`contextmenu`: the
+  middle-click description popup needs a delegated `auxclick` listener in
+  `hud.mjs -> _onFirstRender`, and the config dialog's drop zones need the four HTML5
+  drag events in `config-app.mjs -> _onFirstRender`. Both are delegated from the
+  persistent root and bound once. Do not add further listeners.
 - **No browser storage.** No `localStorage` or `sessionStorage`. State goes in document
   flags or `game.settings`.
 - **CSS lives in `@layer modules`** and uses Foundry's CSS variables so light and dark

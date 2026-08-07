@@ -1,18 +1,18 @@
 import {
   MODULE_ID, CONFIGURABLE_POOLS, CONFIG_LIMITS, DEFAULT_ATTACKS_PER_ACTION,
-  ASSIGNABLE_POOLS, RESOURCES
+  ASSIGNABLE_POOLS, RESOURCES, HIDDEN_ZONE
 } from "./const.mjs";
 import { guessAttacksPerAction, collectConfigurable } from "./actions.mjs";
-import { configTarget, getActorConfig, setActorConfig, entryKey } from "./config.mjs";
+import { configTarget, getActorConfig, setActorConfig } from "./config.mjs";
 
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 /**
  * PER-ACTOR CONFIGURATION, dialog layer. Storage lives in config.mjs; this file is
  * what the owner (or the GM) uses to fill it in.
  *
  * The detection in actions.mjs is NOT removed by any of this. It is demoted to a
- * suggestion: it prefills this dialog and still serves as the runtime fallback while
+ * suggestion: it seeds the zones below and still serves as the runtime fallback while
  * nothing has been configured (which is what keeps a freshly dropped pack of NPCs
  * usable without clicking through six statblocks first).
  */
@@ -97,12 +97,15 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     classes: ["hudtra-config"],
     tag: "form",
     window: { title: `${MODULE_ID}.config.title`, icon: "fa-solid fa-sliders", resizable: true },
-    position: { width: 760, height: 640 },
+    position: { width: 820, height: 680 },
     form: { handler: HudConfig.#onSubmit, submitOnChange: false, closeOnSubmit: false },
     actions: {
       pickActor: HudConfig.#onPickActor,
       applyNotice: HudConfig.#onApplyNotice,
       dismissNotice: HudConfig.#onDismissNotice,
+      toggleAttack: HudConfig.#onToggleAttack,
+      toggleHidden: HudConfig.#onToggleHidden,
+      resetEntry: HudConfig.#onResetEntry,
       clear: HudConfig.#onClear
     }
   };
@@ -123,6 +126,76 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   selectActor(actor) {
     this.#actorUuid = configTarget(actor)?.uuid ?? null;
     return this;
+  }
+
+  /* -------------------------------------------- */
+  /*  Zones                                       */
+  /* -------------------------------------------- */
+
+  /**
+   * The zones and their tiles, in bar order. Zones are SEEDED BY DETECTION: an entry
+   * nobody ever touched still sits where the module thinks it belongs, so this is a
+   * correction surface, not a blank slate you have to fill in before the bar works.
+   *
+   * HIDDEN_ZONE collects two different things on purpose - what was explicitly hidden
+   * and what detection drops anyway (out-of-combat activations like a 1-minute
+   * ritual). Both answer the same question, "why is this not on my bar", and dragging
+   * either one into a pool is how you overrule it.
+   */
+  #zonesFor(actor, config) {
+    const stored = config.entries ?? {};
+    const rows = collectConfigurable(actor);
+    const zones = new Map();
+    const zoneKeys = [...ASSIGNABLE_POOLS, "passive", HIDDEN_ZONE];
+    for (const key of zoneKeys) zones.set(key, []);
+
+    for (const row of rows) {
+      const set = stored[row.key] ?? {};
+      const auto = row.auto.pool;
+      // An out-of-combat activation has no auto pool at all -> it belongs in the
+      // "not on the bar" zone unless something put it somewhere.
+      let zone = set.hidden ? HIDDEN_ZONE : (set.pool ?? auto ?? HIDDEN_ZONE);
+      if (!zones.has(zone)) zone = HIDDEN_ZONE;
+
+      const attack = typeof set.attack === "boolean" ? set.attack : row.auto.attack;
+      zones.get(zone).push({
+        key: row.key,
+        name: row.name,
+        detail: row.detail,
+        img: row.img,
+        passive: !!row.passive,
+        sort: Number.isFinite(set.sort) ? set.sort : null,
+        attack,
+        attackOverridden: typeof set.attack === "boolean",
+        poolOverridden: !!set.pool && set.pool !== auto,
+        hidden: set.hidden === true,
+        // `sort` deliberately does NOT count as an override: reordering one zone
+        // writes a position onto every tile in it, and marking all of them would
+        // turn the whole zone orange and hand each one a reset button it does not
+        // need. The mark means "a rule was set", not "this was touched".
+        overridden: !!set.pool || typeof set.attack === "boolean" || set.hidden === true,
+        // Only the action pool cares, and only usable entries can consume an attack.
+        showAttack: zone === "action" && !row.passive
+      });
+    }
+
+    for (const tiles of zones.values()) {
+      tiles.sort((a, b) => {
+        const as = a.sort ?? Infinity;
+        const bs = b.sort ?? Infinity;
+        return as !== bs ? as - bs : a.name.localeCompare(b.name);
+      });
+    }
+
+    return zoneKeys.map(key => ({
+      key,
+      label: game.i18n.localize(
+        key === HIDDEN_ZONE ? `${MODULE_ID}.config.zones.hidden` : `${MODULE_ID}.pool.${key}`
+      ),
+      icon: key === HIDDEN_ZONE ? "fa-solid fa-eye-slash" : (RESOURCES[key]?.icon ?? "fa-solid fa-circle"),
+      hint: game.i18n.localize(`${MODULE_ID}.config.zones.${key === HIDDEN_ZONE ? "hiddenHint" : "empty"}`),
+      tiles: zones.get(key)
+    }));
   }
 
   async _prepareContext() {
@@ -159,48 +232,192 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested: suggestion.count })
         : game.i18n.format(`${MODULE_ID}.config.attacksPerAction.none`, { fallback: DEFAULT_ATTACKS_PER_ACTION }),
       pools,
-      entries: actor ? this.#prepareEntries(actor, config) : [],
+      zones: actor ? this.#zonesFor(actor, config) : [],
       limits: CONFIG_LIMITS
     };
   }
 
-  /**
-   * One row per configurable activity. Every dropdown carries an explicit "auto"
-   * option showing what detection would pick, so the row states both what the module
-   * thinks and what was decided - and "auto" stays selectable, which is how a rule
-   * gets removed again.
-   */
-  #prepareEntries(actor, config) {
-    const stored = config.entries ?? {};
-    const poolLabel = key => game.i18n.localize(`${MODULE_ID}.pool.${key}`);
+  /* -------------------------------------------- */
+  /*  Drag and drop                               */
+  /* -------------------------------------------- */
 
-    return collectConfigurable(actor).map(row => {
-      const set = stored[row.key] ?? {};
-      const autoPool = row.auto.pool ? poolLabel(row.auto.pool) : game.i18n.localize(`${MODULE_ID}.config.entries.dropped`);
-      return {
-        key: row.key,
-        name: row.name,
-        detail: row.detail,
-        img: row.img,
-        passive: row.passive,
-        hidden: set.hidden === true,
-        pools: [
-          { value: "", label: game.i18n.format(`${MODULE_ID}.config.entries.auto`, { value: autoPool }), selected: !set.pool }
-        ].concat(ASSIGNABLE_POOLS.filter(k => RESOURCES[k]).map(k => ({
-          value: k, label: poolLabel(k), selected: set.pool === k
-        }))),
-        attacks: [
-          { value: "", selected: typeof set.attack !== "boolean",
-            label: game.i18n.format(`${MODULE_ID}.config.entries.auto`, {
-              value: game.i18n.localize(`${MODULE_ID}.config.entries.attack${row.auto.attack ? "Yes" : "No"}`)
-            }) },
-          { value: "yes", label: game.i18n.localize(`${MODULE_ID}.config.entries.attackYes`), selected: set.attack === true },
-          { value: "no",  label: game.i18n.localize(`${MODULE_ID}.config.entries.attackNo`),  selected: set.attack === false }
-        ]
-      };
-    });
+  /**
+   * DOCUMENTED EXCEPTION to "no manual listeners", the second one in this codebase
+   * after the HUD's auxclick handler. HTML5 drag events cannot be routed through
+   * ApplicationV2's action dispatcher, which binds only click and contextmenu. These
+   * four are delegated from the persistent root element and bound once.
+   * @override
+   */
+  _onFirstRender(context, options) {
+    super._onFirstRender(context, options);
+    const el = this.element;
+    el.addEventListener("dragstart", this.#onDragStart.bind(this));
+    el.addEventListener("dragover", this.#onDragOver.bind(this));
+    el.addEventListener("dragleave", this.#onDragLeave.bind(this));
+    el.addEventListener("drop", this.#onDrop.bind(this));
   }
 
+  #onDragStart(event) {
+    const tile = event.target?.closest?.(".hudtra-tile");
+    if (!tile) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", JSON.stringify({
+      type: "hudtra-entry", key: tile.dataset.key
+    }));
+  }
+
+  #onDragOver(event) {
+    const zone = event.target?.closest?.(".hudtra-zone");
+    if (!zone) return;
+    event.preventDefault();
+    zone.classList.add("drop-target");
+  }
+
+  #onDragLeave(event) {
+    const zone = event.target?.closest?.(".hudtra-zone");
+    // relatedTarget is where the pointer went; ignore moves between a zone's children.
+    if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove("drop-target");
+  }
+
+  async #onDrop(event) {
+    const zone = event.target?.closest?.(".hudtra-zone");
+    if (!zone) return;
+    event.preventDefault();
+    zone.classList.remove("drop-target");
+    const actor = this.actor;
+    if (!actor) return;
+
+    let data = null;
+    try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
+    if (!data) return;
+
+    // Two sources: a tile already in the dialog, or an Item dragged off the sheet.
+    const key = data.type === "hudtra-entry" ? data.key
+      : data.type === "Item" ? await this.#keyForItem(actor, data.uuid)
+      : null;
+    if (!key) return;
+
+    return this.#assign(actor, key, zone.dataset.zone, this.#insertionIndex(zone, event));
+  }
+
+  /**
+   * Resolve an Item dropped from the character sheet to one configurable entry.
+   * Rejects items belonging to somebody else, and items whose activities span several
+   * pools - there the item is not one entry, and silently moving all of its halves is
+   * exactly the behaviour the per-activity keys exist to prevent.
+   */
+  async #keyForItem(actor, uuid) {
+    const item = await fromUuid(uuid).catch(() => null);
+    if (!item) return null;
+    if (configTarget(item.actor)?.uuid !== configTarget(actor)?.uuid) {
+      ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.foreignItem`));
+      return null;
+    }
+    const rows = collectConfigurable(actor).filter(r => r.key === item.id || r.key.startsWith(`${item.id}:`));
+    if (!rows.length) return null;
+    if (rows.length > 1) {
+      ui.notifications.warn(game.i18n.format(`${MODULE_ID}.config.zones.splitItem`, { name: item.name }));
+      return null;
+    }
+    return rows[0].key;
+  }
+
+  /** Reading-order insertion point for a drop inside a wrapping tile grid. */
+  #insertionIndex(zone, event) {
+    const tiles = [...zone.querySelectorAll(".hudtra-tile")];
+    for (let i = 0; i < tiles.length; i++) {
+      const rect = tiles[i].getBoundingClientRect();
+      if (event.clientY < rect.top + rect.height / 2) return i;
+      if (event.clientY <= rect.bottom && event.clientX < rect.left + rect.width / 2) return i;
+    }
+    return tiles.length;
+  }
+
+  /**
+   * Move an entry into a zone at a position, and persist both. Asks first when the
+   * target disagrees with detection - that confirmation is the whole point of seeding
+   * the zones from detection, since it turns a silent override into a decision.
+   */
+  async #assign(actor, key, zone, index) {
+    const config = getActorConfig(actor);
+    const row = collectConfigurable(actor).find(r => r.key === key);
+    if (!row) return;
+
+    if (row.passive && zone !== "passive" && zone !== HIDDEN_ZONE) {
+      return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.passiveOnly`));
+    }
+    if (!row.passive && zone === "passive") {
+      return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.notPassive`));
+    }
+
+    const auto = row.auto.pool;
+    const mismatch = zone !== HIDDEN_ZONE && zone !== "passive" && auto && zone !== auto;
+    if (mismatch) {
+      const esc = Handlebars.escapeExpression;
+      const ok = await DialogV2.confirm({
+        window: { title: game.i18n.localize(`${MODULE_ID}.config.zones.confirmTitle`) },
+        content: `<p>${game.i18n.format(`${MODULE_ID}.config.zones.confirmBody`, {
+          name: esc(row.name),
+          target: esc(game.i18n.localize(`${MODULE_ID}.pool.${zone}`)),
+          detected: esc(game.i18n.localize(`${MODULE_ID}.pool.${auto}`))
+        })}</p>`,
+        modal: true,
+        rejectClose: false
+      }).catch(() => false);
+      if (!ok) return;
+    }
+
+    const entries = foundry.utils.deepClone(config.entries ?? {});
+    const rule = { ...(entries[key] ?? {}) };
+
+    if (zone === HIDDEN_ZONE) rule.hidden = true;
+    else {
+      delete rule.hidden;
+      // Dropping something back where detection wanted it removes the rule instead of
+      // pinning the same value - otherwise "auto" could never be restored by dragging.
+      if (zone === auto || zone === "passive") delete rule.pool;
+      else rule.pool = zone;
+    }
+    entries[key] = rule;
+
+    // Renumber the target zone so the dropped entry sits where it was let go. Only
+    // this zone is touched; every other entry keeps whatever it had.
+    const current = this.#zonesFor(actor, { ...config, entries })
+      .find(z => z.key === zone)?.tiles.map(t => t.key) ?? [];
+    const from = current.indexOf(key);
+    const ordered = current.filter(k => k !== key);
+    // The index came from the rendered grid, which still counted the dragged tile.
+    // Moving an entry further down its own zone therefore has to shift back by one,
+    // or it lands one slot short of where it was dropped.
+    const target = from >= 0 && from < index ? index - 1 : index;
+    ordered.splice(Math.clamp(target, 0, ordered.length), 0, key);
+    ordered.forEach((k, i) => {
+      entries[k] = { ...(entries[k] ?? {}), sort: i };
+    });
+
+    await this.#write(actor, { ...config, entries });
+  }
+
+  /** Persist, dropping rules that no longer say anything. */
+  async #write(actor, config) {
+    const entries = {};
+    for (const [key, rule] of Object.entries(config.entries ?? {})) {
+      const kept = {};
+      if (rule.pool) kept.pool = rule.pool;
+      if (typeof rule.attack === "boolean") kept.attack = rule.attack;
+      if (rule.hidden === true) kept.hidden = true;
+      if (Number.isFinite(rule.sort)) kept.sort = rule.sort;
+      if (Object.keys(kept).length) entries[key] = kept;
+    }
+    const next = { ...config };
+    if (Object.keys(entries).length) next.entries = entries;
+    else delete next.entries;
+    await setActorConfig(actor, next);
+    return this.render();
+  }
+
+  /* -------------------------------------------- */
+  /*  Actions                                     */
   /* -------------------------------------------- */
 
   static async #onSubmit(event, form, formData) {
@@ -211,12 +428,13 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const config = {};
 
     // The write replaces the whole object (see setActorConfig), so anything the form
-    // does not render has to be carried across by hand. seenAttackSuggestion is the
-    // only such field today - losing it would resurrect a dismissed notice on the
-    // next save.
+    // does not render has to be carried across by hand. The zones are not form
+    // fields - they save on every drop - so losing these two here would wipe every
+    // rule the moment somebody edited a number.
     if (previous.seenAttackSuggestion !== undefined) {
       config.seenAttackSuggestion = previous.seenAttackSuggestion;
     }
+    if (previous.entries) config.entries = previous.entries;
 
     const attacks = toInt(raw.attacksPerAction, CONFIG_LIMITS.attacksPerAction);
     if (attacks !== null) config.attacksPerAction = attacks;
@@ -228,20 +446,6 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     if (Object.keys(max).length) config.max = max;
 
-    // Per-entry rules. Only non-default values are kept, so a row left on "auto"
-    // everywhere stores nothing at all - and because the form renders every entry
-    // this actor still has, rules orphaned by a deleted item prune themselves here.
-    const entries = {};
-    for (const [key, value] of Object.entries(raw.entries ?? {})) {
-      const rule = {};
-      if (value.pool && RESOURCES[value.pool]) rule.pool = value.pool;
-      if (value.attack === "yes") rule.attack = true;
-      else if (value.attack === "no") rule.attack = false;
-      if (value.hidden === true) rule.hidden = true;
-      if (Object.keys(rule).length) entries[key] = rule;
-    }
-    if (Object.keys(entries).length) config.entries = entries;
-
     await setActorConfig(actor, config);
     ui.notifications.info(game.i18n.format(`${MODULE_ID}.config.saved`, { name: actor.name }));
     return this.render();
@@ -250,6 +454,48 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onPickActor(event, target) {
     this.#actorUuid = target.dataset.actorUuid ?? null;
     return this.render();
+  }
+
+  /**
+   * Flip whether this entry consumes one attack inside the Attack action. Stored as
+   * an explicit boolean, but cleared again when it would only repeat what detection
+   * already says - so the button is a two-state toggle to use and tri-state to store.
+   */
+  static async #onToggleAttack(event, target) {
+    const actor = this.actor;
+    const key = target.closest(".hudtra-tile")?.dataset.key;
+    if (!actor || !key) return;
+    const config = getActorConfig(actor);
+    const row = collectConfigurable(actor).find(r => r.key === key);
+    if (!row) return;
+    const rule = { ...(config.entries?.[key] ?? {}) };
+    const current = typeof rule.attack === "boolean" ? rule.attack : row.auto.attack;
+    const next = !current;
+    if (next === row.auto.attack) delete rule.attack;
+    else rule.attack = next;
+    return this.#write(actor, { ...config, entries: { ...(config.entries ?? {}), [key]: rule } });
+  }
+
+  static async #onToggleHidden(event, target) {
+    const actor = this.actor;
+    const key = target.closest(".hudtra-tile")?.dataset.key;
+    if (!actor || !key) return;
+    const config = getActorConfig(actor);
+    const rule = { ...(config.entries?.[key] ?? {}) };
+    if (rule.hidden) delete rule.hidden;
+    else rule.hidden = true;
+    return this.#write(actor, { ...config, entries: { ...(config.entries ?? {}), [key]: rule } });
+  }
+
+  /** Drop every rule for one entry, back to whatever detection says. */
+  static async #onResetEntry(event, target) {
+    const actor = this.actor;
+    const key = target.closest(".hudtra-tile")?.dataset.key;
+    if (!actor || !key) return;
+    const config = getActorConfig(actor);
+    const entries = { ...(config.entries ?? {}) };
+    delete entries[key];
+    return this.#write(actor, { ...config, entries });
   }
 
   /** Take the suggestion: the configured count becomes the suggested one. */

@@ -4,16 +4,13 @@
   "dnd5e-hud-to-rule-them-all.endTurn": "End turn",
   "dnd5e-hud-to-rule-them-all.openSheet": "Open character sheet",
   "dnd5e-hud-to-rule-them-all.deathSave": "Roll a death saving throw",
-
   "dnd5e-hud-to-rule-them-all.pool.action": "Action",
   "dnd5e-hud-to-rule-them-all.pool.bonus": "Bonus Action",
   "dnd5e-hud-to-rule-them-all.pool.reaction": "Reaction",
   "dnd5e-hud-to-rule-them-all.pool.legendary": "Legendary Action",
   "dnd5e-hud-to-rule-them-all.pool.other": "Other",
   "dnd5e-hud-to-rule-them-all.pool.passive": "Passive",
-
   "dnd5e-hud-to-rule-them-all.attacksAvailable": "{available}/{max} attacks available this action",
-
   "dnd5e-hud-to-rule-them-all.tooltip.range": "Range",
   "dnd5e-hud-to-rule-them-all.tooltip.target": "Target",
   "dnd5e-hud-to-rule-them-all.tooltip.damage": "Damage",
@@ -22,10 +19,8 @@
   "dnd5e-hud-to-rule-them-all.close": "Close",
   "dnd5e-hud-to-rule-them-all.toggleBar": "Collapse or expand the bar",
   "dnd5e-hud-to-rule-them-all.closeDescription": "Close the description",
-
   "dnd5e-hud-to-rule-them-all.notify.exhausted": "No {pool} left this turn.",
   "dnd5e-hud-to-rule-them-all.notify.noGM": "A GM must be online for this.",
-
   "dnd5e-hud-to-rule-them-all.config.title": "HUD configuration",
   "dnd5e-hud-to-rule-them-all.config.open": "Configure this character's HUD",
   "dnd5e-hud-to-rule-them-all.config.notice.gear": "New suggestion from \"{feature}\": {count} attacks per Attack action (configured: {configured})",
@@ -41,25 +36,13 @@
   "dnd5e-hud-to-rule-them-all.config.attacksPerAction.none": "Nothing detected automatically. Leave empty for {fallback} attack per action.",
   "dnd5e-hud-to-rule-them-all.config.pools.name": "Pool sizes",
   "dnd5e-hud-to-rule-them-all.config.pools.hint": "Leave empty to use the world default. Legendary actions come from the character sheet.",
-  "dnd5e-hud-to-rule-them-all.config.entries.name": "Entries",
-  "dnd5e-hud-to-rule-them-all.config.entries.hint": "Per-entry rules. \"Auto\" shows what detection picks and is always selectable again — that is how a rule is removed.",
-  "dnd5e-hud-to-rule-them-all.config.entries.pool": "Pool",
-  "dnd5e-hud-to-rule-them-all.config.entries.attack": "Attack action",
-  "dnd5e-hud-to-rule-them-all.config.entries.hide": "Hide",
-  "dnd5e-hud-to-rule-them-all.config.entries.auto": "Auto ({value})",
-  "dnd5e-hud-to-rule-them-all.config.entries.attackYes": "Uses one attack",
-  "dnd5e-hud-to-rule-them-all.config.entries.attackNo": "Own action",
-  "dnd5e-hud-to-rule-them-all.config.entries.dropped": "not shown",
-  "dnd5e-hud-to-rule-them-all.config.entries.none": "This character has nothing to configure.",
   "dnd5e-hud-to-rule-them-all.config.save": "Save",
   "dnd5e-hud-to-rule-them-all.config.clear": "Reset to automatic",
   "dnd5e-hud-to-rule-them-all.config.saved": "{name}: HUD configuration saved.",
   "dnd5e-hud-to-rule-them-all.config.cleared": "{name}: HUD configuration reset to automatic.",
-
   "dnd5e-hud-to-rule-them-all.settings.actorConfig.name": "Per-character configuration",
   "dnd5e-hud-to-rule-them-all.settings.actorConfig.label": "Configure characters",
   "dnd5e-hud-to-rule-them-all.settings.actorConfig.hint": "Attacks per action and pool sizes, per character. The GM can configure every character, players their own.",
-
   "dnd5e-hud-to-rule-them-all.settings.maxAction.name": "Actions per turn",
   "dnd5e-hud-to-rule-them-all.settings.maxAction.hint": "Default pool size for actions.",
   "dnd5e-hud-to-rule-them-all.settings.maxBonus.name": "Bonus actions per turn",
@@ -82,5 +65,18 @@
   "dnd5e-hud-to-rule-them-all.settings.scale.name": "HUD scale",
   "dnd5e-hud-to-rule-them-all.settings.scale.hint": "Size of the HUD on your screen.",
   "dnd5e-hud-to-rule-them-all.settings.showOnOthersTurn.name": "Show on other turns",
-  "dnd5e-hud-to-rule-them-all.settings.showOnOthersTurn.hint": "Keeps the HUD visible so you can spend reactions."
+  "dnd5e-hud-to-rule-them-all.settings.showOnOthersTurn.hint": "Keeps the HUD visible so you can spend reactions.",
+  "dnd5e-hud-to-rule-them-all.config.zones.hint": "Drag entries between zones to change which pool they use, or drag an item straight from the character sheet. Drag within a zone to set the order the bar shows.",
+  "dnd5e-hud-to-rule-them-all.config.zones.hidden": "Not on the bar",
+  "dnd5e-hud-to-rule-them-all.config.zones.hiddenHint": "Nothing hidden. Drop something here to keep it off the bar.",
+  "dnd5e-hud-to-rule-them-all.config.zones.empty": "Nothing here. Drop an entry to add it.",
+  "dnd5e-hud-to-rule-them-all.config.zones.confirmTitle": "Detection disagrees",
+  "dnd5e-hud-to-rule-them-all.config.zones.confirmBody": "You are moving \"{name}\" to {target}, but it is detected as {detected}. Move it anyway?",
+  "dnd5e-hud-to-rule-them-all.config.zones.attackToggle": "Counts as one attack within the Attack action",
+  "dnd5e-hud-to-rule-them-all.config.zones.hideToggle": "Show or hide on the bar",
+  "dnd5e-hud-to-rule-them-all.config.zones.resetEntry": "Reset this entry to automatic",
+  "dnd5e-hud-to-rule-them-all.config.zones.passiveOnly": "A passive feature cannot be used, so it can only be shown or hidden.",
+  "dnd5e-hud-to-rule-them-all.config.zones.notPassive": "Only features without a usable activity belong in Passive.",
+  "dnd5e-hud-to-rule-them-all.config.zones.foreignItem": "That item belongs to a different character.",
+  "dnd5e-hud-to-rule-them-all.config.zones.splitItem": "\"{name}\" has activities in different pools — drag its individual entries instead."
 }

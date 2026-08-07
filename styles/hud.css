@@ -807,67 +807,98 @@
     font-style: italic;
   }
 
-  /* ---- per-entry rules table ----
-     Four columns on a grid rather than a <table>: the name cell has to be the one
-     that shrinks when the dialog narrows, and the three control columns must stay
-     wide enough to read. The list scrolls on its own so the footer stays reachable
-     on a character with forty items. */
-  #hudtra-config .hudtra-config-entries {
+  /* ---- drop zones (config.hbs) ----
+     One zone per pool plus "not on the bar". Seeded by detection, so this is a
+     correction surface rather than a blank slate. Dragging is delegated from the
+     dialog root - see HudConfig#_onFirstRender. */
+  #hudtra-config .hudtra-config-zones {
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    flex: 1 1 auto;
-  }
-  #hudtra-config .hudtra-config-entry-list {
+    gap: 0.4rem;
     overflow-y: auto;
-    min-height: 6rem;
+    min-height: 8rem;
+    flex: 1 1 auto;
     padding-right: 0.35rem;
   }
-  #hudtra-config .hudtra-config-entry-head,
-  #hudtra-config .hudtra-config-entry {
-    display: grid;
-    grid-template-columns: minmax(6rem, 1fr) 9rem 9rem 3rem;
-    align-items: center;
-    gap: 0.4rem;
+  #hudtra-config .hudtra-zone {
+    border: 1px dashed var(--color-border-light-tertiary, rgb(128 128 128 / 0.4));
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.45rem 0.45rem;
+    transition: border-color 120ms, background-color 120ms;
   }
-  #hudtra-config .hudtra-config-entry-head {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding-bottom: 0.2rem;
-    background: var(--color-bg, var(--color-bg-option, Canvas));
+  #hudtra-config .hudtra-zone.drop-target {
+    border-style: solid;
+    border-color: var(--color-border-highlight, #7ba7d7);
+    background: rgb(123 167 215 / 0.12);
+  }
+  #hudtra-config .hudtra-zone > h4 {
+    margin: 0 0 0.3rem;
+    font-size: var(--font-size-13, 0.95em);
+    opacity: 0.85;
+  }
+  #hudtra-config .hudtra-zone-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    min-height: 2rem;
+    align-content: flex-start;
+  }
+  #hudtra-config .hudtra-zone-empty {
+    margin: 0;
+    padding: 0.25rem;
+    font-style: italic;
+    opacity: 0.55;
     font-size: var(--font-size-12, 0.85em);
-    font-weight: bold;
-    text-align: center;
   }
-  #hudtra-config .hudtra-config-entry-head > span:first-child { text-align: left; }
-  #hudtra-config .hudtra-config-entry { padding: 0.1rem 0; }
-  #hudtra-config .hudtra-config-entry.is-hidden { opacity: 0.55; }
-  #hudtra-config .hudtra-config-entry-name {
+
+  #hudtra-config .hudtra-tile {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    min-width: 0;
+    gap: 0.35rem;
+    max-width: 100%;
+    padding: 0.2rem 0.4rem 0.2rem 0.2rem;
+    border: 1px solid var(--color-border-light-tertiary, rgb(128 128 128 / 0.4));
+    border-radius: 0.3rem;
+    background: var(--color-bg-option, rgb(128 128 128 / 0.12));
+    cursor: grab;
   }
-  #hudtra-config .hudtra-config-entry-name img {
+  #hudtra-config .hudtra-tile:active { cursor: grabbing; }
+  /* A rule was set on this entry - the only visual difference between "the module
+     decided" and "you decided". */
+  #hudtra-config .hudtra-tile.overridden { border-color: #b8651a; }
+  #hudtra-config .hudtra-tile img {
     flex: 0 0 auto;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.6rem;
+    height: 1.6rem;
     object-fit: cover;
     border: none;
     border-radius: 0.2rem;
+    pointer-events: none;
   }
-  #hudtra-config .hudtra-config-entry-name > span {
+  #hudtra-config .hudtra-tile-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    pointer-events: none;
   }
-  #hudtra-config .hudtra-config-entry-name em {
-    opacity: 0.7;
-    font-size: var(--font-size-12, 0.85em);
+  #hudtra-config .hudtra-tile-name em { opacity: 0.7; font-size: var(--font-size-12, 0.85em); }
+  #hudtra-config .hudtra-tile-tools {
+    display: flex;
+    gap: 0.1rem;
+    flex: 0 0 auto;
   }
-  #hudtra-config .hudtra-config-entry select { width: 100%; }
-  #hudtra-config .hudtra-config-entry input[type="checkbox"] { justify-self: center; }
+  #hudtra-config .hudtra-tile-tools button {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: none;
+    background: none;
+    opacity: 0.4;
+    line-height: 1;
+  }
+  #hudtra-config .hudtra-tile-tools button:hover { opacity: 1; }
+  #hudtra-config .hudtra-tile-tools button.on { opacity: 0.9; color: #b8651a; }
+  #hudtra-config .hudtra-tile-tools button.set { text-shadow: 0 0 0.4rem currentColor; }
 
   #hudtra-config .hudtra-config-footer {
     display: flex;

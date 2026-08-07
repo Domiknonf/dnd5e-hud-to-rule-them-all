@@ -93,6 +93,14 @@ export const CONFIGURABLE_POOLS = {
  */
 export const ASSIGNABLE_POOLS = ["action", "bonus", "reaction", "legendary", "other"];
 
+/**
+ * Zone key in the config dialog for "not on the bar". Not a pool and never stored as
+ * one - dropping into it writes `hidden`. It collects both what was hidden by hand
+ * and what has no pool at all (out-of-combat activations), because both answer the
+ * same question and both are undone the same way: drag it into a pool.
+ */
+export const HIDDEN_ZONE = "hidden";
+
 /** Upper bounds for the config dialog's number inputs. Sanity rails, not rules. */
 export const CONFIG_LIMITS = {
   attacksPerAction: { min: 1, max: 10 },

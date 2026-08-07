@@ -1,5 +1,7 @@
 {{!-- Per-actor HUD configuration. The application's tag is <form>, so everything
-     below already sits inside it - the submit button needs no form attribute. --}}
+     below already sits inside it - the submit button needs no form attribute.
+     Note what is NOT a form field: the zones save on every drop, which is why
+     #onSubmit has to carry `entries` across by hand. --}}
 <div class="hudtra-config-body">
 
   {{!-- Left column: every actor this user may configure. A player sees their own
@@ -42,64 +44,75 @@
     </div>
     {{/if}}
 
-    <div class="form-group">
-      <label for="hudtra-cfg-attacks">
-        {{localize "dnd5e-hud-to-rule-them-all.config.attacksPerAction.name"}}
-      </label>
-      <div class="form-fields">
-        <input type="number" id="hudtra-cfg-attacks" name="attacksPerAction"
-               min="{{limits.attacksPerAction.min}}" max="{{limits.attacksPerAction.max}}" step="1"
-               value="{{attacksPerAction}}" placeholder="{{attacksPlaceholder}}">
+    <div class="hudtra-config-numbers">
+      <div class="form-group">
+        <label for="hudtra-cfg-attacks">
+          {{localize "dnd5e-hud-to-rule-them-all.config.attacksPerAction.name"}}
+        </label>
+        <div class="form-fields">
+          <input type="number" id="hudtra-cfg-attacks" name="attacksPerAction"
+                 min="{{limits.attacksPerAction.min}}" max="{{limits.attacksPerAction.max}}" step="1"
+                 value="{{attacksPerAction}}" placeholder="{{attacksPlaceholder}}">
+        </div>
+        <p class="hint">{{attacksHint}}</p>
       </div>
-      <p class="hint">{{attacksHint}}</p>
+
+      <fieldset class="hudtra-config-pools">
+        <legend>{{localize "dnd5e-hud-to-rule-them-all.config.pools.name"}}</legend>
+        {{#each pools}}
+        <div class="form-group">
+          <label for="hudtra-cfg-max-{{key}}">{{label}}</label>
+          <div class="form-fields">
+            <input type="number" id="hudtra-cfg-max-{{key}}" name="max.{{key}}"
+                   min="{{../limits.poolMax.min}}" max="{{../limits.poolMax.max}}" step="1"
+                   value="{{value}}" placeholder="{{placeholder}}">
+          </div>
+        </div>
+        {{/each}}
+        <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.pools.hint"}}</p>
+      </fieldset>
     </div>
 
-    <fieldset class="hudtra-config-pools">
-      <legend>{{localize "dnd5e-hud-to-rule-them-all.config.pools.name"}}</legend>
-      {{#each pools}}
-      <div class="form-group">
-        <label for="hudtra-cfg-max-{{key}}">{{label}}</label>
-        <div class="form-fields">
-          <input type="number" id="hudtra-cfg-max-{{key}}" name="max.{{key}}"
-                 min="{{../limits.poolMax.min}}" max="{{../limits.poolMax.max}}" step="1"
-                 value="{{value}}" placeholder="{{placeholder}}">
-        </div>
-      </div>
-      {{/each}}
-      <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.pools.hint"}}</p>
-    </fieldset>
-
-    {{!-- Per-entry rules. Every dropdown keeps an "auto" option that names what the
-         detection would pick, so a rule can always be taken back off again. --}}
-    <fieldset class="hudtra-config-entries">
-      <legend>{{localize "dnd5e-hud-to-rule-them-all.config.entries.name"}}</legend>
-      <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.entries.hint"}}</p>
-      <div class="hudtra-config-entry-list">
-        <div class="hudtra-config-entry-head">
-          <span></span>
-          <span>{{localize "dnd5e-hud-to-rule-them-all.config.entries.pool"}}</span>
-          <span>{{localize "dnd5e-hud-to-rule-them-all.config.entries.attack"}}</span>
-          <span>{{localize "dnd5e-hud-to-rule-them-all.config.entries.hide"}}</span>
-        </div>
-        {{#each entries}}
-        <div class="hudtra-config-entry {{#if hidden}}is-hidden{{/if}}">
-          <span class="hudtra-config-entry-name">
+    {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item
+         straight off the character sheet, to overrule where it belongs; drag within
+         a zone to set the order the bar shows. --}}
+    <div class="hudtra-config-zones">
+      <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.zones.hint"}}</p>
+      {{#each zones}}
+      <section class="hudtra-zone" data-zone="{{key}}">
+        <h4><i class="{{icon}}"></i> {{label}}</h4>
+        <div class="hudtra-zone-tiles">
+          {{#each tiles}}
+          <div class="hudtra-tile {{#if overridden}}overridden{{/if}}" draggable="true" data-key="{{key}}">
             <img src="{{img}}" alt="">
-            <span>{{name}}{{#if detail}} <em>{{detail}}</em>{{/if}}</span>
-          </span>
-          <select name="entries.{{key}}.pool" {{#if passive}}disabled{{/if}}>
-            {{#each pools}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
-          </select>
-          <select name="entries.{{key}}.attack" {{#if passive}}disabled{{/if}}>
-            {{#each attacks}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
-          </select>
-          <input type="checkbox" name="entries.{{key}}.hidden" {{#if hidden}}checked{{/if}}>
+            <span class="hudtra-tile-name">{{name}}{{#if detail}} <em>{{detail}}</em>{{/if}}</span>
+            <span class="hudtra-tile-tools">
+              {{#if showAttack}}
+              <button type="button" data-action="toggleAttack"
+                      class="{{#if attack}}on{{/if}} {{#if attackOverridden}}set{{/if}}"
+                      data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.attackToggle">
+                <i class="fa-solid fa-hand-fist"></i>
+              </button>
+              {{/if}}
+              <button type="button" data-action="toggleHidden"
+                      data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.hideToggle">
+                <i class="fa-solid {{#if hidden}}fa-eye{{else}}fa-eye-slash{{/if}}"></i>
+              </button>
+              {{#if overridden}}
+              <button type="button" data-action="resetEntry"
+                      data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.resetEntry">
+                <i class="fa-solid fa-rotate-left"></i>
+              </button>
+              {{/if}}
+            </span>
+          </div>
+          {{else}}
+          <p class="hudtra-zone-empty">{{hint}}</p>
+          {{/each}}
         </div>
-        {{else}}
-        <p class="hudtra-config-empty">{{localize "dnd5e-hud-to-rule-them-all.config.entries.none"}}</p>
-        {{/each}}
-      </div>
-    </fieldset>
+      </section>
+      {{/each}}
+    </div>
 
     <footer class="hudtra-config-footer">
       <button type="submit" class="hudtra-config-save">
