@@ -117,6 +117,11 @@ Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
 - **ApplicationV2 only.** `foundry.applications.api.HandlebarsApplicationMixin(ApplicationV2)`.
   Never `Application`, `FormApplication` or `Dialog` — all deprecated in v13. Use
   `DialogV2` for prompts.
+- **Every `PARTS` template renders exactly one root element**, always — including the
+  branch where there is nothing to show. Two siblings, or an empty render, throws
+  `Template part "…" must render a single HTML element` and the application never
+  appears. Put the `{{#if}}` *inside* the wrapper, never around it. This is why
+  `hud.hbs` opens with `.hudtra-root`.
 - **Namespaced globals.** Prefer `foundry.applications.handlebars.loadTemplates` over the
   bare global, and likewise for other v13-namespaced helpers. If you are unsure whether a
   global is deprecated, check the console for deprecation warnings rather than guessing.

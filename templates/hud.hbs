@@ -1,3 +1,10 @@
+{{!-- ApplicationV2 requires every PARTS template to render EXACTLY ONE root element,
+     so this wrapper is mandatory, not cosmetic: the bar and the re-open handle are
+     siblings (see the handle's own comment below), and an empty render - possible
+     for a moment before refreshHUD() closes the app - still has to produce one
+     element. It also spans the full width, which is what lets the handle sit in the
+     viewport's corner while the frame itself stays centred. --}}
+<div class="hudtra-root">
 {{#if hasSubject}}
 {{!-- --hudtra-scale drives the whole bar's em-based sizing (per-user "HUD scale"
      setting); --hudtra-hp-pct feeds the portrait's conic-gradient HP ring. Both are
@@ -116,3 +123,4 @@
   <i class="fa-solid fa-chevron-up"></i>
 </button>
 {{/if}}
+</div>

@@ -38,6 +38,17 @@
     pointer-events: none;
   }
 
+  /* Single root element for the template part (ApplicationV2 requires exactly one).
+     It spans the full width and carries `position: relative`, which is what makes it
+     the containing block for .hudtra-reopen - the frame can't do that job because
+     its collapse transform would drag the handle along. */
+  #hud-to-rule-them-all .hudtra-root {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+  }
+
   /* Don't rely on core's global border-box reset staying reachable from our layer. */
   #hud-to-rule-them-all,
   #hud-to-rule-them-all *,
@@ -100,11 +111,11 @@
   #hud-to-rule-them-all.collapsed .hudtra-collapse i { transform: rotate(180deg); }
 
   /* ---- re-open handle for the collapsed bar (see hud.hbs) ----
-     Sibling of .hudtra-frame, so the frame's collapse transform doesn't move it -
-     and, just as importantly, doesn't make it the containing block. Pinned to the
-     viewport's bottom-right corner, clear of Foundry's centred macro bar. Sized
-     from a core variable rather than the bar's own em scale, which lives on the
-     frame and is out of reach from here. */
+     Sibling of .hudtra-frame, positioned against .hudtra-root, so the frame's
+     collapse transform doesn't move it - and, just as importantly, doesn't make it
+     the containing block. Pinned to the bottom-right corner, clear of Foundry's
+     centred macro bar. Sized from a core variable rather than the bar's own em
+     scale, which lives on the frame and is out of reach from here. */
   #hud-to-rule-them-all .hudtra-reopen { display: none; }
   #hud-to-rule-them-all.collapsed .hudtra-reopen {
     display: block;
