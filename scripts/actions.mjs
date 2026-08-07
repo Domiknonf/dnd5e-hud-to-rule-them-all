@@ -377,12 +377,31 @@ export function collectConfigurable(actor) {
     if (!activities.length) {
       if (item.type !== "feat") continue;
       rows.push({
-        key: entryKey(item), name: item.name, img: item.img,
-        detail: game.i18n.localize(`${MODULE_ID}.pool.passive`),
+        key: entryKey(item), name: item.name, img: item.img, detail: "",
         auto: { pool: "passive", attack: false }, passive: true
       });
       continue;
     }
+
+    // MIRROR collectActions' GROUPING. An item whose activities all land in the same
+    // pool is ONE button in the bar (Cunning Action: Dash/Disengage/Hide behind
+    // dnd5e's own activity picker), so it gets ONE row here - a config list at a
+    // different granularity than the thing it configures is just a trap. Only an
+    // item that genuinely splits across pools (Net: Attack = action, Utility =
+    // bonus) needs a row per activity, because there one rule must not drag the
+    // other half along.
+    const pools = new Set(activities.map(a => bucketFor(a.activation?.type)));
+    if (pools.size === 1) {
+      rows.push({
+        key: entryKey(item), name: item.name, img: item.img, detail: "",
+        auto: {
+          pool: [...pools][0],
+          attack: activities.some(a => a.type === "attack") || isAttackSubstituteItem(item)
+        }
+      });
+      continue;
+    }
+
     for (const activity of activities) {
       // Only name the activity when it adds something: dnd5e seeds a lot of them
       // with the item's own name, and "Longsword - Longsword" helps nobody.
