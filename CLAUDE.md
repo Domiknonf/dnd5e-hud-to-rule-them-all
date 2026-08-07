@@ -30,6 +30,12 @@ once. Check them by hand after touching templates or imports:
 - **Every `PARTS` template renders exactly one root element** — count roots with a depth
   counter, not by balancing tags. Two siblings and zero roots both throw.
 - **No import cycles between `scripts/*.mjs`** — walk the `from "./x.mjs"` graph.
+- **No i18n key is both a leaf and a branch.** Foundry expands the dotted keys in
+  `lang/en.json` into a nested object, so shipping `…entries.attack` *and*
+  `…entries.attack.yes` asks one key to be a string and an object at once. That takes
+  down the module's whole translation table — every key everywhere renders raw, which
+  looks nothing like an i18n bug. `JSON.parse` cannot see it; check for any key that is
+  a prefix of another key plus a dot.
 
 Verification is manual, in a running Foundry world. If a change cannot be verified by
 reading the code, say so rather than claiming it works.

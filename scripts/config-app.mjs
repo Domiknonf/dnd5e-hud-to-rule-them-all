@@ -192,10 +192,10 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         attacks: [
           { value: "", selected: typeof set.attack !== "boolean",
             label: game.i18n.format(`${MODULE_ID}.config.entries.auto`, {
-              value: game.i18n.localize(`${MODULE_ID}.config.entries.attack.${row.auto.attack ? "yes" : "no"}`)
+              value: game.i18n.localize(`${MODULE_ID}.config.entries.attack${row.auto.attack ? "Yes" : "No"}`)
             }) },
-          { value: "yes", label: game.i18n.localize(`${MODULE_ID}.config.entries.attack.yes`), selected: set.attack === true },
-          { value: "no",  label: game.i18n.localize(`${MODULE_ID}.config.entries.attack.no`),  selected: set.attack === false }
+          { value: "yes", label: game.i18n.localize(`${MODULE_ID}.config.entries.attackYes`), selected: set.attack === true },
+          { value: "no",  label: game.i18n.localize(`${MODULE_ID}.config.entries.attackNo`),  selected: set.attack === false }
         ]
       };
     });
