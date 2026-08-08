@@ -123,6 +123,12 @@ Consequences to respect:
   is what gives the mismatch confirmation something to compare against. Dropping an
   entry back where detection wanted it *removes* the rule rather than pinning the same
   value — otherwise "auto" could never be restored by dragging.
+- **The Multiattack editor is seeded the same way**, from `suggestMultiattack()`, but
+  only while nothing is configured — what is stored always wins. Nothing is written
+  until Save, so closing the dialog declines the offer, and a banner says the prefill
+  is not in force yet. Unlike the zones there is no live fallback behind it:
+  `multiattackOptions()` reads config and nothing else, so an unsaved prefill has no
+  effect on the bar at all.
 - Reordering writes a `sort` onto every tile in the touched zone. `sort` therefore does
   **not** count towards an entry's "overridden" mark, or a single reorder would light up
   the whole zone.
@@ -139,9 +145,22 @@ Consequences to respect:
   holds the count that was waved away, so silencing "3" is permanent for 3 while a later
   tier suggesting 4 raises the mark again on its own. A boolean would swallow every
   future level-up and would have to be reset by hand — which defeats the feature.
+  `config.seenMultiattackSuggestion` does the same for the Multiattack, holding the
+  `multiattackKey()` signature of the reading that was answered. Re-statting a creature
+  changes the signature and raises the mark again; reordering the alternatives does not,
+  because that is the same answer. Saving the editor records it too — the reading was on
+  screen, prefilled, and the player pressed Save.
+- **The Multiattack mark is silent for what a number already covers.** A statblock
+  reading of one alternative with one attack *is* an attacks-per-action number, and
+  `attackNotice` already speaks for that. Marking it here as well would put a permanent
+  mark on every ordinary monster in the encounter. There is no one-click "apply"
+  either: applying would write a guess into the config, so the offer is the editor
+  opening prefilled with it.
 - Whatever the dialog does not render has to be carried across in `#onSubmit`: the write
   replaces the whole config object, so an unlisted field is a field that gets deleted on
-  the next save.
+  the next save. That is now **four** fields — `entries`, `seenAttackSuggestion`,
+  `multiattack`, `seenMultiattackSuggestion` — and forgetting one has already silently
+  deleted a configured Multiattack once. Add to that list whenever you add a field.
 - When you extend this, add a field to the dialog rather than a new heuristic.
 
 ### The bar's lifecycle
