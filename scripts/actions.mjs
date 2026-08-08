@@ -277,13 +277,18 @@ export function enumerateEntries(actor) {
   if (!actor) return entries;
   const produced = new Set();
 
-  const make = (item, activities, pool, passive = false) => {
+  const make = (item, activities, pool, passive = false, allActivities = activities) => {
     const first = activities[0] ?? null;
     const rule = entryConfig(actor, item, first);
     produced.add(item.id);
     return {
       key: activities.length ? entryKey(item, first) : entryKey(item),
       keys: activities.length ? activities.map(a => entryKey(item, a)) : [entryKey(item)],
+      // The item-level key, plus every activity key the item has - not just this
+      // group's. A rule set on the item covers activities it grows later, which a
+      // pile of per-activity rules never can.
+      itemKey: entryKey(item),
+      allKeys: allActivities.map(a => entryKey(item, a)),
       item, activities, pool, passive,
       // Whether there is anything to fire. Governs one thing only: may this be
       // dragged into a pool. A passive feat that does carry activities can be.
@@ -318,8 +323,8 @@ export function enumerateEntries(actor) {
     }
 
     if (byPool.size) {
-      for (const [pool, group] of byPool) entries.push(make(item, group, pool));
-      if (unpooled.length) entries.push(make(item, unpooled, null));
+      for (const [pool, group] of byPool) entries.push(make(item, group, pool, false, activities));
+      if (unpooled.length) entries.push(make(item, unpooled, null, false, activities));
       continue;
     }
     // Nothing lands anywhere. A feat drops through to the passive section - whether
@@ -423,10 +428,22 @@ export function costOfActivity(activity) {
  * hidden ones (nothing could be un-hidden otherwise) and the ones with no pool.
  */
 export function collectConfigurable(actor) {
-  return enumerateEntries(actor)
+  const entries = enumerateEntries(actor);
+  // How many buttons one item produces. Anything above 1 means its activities
+  // disagree about which pool they cost - a Planetar's Divine Aid, whose `cast`
+  // activities each report the CASTING TIME OF THE SPELL rather than what the
+  // feature costs. The dialog surfaces that instead of letting it look like two
+  // unrelated things.
+  const perItem = new Map();
+  for (const e of entries) perItem.set(e.item.id, (perItem.get(e.item.id) ?? 0) + 1);
+
+  return entries
     .map(entry => ({
       key: entry.key,
       keys: entry.keys,
+      itemKey: entry.itemKey,
+      allKeys: entry.allKeys,
+      split: (perItem.get(entry.item.id) ?? 1) > 1,
       name: entry.item.name,
       detail: activityLabel(entry),
       img: entryImage(entry),

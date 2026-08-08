@@ -86,6 +86,8 @@
           <div class="hudtra-tile {{#if overridden}}overridden{{/if}}" draggable="true" data-key="{{key}}">
             <img src="{{img}}" alt="">
             <span class="hudtra-tile-name">{{name}}{{#if detail}} <em>{{detail}}</em>{{/if}}</span>
+            {{#if split}}<i class="hudtra-tile-split fa-solid fa-link-slash"
+                            data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.splitMark"></i>{{/if}}
             <span class="hudtra-tile-tools">
               {{#if showAttack}}
               <button type="button" data-action="toggleAttack"

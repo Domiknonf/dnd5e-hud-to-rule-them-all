@@ -87,6 +87,16 @@ Consequences to respect:
   synthetic token actor's uuid carries its scene and token, so a uuid key written for one
   goblin would never match the base Actor the config is stored on. `entryKey()` builds
   `itemId` or `itemId:activityId`; the activity rule wins over the item rule.
+- **Prefer the item-level key.** A rule on `itemId` also covers activities the item gains
+  later; a pile of per-activity rules does not. A drop writes the item key whenever the
+  dragged button already covers the whole item.
+- **Some items split across pools, and no heuristic fixes that.** dnd5e models "as a bonus
+  action, cast one of these" as several `cast` activities, and a non-overriding `cast`
+  activity reports the *spell's* casting time, not what the feature costs — so a Planetar's
+  Divine Aid arrives as one Action button and one Bonus Action button although the sheet
+  lists it once as a Bonus Action. `collectConfigurable` marks those entries `split`, the
+  dialog shows a link-slash icon on them, and the drop asks "move all of it or just this
+  group?" with *all of it* as the default. Do not try to guess it instead.
 - Four things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
   the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `hidden`, and
   `sort` (position within its pool). The first three are resolved in `actions.mjs`

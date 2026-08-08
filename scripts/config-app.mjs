@@ -3,7 +3,7 @@ import {
   ASSIGNABLE_POOLS, RESOURCES, HIDDEN_ZONE
 } from "./const.mjs";
 import { guessAttacksPerAction, collectConfigurable } from "./actions.mjs";
-import { configTarget, getActorConfig, setActorConfig } from "./config.mjs";
+import { configTarget, getActorConfig, setActorConfig, entryKey as entryKeyOf } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -78,13 +78,18 @@ function toInt(value, { min, max }) {
  * useful out of combat too - the GM's "let me fix my players' sheets before the
  * session" case. Collapsed through configTarget(), so five goblins appear once.
  */
-function configurableActors() {
+function configurableActors(pinned = null) {
   const found = new Map();
   const add = (actor) => {
     const target = configTarget(actor);
     if (!target?.isOwner) return;
     if (!found.has(target.uuid)) found.set(target.uuid, target);
   };
+  // The one the gear was clicked for goes first and is ALWAYS listed, even when it
+  // is neither a combatant nor a party member - a selected NPC that is not in the
+  // encounter used to fall out of this list, and the dialog then silently showed
+  // whatever happened to be first instead.
+  if (pinned) add(pinned);
   for (const combatant of game.combat?.combatants ?? []) add(combatant.actor);
   for (const actor of game.actors ?? []) if (actor.type === "character") add(actor);
   return [...found.values()];
@@ -118,8 +123,14 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   #actorUuid = null;
 
   get actor() {
-    const list = configurableActors();
-    return list.find(a => a.uuid === this.#actorUuid) ?? list[0] ?? null;
+    // Resolve the pinned uuid directly rather than looking it up in the list: the
+    // list is a convenience, not the source of truth, and a creature missing from it
+    // must not silently redirect the dialog to somebody else.
+    if (this.#actorUuid) {
+      const doc = fromUuidSync(this.#actorUuid);
+      if (doc?.isOwner) return doc;
+    }
+    return configurableActors()[0] ?? null;
   }
 
   /** Point the dialog at an actor (the HUD gear passes the shown combatant's). */
@@ -160,6 +171,9 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         attack: row.attack,
         attackOverridden: row.attackOverridden,
         hidden: row.hidden,
+        // This item also has a button in another zone. Visible on purpose: without
+        // it, Divine Aid in two pools looks like two unrelated features.
+        split: row.split,
         // `sort` deliberately does NOT count: reordering one zone writes a position
         // onto every tile in it, and marking all of them would turn the whole zone
         // orange. The mark means "a rule was set", not "this was touched".
@@ -201,7 +215,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     }));
 
     return {
-      actors: configurableActors().map(a => ({
+      actors: configurableActors(actor).map(a => ({
         uuid: a.uuid, name: a.name, img: a.img,
         selected: a.uuid === actor?.uuid,
         notice: !!attackNotice(a)
@@ -302,13 +316,11 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.foreignItem`));
       return null;
     }
-    const rows = collectConfigurable(actor).filter(r => r.key === item.id || r.key.startsWith(`${item.id}:`));
-    if (!rows.length) return null;
-    if (rows.length > 1) {
-      ui.notifications.warn(game.i18n.format(`${MODULE_ID}.config.zones.splitItem`, { name: item.name }));
-      return null;
-    }
-    return rows[0].key;
+    // A split item has several buttons; any of them will do, because the drop then
+    // offers "move all of it" - which is what dragging the whole item off the sheet
+    // means anyway.
+    const rows = collectConfigurable(actor).filter(r => r.itemKey === entryKeyOf(item));
+    return rows[0]?.key ?? null;
   }
 
   /** Reading-order insertion point for a drop inside a wrapping tile grid. */
@@ -343,38 +355,29 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.notPassive`));
     }
 
-    if (zone !== HIDDEN_ZONE && zone !== "passive" && auto && zone !== auto) {
-      const esc = Handlebars.escapeExpression;
-      const ok = await DialogV2.confirm({
-        window: { title: game.i18n.localize(`${MODULE_ID}.config.zones.confirmTitle`) },
-        content: `<p>${game.i18n.format(`${MODULE_ID}.config.zones.confirmBody`, {
-          name: esc(row.name),
-          target: esc(game.i18n.localize(`${MODULE_ID}.pool.${zone}`)),
-          detected: esc(game.i18n.localize(`${MODULE_ID}.pool.${auto}`))
-        })}</p>`,
-        modal: true,
-        rejectClose: false
-      }).catch(() => false);
-      if (!ok) return;
-    }
+    const scope = await this.#askScope(row, zone, auto);
+    if (!scope) return;
 
     const config = getActorConfig(actor);
     const entries = foundry.utils.deepClone(config.entries ?? {});
+    const hiding = zone === HIDDEN_ZONE;
 
-    // A button can cover several activities (a Planetar's Divine Aid groups three
-    // at-will spells into one), so the rule goes on every one of them - otherwise
-    // the group would come apart the moment it moved.
-    for (const k of row.keys) {
-      const rule = { ...(entries[k] ?? {}) };
-      if (zone === HIDDEN_ZONE) rule.hidden = true;
-      else {
-        delete rule.hidden;
-        // Dropping something back where detection wanted it removes the rule instead
-        // of pinning the same value - otherwise "auto" could never be restored.
-        if (zone === auto || zone === "passive") delete rule.pool;
-        else rule.pool = zone;
+    if (scope === "whole") {
+      // One durable rule on the ITEM. Per-activity pool rules are cleared so they
+      // cannot outvote it (an activity rule beats an item rule by design), but their
+      // attack / hidden / sort settings survive - only the pool moves up a level.
+      for (const k of row.allKeys) {
+        if (!entries[k]) continue;
+        const rest = { ...entries[k] };
+        delete rest.pool;
+        delete rest.hidden;
+        entries[k] = rest;
       }
-      entries[k] = rule;
+      entries[row.itemKey] = this.#poolRule(entries[row.itemKey], zone, auto, hiding);
+    } else {
+      // A button can cover several activities, so the rule goes on every one of
+      // them - otherwise the group would come apart the moment it moved.
+      for (const k of row.keys) entries[k] = this.#poolRule(entries[k], zone, auto, hiding);
     }
 
     // Renumber the target zone so the entry sits where it was let go. Computed from
@@ -396,6 +399,70 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     });
 
     await this.#write(actor, { ...config, entries });
+  }
+
+  /** The pool half of a rule, shared by both scopes. */
+  #poolRule(existing, zone, auto, hiding) {
+    const rule = { ...(existing ?? {}) };
+    if (hiding) { rule.hidden = true; return rule; }
+    delete rule.hidden;
+    // Dropping something back where detection wanted it removes the rule instead of
+    // pinning the same value - otherwise "auto" could never be restored by dragging.
+    if (zone === auto || zone === "passive") delete rule.pool;
+    else rule.pool = zone;
+    return rule;
+  }
+
+  /**
+   * How much of the item this drop applies to: "whole", "group", or null to cancel.
+   *
+   * A split item is the interesting case and the reason this exists. dnd5e models
+   * "as a bonus action, cast one of these spells" as several `cast` activities, each
+   * reporting the CASTING TIME OF ITS SPELL rather than what the feature costs - so
+   * a Planetar's Divine Aid arrives as one Action button and one Bonus Action button
+   * although the sheet, correctly, lists it once as a Bonus Action. No heuristic
+   * settles that reliably, so the drop asks, and "move all of it" is the default
+   * because that is the answer nearly every time.
+   */
+  async #askScope(row, zone, auto) {
+    const esc = Handlebars.escapeExpression;
+    const name = esc(row.name);
+    const target = esc(game.i18n.localize(
+      zone === HIDDEN_ZONE ? `${MODULE_ID}.config.zones.hidden` : `${MODULE_ID}.pool.${zone}`
+    ));
+    const mismatch = zone !== HIDDEN_ZONE && zone !== "passive" && auto && zone !== auto;
+
+    if (row.split) {
+      const choice = await DialogV2.wait({
+        window: { title: game.i18n.localize(`${MODULE_ID}.config.zones.splitTitle`) },
+        content: `<p>${game.i18n.format(`${MODULE_ID}.config.zones.splitBody`, { name, target })}</p>`,
+        buttons: [
+          { action: "whole", default: true, icon: "fa-solid fa-object-group",
+            label: game.i18n.format(`${MODULE_ID}.config.zones.moveWhole`, { name }) },
+          { action: "group", icon: "fa-solid fa-arrow-right",
+            label: game.i18n.localize(`${MODULE_ID}.config.zones.moveGroup`) }
+        ],
+        modal: true,
+        rejectClose: false
+      }).catch(() => null);
+      return choice ?? null;
+    }
+
+    if (mismatch) {
+      const ok = await DialogV2.confirm({
+        window: { title: game.i18n.localize(`${MODULE_ID}.config.zones.confirmTitle`) },
+        content: `<p>${game.i18n.format(`${MODULE_ID}.config.zones.confirmBody`, {
+          name, target, detected: esc(game.i18n.localize(`${MODULE_ID}.pool.${auto}`))
+        })}</p>`,
+        modal: true,
+        rejectClose: false
+      }).catch(() => false);
+      if (!ok) return null;
+    }
+
+    // Not split: this button already covers the whole item, so the rule belongs on
+    // the item and keeps working when the item gains an activity later.
+    return "whole";
   }
 
   /** Apply a change to every config key one button covers. */

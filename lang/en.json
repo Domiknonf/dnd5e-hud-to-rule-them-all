@@ -75,6 +75,10 @@
   "dnd5e-hud-to-rule-them-all.config.zones.resetEntry": "Reset this entry to automatic",
   "dnd5e-hud-to-rule-them-all.config.zones.notPassive": "Only features the bar shows as passive belong here.",
   "dnd5e-hud-to-rule-them-all.config.zones.foreignItem": "That item belongs to a different character.",
-  "dnd5e-hud-to-rule-them-all.config.zones.splitItem": "\"{name}\" has activities in different pools — drag its individual entries instead.",
-  "dnd5e-hud-to-rule-them-all.config.zones.notUsable": "\"{name}\" has no usable activity, so there is nothing to put on the bar."
+  "dnd5e-hud-to-rule-them-all.config.zones.notUsable": "\"{name}\" has no usable activity, so there is nothing to put on the bar.",
+  "dnd5e-hud-to-rule-them-all.config.zones.splitTitle": "This feature is split across pools",
+  "dnd5e-hud-to-rule-them-all.config.zones.splitBody": "\"{name}\" currently has buttons in more than one pool, because its activities disagree about what it costs. Move all of it to {target}, or only the group you dragged?",
+  "dnd5e-hud-to-rule-them-all.config.zones.moveWhole": "Move all of {name}",
+  "dnd5e-hud-to-rule-them-all.config.zones.moveGroup": "Only this group",
+  "dnd5e-hud-to-rule-them-all.config.zones.splitMark": "This feature has buttons in more than one pool. Drag one onto the other's zone to merge them."
 }
