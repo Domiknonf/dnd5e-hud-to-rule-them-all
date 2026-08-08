@@ -84,9 +84,11 @@ export function entryKey(item, activity = null) {
  */
 export function entryConfig(actor, item, activity = null) {
   const entries = getActorConfig(actor).entries ?? {};
-  if (activity) {
-    const specific = entries[entryKey(item, activity)];
-    if (specific) return specific;
-  }
-  return entries[entryKey(item)] ?? {};
+  const base = entries[entryKey(item)] ?? {};
+  if (!activity) return base;
+  // Merge FIELD BY FIELD, not object by object. Reordering writes a `sort` onto
+  // every activity, so an activity rule almost always exists - and returning it
+  // whole meant an item-level `pool` was never read again once anything had been
+  // dragged. The activity still wins per field, which is the point.
+  return { ...base, ...(entries[entryKey(item, activity)] ?? {}) };
 }

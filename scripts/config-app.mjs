@@ -109,9 +109,6 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       applyNotice: HudConfig.#onApplyNotice,
       dismissNotice: HudConfig.#onDismissNotice,
       toggleAttack: HudConfig.#onToggleAttack,
-      // Left click counts up, right click counts down - ApplicationV2 dispatches
-      // both to one handler when `buttons` lists them.
-      cycleAttacks: { handler: HudConfig.#onCycleAttacks, buttons: [0, 2] },
       toggleHidden: HudConfig.#onToggleHidden,
       resetEntry: HudConfig.#onResetEntry,
       clear: HudConfig.#onClear
@@ -173,7 +170,6 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         sort: row.sort,
         attack: row.attack,
         attacks: row.attacks,
-        attacksLabel: row.attacks ?? "\u2013",
         attackOverridden: row.attackOverridden,
         hidden: row.hidden,
         // This item also has a button in another zone. Visible on purpose: without
@@ -551,28 +547,6 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       const next = !row.attack;
       if (next === row.auto.attack) delete rule.attack;
       else rule.attack = next;
-      return rule;
-    });
-  }
-
-  /**
-   * Cycle this entry's own attack count: - (use the actor's number), 1, 2, ... and
-   * around again. Right click walks back. This is the alternative Multiattack -
-   * "two Holy Bursts OR three Radiant Swords" - which one actor-wide number can
-   * never express, since the count depends on which attack opened the action.
-   */
-  static async #onCycleAttacks(event, target) {
-    const key = target.closest(".hudtra-tile")?.dataset.key;
-    const { min, max } = CONFIG_LIMITS.attacksPerAction;
-    const step = event.type === "contextmenu" ? -1 : 1;
-    return this.#mutateEntry(key, (rule, row) => {
-      const current = row.attacks ?? 0;             // 0 stands for "use the actor's"
-      let next = current + step;
-      if (next > max) next = 0;
-      if (next < 0) next = max;
-      if (next && next < min) next = min;
-      if (next) rule.attacks = next;
-      else delete rule.attacks;
       return rule;
     });
   }

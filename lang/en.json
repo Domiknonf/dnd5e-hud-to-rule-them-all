@@ -80,6 +80,5 @@
   "dnd5e-hud-to-rule-them-all.config.zones.splitBody": "\"{name}\" currently has buttons in more than one pool, because its activities disagree about what it costs. Move all of it to {target}, or only the group you dragged?",
   "dnd5e-hud-to-rule-them-all.config.zones.moveWhole": "Move all of {name}",
   "dnd5e-hud-to-rule-them-all.config.zones.moveGroup": "Only this group",
-  "dnd5e-hud-to-rule-them-all.config.zones.splitMark": "This feature has buttons in more than one pool. Drag one onto the other's zone to merge them.",
-  "dnd5e-hud-to-rule-them-all.config.zones.attackCount": "Attacks this entry grants when it starts the Attack action. – uses the character's number above. Left click counts up, right click down."
+  "dnd5e-hud-to-rule-them-all.config.zones.splitMark": "This feature has buttons in more than one pool. Drag one onto the other's zone to merge them."
 }

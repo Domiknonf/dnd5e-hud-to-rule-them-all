@@ -154,11 +154,46 @@ export function attacksForActivity(activity) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * A `cast` activity that does not override its activation reports the CASTING TIME
+ * OF THE SPELL it casts, not what the feature costs to use. That is why a Planetar's
+ * Divine Aid - one Bonus Action feature on the sheet - arrived as several activities
+ * claiming different pools.
+ *
+ * VERIFY AT RUNTIME if this looks wrong: `activity.activation.override` on a cast
+ * activity. When the field is absent this whole rule is inert and the old
+ * per-activity behaviour applies, which is deliberate - it can only ever help.
+ */
+function inheritsSpellActivation(activity) {
+  return activity?.type === "cast" && activity.activation?.override !== true;
+}
+
+/** The activation the ITEM itself declares, ignoring echoed spell casting times. */
+function ownActivation(item) {
+  for (const activity of item?.system?.activities ?? []) {
+    if (inheritsSpellActivation(activity)) continue;
+    const type = activity.activation?.type;
+    if (type) return type;
+  }
+  return null;
+}
+
+/**
+ * The activation that actually describes what using this costs. Top level wins: if
+ * the feature says what it costs, an activity echoing a spell's casting time does
+ * not get to disagree.
+ */
+function activationFor(activity) {
+  const raw = activity?.activation?.type;
+  if (!inheritsSpellActivation(activity)) return raw;
+  return ownActivation(activity.item) ?? raw;
+}
+
 /** Which pool an activity draws from. Configuration wins over ACTIVATION_MAP. */
 export function poolFor(activity) {
   const override = entryConfig(activity?.actor, activity?.item, activity).pool;
   if (override && RESOURCES[override]) return override;
-  return bucketFor(activity?.activation?.type);
+  return bucketFor(activationFor(activity));
 }
 
 /** Cheap availability filter. Extend this — it is where most house rules land. */
@@ -314,7 +349,7 @@ export function enumerateEntries(actor) {
       hidden: rule.hidden === true,
       sort: Number.isFinite(rule.sort) ? rule.sort : null,
       auto: {
-        pool: passive ? "passive" : (first ? bucketFor(first.activation?.type) : null),
+        pool: passive ? "passive" : (first ? bucketFor(activationFor(first)) : null),
         attack: activities.some(a => a.type === "attack") || isAttackSubstituteItem(item)
       },
       attack: activities.some(countsAsAttack),

@@ -62,6 +62,9 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Item/activity uuid whose description panel is currently expanded, if any. */
   #descriptionUuid = null;
 
+  /** Who the bar showed last render, so a change can close a stale description. */
+  #shownActorUuid = null;
+
   /**
    * Whether the bar is slid down out of view. Tracked here AND as a CSS class on
    * the persistent root element: toggling the class without a re-render is what
@@ -211,6 +214,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // for someone watching a creature that isn't in the fight - it stays null, which
     // is exactly what keeps every economy call below inert.
     const actor = this.subjectActor;
+    // An open description belongs to the creature it was opened on. Turn changes and
+    // token clicks swap the whole bar underneath it, so drop it rather than leave a
+    // goblin's feature pinned above a player's abilities.
+    if (this.#shownActorUuid !== (actor?.uuid ?? null)) {
+      this.#shownActorUuid = actor?.uuid ?? null;
+      this.#descriptionUuid = null;
+    }
     const combatant = this.subjectCombatant;
     const inCombat = !!combatant;
     const isMyTurn = !!combatant && game.combat?.combatant?.id === combatant.id;
