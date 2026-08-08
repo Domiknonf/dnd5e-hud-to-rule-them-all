@@ -136,6 +136,24 @@ export function countsAsAttack(activity) {
   return activity?.type === "attack" || isAttackSubstituteItem(activity?.item);
 }
 
+/**
+ * How many attacks this specific entry grants when it OPENS an Attack action, or
+ * null to use the actor-wide number.
+ *
+ * This is what models the alternative Multiattack - "the planetar makes two Holy
+ * Burst attacks or three Radiant Sword attacks". A single number per actor cannot
+ * say that; a number per entry can, because the count is decided by whichever
+ * attack starts the action. Still one booking path: economy.spendAttack just gets
+ * told the total instead of looking it up.
+ *
+ * What it deliberately does NOT model is the genuinely mixed Multiattack ("one bite
+ * and two claws") - that is not a total, it is a per-entry budget, and it stays open.
+ */
+export function attacksForActivity(activity) {
+  const n = entryConfig(activity?.actor, activity?.item, activity).attacks;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 /** Which pool an activity draws from. Configuration wins over ACTIVATION_MAP. */
 export function poolFor(activity) {
   const override = entryConfig(activity?.actor, activity?.item, activity).pool;
@@ -301,6 +319,9 @@ export function enumerateEntries(actor) {
       },
       attack: activities.some(countsAsAttack),
       attackOverridden: typeof rule.attack === "boolean",
+      // How many attacks ONE Attack action grants when this entry starts it. Null
+      // means "use the actor's number" (config.attacksPerAction / detection).
+      attacks: Number.isFinite(rule.attacks) ? rule.attacks : null,
       poolOverridden: !!rule.pool
     };
   };
@@ -391,6 +412,7 @@ export function collectActions(actor) {
       details: single ? detailsFor(single) : null,
       description: plainDescription(item),
       countsAsAttack: entry.attack,
+      attacks: entry.attacks,
       sort: entry.sort
     });
   }
@@ -453,6 +475,7 @@ export function collectConfigurable(actor) {
       hidden: entry.hidden,
       sort: entry.sort,
       attack: entry.attack,
+      attacks: entry.attacks,
       attackOverridden: entry.attackOverridden,
       poolOverridden: entry.poolOverridden,
       auto: entry.auto

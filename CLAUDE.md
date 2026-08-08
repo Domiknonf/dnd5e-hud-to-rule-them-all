@@ -97,11 +97,16 @@ Consequences to respect:
   lists it once as a Bonus Action. `collectConfigurable` marks those entries `split`, the
   dialog shows a link-slash icon on them, and the drop asks "move all of it or just this
   group?" with *all of it* as the default. Do not try to guess it instead.
-- Four things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
-  the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `hidden`, and
-  `sort` (position within its pool). The first three are resolved in `actions.mjs`
-  (`poolFor`, `countsAsAttack`), so the HUD, the gate and the booking path all see the
-  same answer — including usages from the sheet or a macro.
+- Five things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
+  the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `attacks` (how
+  many attacks this entry grants when it *opens* the Attack action), `hidden`, and
+  `sort` (position within its pool). All but `sort` are resolved in `actions.mjs`
+  (`poolFor`, `countsAsAttack`, `attacksForActivity`), so the HUD, the gate and the
+  booking path all see the same answer — including usages from the sheet or a macro.
+- **`attacks` is what models the alternative Multiattack** — "two Holy Bursts *or* three
+  Radiant Swords". One number per actor cannot say that, because the total depends on
+  which attack opened the action; a number per entry can. `spendAttack` is simply *told*
+  the total instead of looking it up, so this stays inside the one booking path.
 - **The zones are seeded by detection, not empty.** That is what makes the dialog a
   correction surface instead of something you must fill in before the bar works, and it
   is what gives the mismatch confirmation something to compare against. Dropping an
@@ -222,10 +227,10 @@ game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
 
 Do not "fix" these casually — each needs a design decision.
 
-- **Extra Attack.** Handled: `economy.spendAttack` runs the per-action counter, the count
-  is configured per actor, and which entries draw from it is a per-entry `attack` rule.
-  What is still open is the *mixed* Multiattack — "one bite and two claws" is not a single
-  number, and neither the counter nor the dialog can express it today.
+- **Extra Attack.** Handled, including the *alternative* Multiattack ("two Holy Bursts or
+  three Radiant Swords") via the per-entry `attacks` rule. What is still open is the
+  genuinely *mixed* one — "one bite and two claws" is not a total at all, it is a budget
+  per entry, and neither the counter nor the dialog can express that.
 - **Reactions off-turn.** Solved. A player's bar stays on their own character all
   encounter, so their reaction pip is visible and clickable during someone else's turn.
   `setCombatant` still exists and nothing calls it — it is now only a GM convenience

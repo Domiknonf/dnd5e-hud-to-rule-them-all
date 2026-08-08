@@ -95,6 +95,13 @@
                       data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.attackToggle">
                 <i class="fa-solid fa-hand-fist"></i>
               </button>
+              {{#if attack}}
+              <button type="button" data-action="cycleAttacks"
+                      class="hudtra-tile-count {{#if attacks}}set{{/if}}"
+                      data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.attackCount">
+                &times;{{attacksLabel}}
+              </button>
+              {{/if}}
               {{/if}}
               <button type="button" data-action="toggleHidden"
                       data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.hideToggle">

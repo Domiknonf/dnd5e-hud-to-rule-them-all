@@ -147,10 +147,10 @@ export async function spend(combatant, type, { amount = 1, label = "", uuid = nu
  * (from getAttacksPerAction). Still funnels through the same flag write as spend()
  * - this is a second booking function, not a second write path (decision 2 intact).
  */
-export async function spendAttack(combatant, { label = "", uuid = null } = {}) {
+export async function spendAttack(combatant, { label = "", uuid = null, attacks = null } = {}) {
   if (!combatant) return false;
   if (!combatant.isOwner || !canWriteFlags(combatant)) {
-    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid });
+    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid, attacks });
   }
   const econ = getEconomy(combatant);
   const attacksLeftBefore = econ.attacksLeft ?? 0;
@@ -159,7 +159,11 @@ export async function spendAttack(combatant, { label = "", uuid = null } = {}) {
     econ.attacksLeft = attacksLeftBefore - 1;
     amount = 0;
   } else {
-    econ.attacksLeft = Math.max(0, getAttacksPerAction(combatant) - 1);
+    // The entry that OPENS the action decides how many it grants - that is what
+    // makes "two Holy Bursts or three Radiant Swords" expressible. Without one, the
+    // actor-wide number applies.
+    const total = Number.isFinite(attacks) && attacks > 0 ? attacks : getAttacksPerAction(combatant);
+    econ.attacksLeft = Math.max(0, total - 1);
     econ.used.action = (econ.used.action ?? 0) + 1;
     amount = 1;
   }

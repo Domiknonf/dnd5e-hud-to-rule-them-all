@@ -902,6 +902,14 @@
     line-height: 1;
   }
   #hudtra-config .hudtra-tile-tools button:hover { opacity: 1; }
+  #hudtra-config .hudtra-tile-tools button.hudtra-tile-count {
+    width: auto;
+    min-width: 1.7rem;
+    padding: 0 0.2rem;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.55;
+  }
+  #hudtra-config .hudtra-tile-tools button.hudtra-tile-count.set { opacity: 1; color: #b8651a; }
   #hudtra-config .hudtra-tile-tools button.on { opacity: 0.9; color: #b8651a; }
   #hudtra-config .hudtra-tile-tools button.set { text-shadow: 0 0 0.4rem currentColor; }
 

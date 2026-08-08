@@ -255,12 +255,15 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           // more than one attack per action configured, so it's visible even before
           // the first attack (not just once mid-sequence) - answers "why can I
           // still use this" without needing the removed Multiattack description.
+          // An entry may carry its own total (the alternative Multiattack), in which
+          // case the badge has to promise THAT number rather than the actor's.
+          const total = entry.attacks ?? attacksPerAction;
           let attacksBadge = null;
-          if (isAttackEntry && attacksPerAction > 1) {
-            const available = remaining(combatant, "action") > 0 ? attacksPerAction : (econ.attacksLeft ?? 0);
+          if (isAttackEntry && total > 1) {
+            const available = remaining(combatant, "action") > 0 ? total : (econ.attacksLeft ?? 0);
             attacksBadge = {
-              available, max: attacksPerAction,
-              hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: attacksPerAction })
+              available, max: total,
+              hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: total })
             };
           }
           const enriched = { ...entry, locked: midAttackSequence && !entry.countsAsAttack, attacksBadge };

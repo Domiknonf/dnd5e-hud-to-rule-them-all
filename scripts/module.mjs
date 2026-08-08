@@ -3,7 +3,7 @@ import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor } from "./economy.mjs";
-import { costOfActivity, countsAsAttack } from "./actions.mjs";
+import { costOfActivity, countsAsAttack, attacksForActivity } from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
 
@@ -82,7 +82,7 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   // spendAttack()'s first-use branch (spend the action, queue the rest) is exactly
   // the RAW behaviour.
   if (type === "action" && countsAsAttack(activity)) {
-    await spendAttack(combatant, { label, uuid: activity.uuid });
+    await spendAttack(combatant, { label, uuid: activity.uuid, attacks: attacksForActivity(activity) });
     return;
   }
 
