@@ -484,6 +484,19 @@
     font-size: 1em;
     text-shadow: 0 1px 3px #000;
   }
+  /* Split marker: top-right, the one corner neither the uses badge (bottom-right)
+     nor the attacks badge (top-left) uses. Muted rather than gold - it explains a
+     button, it does not rank it. */
+  #hud-to-rule-them-all .hudtra-split {
+    position: absolute;
+    right: 0.15em;
+    top: 0.15em;
+    font-size: 0.6em;
+    color: var(--hudtra-gold-bright);
+    opacity: 0.75;
+    text-shadow: 0 1px 3px #000, 0 0 0.4em #000;
+  }
+
   /* Charges/uses: gold, bottom-right. */
   #hud-to-rule-them-all .hudtra-uses {
     position: absolute;

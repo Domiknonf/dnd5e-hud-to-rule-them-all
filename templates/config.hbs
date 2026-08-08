@@ -82,7 +82,7 @@
         {{multiattack.notice.body}}
         {{else if multiattack.configured}}
         {{localize "dnd5e-hud-to-rule-them-all.multiattack.configured"}}
-        {{else}}
+        {{else if multiattack.feature}}
         {{localize "dnd5e-hud-to-rule-them-all.multiattack.absent"}}
         {{/if}}
       </span>

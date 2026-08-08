@@ -2,7 +2,9 @@ import {
   MODULE_ID, CONFIGURABLE_POOLS, CONFIG_LIMITS, DEFAULT_ATTACKS_PER_ACTION,
   ASSIGNABLE_POOLS, RESOURCES, HIDDEN_ZONE
 } from "./const.mjs";
-import { guessAttacksPerAction, collectConfigurable, suggestMultiattack } from "./actions.mjs";
+import {
+  guessAttacksPerAction, collectConfigurable, suggestMultiattack, multiattackFeature
+} from "./actions.mjs";
 import { openMultiattack } from "./multiattack-app.mjs";
 import {
   configTarget, getActorConfig, setActorConfig, entryKey as entryKeyOf, multiattackKey
@@ -290,6 +292,11 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       pools,
       multiattack: actor ? {
         configured: (config.multiattack?.options ?? []).length,
+        // Whether this creature has a Multiattack to say anything about. The button
+        // stays either way - homebrew may well want one where the statblock has no
+        // such feature - but "no Multiattack configured" is only true of a creature
+        // that could have one, and it was being said about every Ankheg in the world.
+        feature: !!multiattackFeature(actor),
         // The row carries the mark and quotes the reading that caused it, the same
         // way the banner above quotes the feature name. Two texts, because "nothing
         // is configured yet" and "this no longer matches" want different sentences.

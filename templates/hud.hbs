@@ -78,6 +78,9 @@
                 data-tooltip-html="{{tooltipHtml}}">
           {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
           {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
+          {{!-- Same icon the config dialog marks a split entry with, meaning the
+               same thing: this item has buttons in more than one pool. --}}
+          {{#if split}}<i class="hudtra-split fa-solid fa-link-slash"></i>{{/if}}
           {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
           {{#if attacksBadge}}<span class="hudtra-attacks"><i class="fa-solid fa-hand-fist"></i>{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
         </button>

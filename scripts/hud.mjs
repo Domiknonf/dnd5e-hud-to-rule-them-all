@@ -19,7 +19,10 @@ function tooltipFor(entry, poolLabel) {
   const img = entry.img ? `<img src="${esc(entry.img)}" alt="">` : "";
   const spellLevel = entry.itemType === "spell" && entry.level != null
     ? game.i18n.localize(CONFIG.DND5E?.spellLevels?.[entry.level] ?? "") : "";
-  const meta = [poolLabel, spellLevel].filter(Boolean).map(esc).join(" &middot; ");
+  // The activity's own name leads the meta line on a split button: it is the one
+  // word that tells this half of the item from the other one, which otherwise shares
+  // its name and its art.
+  const meta = [entry.subtitle, poolLabel, spellLevel].filter(Boolean).map(esc).join(" &middot; ");
   const rows = [];
   const row = (key, value) => rows.push(
     `<div class="hudtra-tt-row"><dt>${esc(game.i18n.localize(`${MODULE_ID}.tooltip.${key}`))}</dt><dd>${esc(value)}</dd></div>`
@@ -28,6 +31,8 @@ function tooltipFor(entry, poolLabel) {
   if (entry.details?.target) row("target", entry.details.target);
   if (entry.details?.damage) row("damage", entry.details.damage);
   if (entry.uses) row("uses", `${entry.uses.value}/${entry.uses.max}`);
+  // Answers "why is this on my bar twice" in the one place with room for it.
+  if (entry.otherPools?.length) row("alsoIn", entry.otherPools.join(", "));
   if (entry.attacksBadge) rows.push(`<div class="hudtra-tt-row"><dd class="hudtra-tt-attacks">${esc(entry.attacksBadge.hint)}</dd></div>`);
   return `<div class="hudtra-tt">`
     + `<header>${img}<div><span class="hudtra-tt-name">${esc(entry.name)}</span>`

@@ -437,6 +437,28 @@ export function entryKeyForActivity(activity) {
 }
 
 /**
+ * The Multiattack-shaped feature this creature has, or null: a monster feature that
+ * is pure description (see isDescriptiveOnly) and whose text is about making
+ * attacks. The same item suggestMultiattack() reads its draft out of.
+ *
+ * What it is for is knowing when NOT to mention the Multiattack at all. An Ankheg
+ * has one Bite and no Multiattack, so telling its owner that "no Multiattack is
+ * configured" is answering a question the statblock never asked - and that sentence
+ * sat on every creature in the game.
+ *
+ * Deliberately not a name match on "Multiattack": monster features have no fixed
+ * vocabulary, and this is the same shape test the rest of the file already trusts.
+ */
+export function multiattackFeature(actor) {
+  for (const item of actor?.items ?? []) {
+    const activities = item.system?.activities;
+    if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
+    if (/\battacks?\b/.test(stripToWords(item.system?.description?.value))) return item;
+  }
+  return null;
+}
+
+/**
  * A first draft of the Multiattack from the statblock's own text, for the dialog to
  * prefill. SRD phrasing is "makes two Holy Burst attacks or three Radiant Sword
  * attacks", so each attack entry is looked for by name with a count in front of it.
@@ -506,9 +528,25 @@ export function collectActions(actor) {
   for (const key of Object.keys(RESOURCES)) buckets[key] = [];
   if (!actor) return buckets;
 
-  for (const entry of enumerateEntries(actor)) {
+  const entries = enumerateEntries(actor);
+  // Which pools each item actually reached. An item whose activities disagree about
+  // what they cost arrives as several buttons carrying the SAME item name and the
+  // SAME item art in different groups - an Ankheg's Bite is the attack in Action and
+  // the escape check in Other - and on an icon-only bar that reads as a duplicate
+  // rather than as two halves of one thing. Computed over the VISIBLE entries only,
+  // so hiding one half stops calling the other one split.
+  const poolsByItem = new Map();
+  for (const entry of entries) {
+    if (entry.hidden || !entry.pool || !buckets[entry.pool]) continue;
+    if (!poolsByItem.has(entry.item.id)) poolsByItem.set(entry.item.id, []);
+    poolsByItem.get(entry.item.id).push(entry.pool);
+  }
+
+  for (const entry of entries) {
     if (entry.hidden || !entry.pool || !buckets[entry.pool]) continue;
     const { item, activities } = entry;
+    const pools = poolsByItem.get(item.id) ?? [];
+    const split = pools.length > 1;
     // A group of several activities collapses into one item-level button that defers
     // to dnd5e's own activity picker - the same choice the sheet's roll button
     // offers - instead of exploding into one button per activity with dnd5e's often
@@ -521,7 +559,16 @@ export function collectActions(actor) {
       action: passive ? "describe" : "use",
       uuid: single && !passive ? single.uuid : item.uuid,
       name: item.name,
-      subtitle: "",
+      // Only split buttons get the activity's own name. dnd5e seeds activity.name
+      // with a per-type placeholder, which is noise on a button that is alone but is
+      // exactly the distinguishing word when two buttons share an item name.
+      subtitle: split ? activityLabel(entry) : "",
+      split,
+      // The other groups this item is also in, named. The tooltip is the only place
+      // with room to say it, and "why is my Bite in two places" is the question.
+      otherPools: pools
+        .filter(p => p !== entry.pool)
+        .map(p => game.i18n.localize(`${MODULE_ID}.pool.${p}`)),
       img: entryImage(entry),
       activityType: single?.type ?? null,
       itemType: item.type,

@@ -15,6 +15,7 @@
   "dnd5e-hud-to-rule-them-all.tooltip.target": "Target",
   "dnd5e-hud-to-rule-them-all.tooltip.damage": "Damage",
   "dnd5e-hud-to-rule-them-all.tooltip.uses": "Uses",
+  "dnd5e-hud-to-rule-them-all.tooltip.alsoIn": "Also under",
   "dnd5e-hud-to-rule-them-all.tooltip.middleClick": "Middle-click for the full description",
   "dnd5e-hud-to-rule-them-all.close": "Close",
   "dnd5e-hud-to-rule-them-all.toggleBar": "Collapse or expand the bar",
