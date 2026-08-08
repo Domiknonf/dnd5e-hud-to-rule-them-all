@@ -978,6 +978,17 @@
   }
   #hudtra-multiattack .hudtra-ma-part > button:hover { opacity: 1; }
   #hudtra-multiattack .hudtra-ma-times { opacity: 0.6; }
+  /* Quiet and narrow: adding a row is a secondary move inside an alternative, and a
+     full-width default button reads louder than the alternative's own controls. */
+  #hudtra-multiattack .hudtra-ma-add-part {
+    width: auto;
+    margin-top: 0.2rem;
+    padding: 0 0.5rem;
+    line-height: 1.6rem;
+    font-size: var(--font-size-12, 0.75rem);
+    opacity: 0.75;
+  }
+  #hudtra-multiattack .hudtra-ma-add-part:hover { opacity: 1; }
   #hudtra-multiattack .hudtra-ma-empty {
     margin: 0.2rem 0;
     font-style: italic;
@@ -985,11 +996,16 @@
   }
   #hudtra-multiattack .hudtra-ma-tools { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
-  #hudtra-config .hudtra-config-footer {
+  /* Both dialogs share this footer markup. Matched on both ids rather than on the
+     .hudtra-config class they also share, so the specificity that overrides
+     Foundry's own form styling stays exactly as it was. */
+  #hudtra-config .hudtra-config-footer,
+  #hudtra-multiattack .hudtra-config-footer {
     display: flex;
     gap: 0.5rem;
     margin-top: auto;
     padding-top: 0.5rem;
   }
-  #hudtra-config .hudtra-config-save { font-weight: bold; }
+  #hudtra-config .hudtra-config-save,
+  #hudtra-multiattack .hudtra-config-save { font-weight: bold; }
 }
