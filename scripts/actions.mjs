@@ -66,6 +66,31 @@ function stripEnrichers(text) {
 }
 
 /**
+ * The same text, but KEEPING what a content link is labelled with.
+ *
+ * stripEnrichers() throws the label away with the enricher, which is right for
+ * counting words between a number and "attacks" - there a long [[/item .someId]] is
+ * pure noise. It is exactly wrong for suggestMultiattack(), which matches on the
+ * attack's NAME: statblocks name their attacks through those very links
+ * ("makes two [[/item .id]]{Holy Burst} attacks"), so stripping the label deleted
+ * the only words there were to match on and the suggestion came back empty.
+ *
+ * Two different jobs, two different strippers - not one with a flag, because the
+ * one that keeps labels must never be handed to the "makes N attacks" match, where
+ * a re-inserted name would widen the gap it measures.
+ */
+function stripToWords(text) {
+  const LINK = /\[\[[^\]]*\]\]|[@&]\w+\[[^\]]*\]/;
+  return (text ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(new RegExp(`(?:${LINK.source})\\{([^}]*)\\}`, "g"), " $1 ")
+    .replace(new RegExp(LINK.source, "g"), " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/**
  * Best-effort read of "how many attacks does this actor get per Attack action".
  * Two independent, deliberately different strategies:
  * - PCs: fixed name lookup (PC_EXTRA_ATTACK_NAMES) - the feature only exists on
@@ -429,7 +454,7 @@ export function suggestMultiattack(actor) {
   for (const item of actor?.items ?? []) {
     const activities = item.system?.activities;
     if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
-    text = stripEnrichers(item.system?.description?.value);
+    text = stripToWords(item.system?.description?.value);
     if (text) break;
   }
   if (!text) return [];
