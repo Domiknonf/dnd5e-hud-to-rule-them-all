@@ -4,7 +4,7 @@ import {
   multiattackOptions, attacksRemaining, attackCapacity
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
-import { openConfig, attackNotice } from "./config-app.mjs";
+import { openConfig, attackNotice, multiattackNotice } from "./config-app.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -327,7 +327,11 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // anything visible in the bar (Extra Attack adds no new entry), so a new
     // suggestion marks the gear instead of silently overwriting what was configured.
     // Cleared from inside the dialog, per suggested value (see config.attackNotice).
+    // Two causes, one mark. A Multiattack the statblock describes but nothing has
+    // answered for is the same kind of thing: something the bar cannot know and
+    // will get wrong until somebody looks.
     const notice = actor ? attackNotice(actor) : null;
+    const maNotice = notice ? null : (actor ? multiattackNotice(actor) : null);
     return {
       hasSubject: !!actor,
       inCombat,
@@ -352,10 +356,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       description,
       // The handle's first stage depends on what is currently open.
       collapseTooltip: game.i18n.localize(`${MODULE_ID}.${description ? "closeDescription" : "toggleBar"}`),
-      configNotice: !!notice,
+      configNotice: !!(notice || maNotice),
       configTooltip: notice
         ? game.i18n.format(`${MODULE_ID}.config.notice.gear`, notice)
-        : game.i18n.localize(`${MODULE_ID}.config.open`),
+        : maNotice
+          ? game.i18n.format(`${MODULE_ID}.multiattack.notice.gear`, maNotice)
+          : game.i18n.localize(`${MODULE_ID}.config.open`),
       editable: isMine || game.user.isGM
     };
   }

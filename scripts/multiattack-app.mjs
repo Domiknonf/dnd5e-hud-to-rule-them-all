@@ -244,6 +244,11 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
     const config = { ...getActorConfig(actor) };
     if (options.length) config.multiattack = { options };
     else delete config.multiattack;
+    // Saving IS the answer to the statblock's reading: it was on screen, prefilled,
+    // and the player pressed Save on whatever they made of it. Recording that
+    // reading as seen is what stops a deliberately hand-built Multiattack - or a
+    // deliberately empty one - from raising the mark again the moment it is stored.
+    config.seenMultiattackSuggestion = multiattackKey(suggestMultiattack(actor));
     await setActorConfig(actor, config);
     this.#draft = null;
     ui.notifications.info(game.i18n.format(

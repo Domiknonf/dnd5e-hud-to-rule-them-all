@@ -4,7 +4,9 @@ import {
 } from "./const.mjs";
 import { guessAttacksPerAction, collectConfigurable, suggestMultiattack } from "./actions.mjs";
 import { openMultiattack } from "./multiattack-app.mjs";
-import { configTarget, getActorConfig, setActorConfig, entryKey as entryKeyOf } from "./config.mjs";
+import {
+  configTarget, getActorConfig, setActorConfig, entryKey as entryKeyOf, multiattackKey
+} from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -61,6 +63,50 @@ export function attackNotice(actor) {
   return { ...suggestion, configured };
 }
 
+/** "2× Holy Burst or 3× Radiant Sword" - what the notice quotes back. */
+function describeOptions(actor, options) {
+  const names = new Map(collectConfigurable(actor).map(row => [row.key, row.name]));
+  const and = game.i18n.localize(`${MODULE_ID}.multiattack.joinAnd`);
+  const or = game.i18n.localize(`${MODULE_ID}.multiattack.joinOr`);
+  return options
+    .map(option => (option.parts ?? [])
+      .map(part => `${part.count}× ${names.get(part.key) ?? "?"}`)
+      .join(and))
+    .join(or);
+}
+
+/**
+ * The Multiattack half of the same mark, returning `{ key, summary, configured }`
+ * or null. Same contract as attackNotice above: it never rewrites anything, it just
+ * raises the exclamation mark and lets the dialog offer the reading by name.
+ *
+ * Deliberately silent for what a single number already covers. A statblock that
+ * reads as one alternative of one attack IS an attacks-per-action number, and
+ * attackNotice speaks for that one - marking it here as well would put a permanent
+ * mark on every ordinary monster in the encounter. This mark is for what a number
+ * provably cannot say: several alternatives, or one that combines several attacks.
+ *
+ * Dismissal stores the SIGNATURE that was waved away, exactly as
+ * seenAttackSuggestion stores the count rather than a boolean. Re-statting the
+ * creature changes the signature and raises the mark again on its own, while an
+ * answer already given stays given. Saving in the editor counts as that answer -
+ * the player just looked at this reading and decided - which is what keeps a
+ * deliberately hand-built Multiattack from being nagged about forever.
+ */
+export function multiattackNotice(actor) {
+  if (!actor) return null;
+  const suggestion = suggestMultiattack(actor);
+  if (!suggestion.length) return null;
+  const config = getActorConfig(actor);
+  const configured = config.multiattack?.options ?? [];
+  const key = multiattackKey(suggestion);
+  if (key === multiattackKey(configured)) return null;
+  if (config.seenMultiattackSuggestion === key) return null;
+  const needsAlternatives = suggestion.length > 1 || (suggestion[0].parts?.length ?? 0) > 1;
+  if (!configured.length && !needsAlternatives) return null;
+  return { key, configured: configured.length, summary: describeOptions(actor, suggestion) };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
@@ -113,6 +159,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       toggleHidden: HudConfig.#onToggleHidden,
       resetEntry: HudConfig.#onResetEntry,
       multiattack: HudConfig.#onMultiattack,
+      dismissMultiattack: HudConfig.#onDismissMultiattack,
       clear: HudConfig.#onClear
     }
   };
@@ -209,6 +256,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const config = actor ? getActorConfig(actor) : {};
     const suggestion = actor ? attackSuggestion(actor) : null;
     const notice = actor ? attackNotice(actor) : null;
+    const maNotice = actor ? multiattackNotice(actor) : null;
 
     const pools = Object.entries(CONFIGURABLE_POOLS).map(([key, def]) => ({
       key,
@@ -221,7 +269,9 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       actors: configurableActors(actor).map(a => ({
         uuid: a.uuid, name: a.name, img: a.img,
         selected: a.uuid === actor?.uuid,
-        notice: !!attackNotice(a)
+        // One mark, either cause: the point of the mark in the actor list is "this
+        // one wants a look", not which of the two things wants it.
+        notice: !!(attackNotice(a) || multiattackNotice(a))
       })),
       actor,
       // The banner quotes the feature that caused the suggestion, so the player can
@@ -238,12 +288,18 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested: suggestion.count })
         : game.i18n.format(`${MODULE_ID}.config.attacksPerAction.none`, { fallback: DEFAULT_ATTACKS_PER_ACTION }),
       pools,
-      // The prompt only appears when the statblock actually names several different
-      // attacks and nothing is configured yet - i.e. exactly when a single "attacks
-      // per action" number is provably not enough to describe this creature.
       multiattack: actor ? {
-        configured: (getActorConfig(actor).multiattack?.options ?? []).length,
-        prompt: !getActorConfig(actor).multiattack && suggestMultiattack(actor).length > 1
+        configured: (config.multiattack?.options ?? []).length,
+        // The row carries the mark and quotes the reading that caused it, the same
+        // way the banner above quotes the feature name. Two texts, because "nothing
+        // is configured yet" and "this no longer matches" want different sentences.
+        notice: maNotice && {
+          ...maNotice,
+          body: game.i18n.format(
+            `${MODULE_ID}.multiattack.notice.${maNotice.configured ? "bodyConfigured" : "body"}`,
+            maNotice
+          )
+        }
       } : null,
       zones: actor ? this.#zonesFor(actor) : [],
       limits: CONFIG_LIMITS
@@ -528,6 +584,9 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     // so it is not a field here, and leaving it out deleted it on the next save of
     // anything else on this form.
     if (previous.multiattack) config.multiattack = previous.multiattack;
+    if (previous.seenMultiattackSuggestion !== undefined) {
+      config.seenMultiattackSuggestion = previous.seenMultiattackSuggestion;
+    }
 
     const attacks = toInt(raw.attacksPerAction, CONFIG_LIMITS.attacksPerAction);
     if (attacks !== null) config.attacksPerAction = attacks;
@@ -547,6 +606,21 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onMultiattack() {
     const actor = this.actor;
     if (actor) openMultiattack(actor);
+  }
+
+  /**
+   * Keep the Multiattack as it is and silence THIS reading. There is deliberately no
+   * one-click "apply" counterpart: applying would mean writing a guess straight into
+   * the config, and the honest version of that is the editor opening prefilled with
+   * it - which is what the button next to this one now does.
+   */
+  static async #onDismissMultiattack() {
+    const actor = this.actor;
+    const notice = actor ? multiattackNotice(actor) : null;
+    if (!notice) return;
+    await setActorConfig(actor, { ...getActorConfig(actor), seenMultiattackSuggestion: notice.key });
+    ui.notifications.info(game.i18n.format(`${MODULE_ID}.multiattack.notice.dismissed`, { name: actor.name }));
+    return this.render();
   }
 
   static async #onPickActor(event, target) {

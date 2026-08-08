@@ -75,11 +75,11 @@
 
     {{!-- Multiattack: a link, plus a nudge when the statblock names several
          different attacks - exactly when one number cannot describe the creature. --}}
-    <div class="hudtra-config-ma {{#if multiattack.prompt}}prompt{{/if}}">
-      {{#if multiattack.prompt}}<i class="fa-solid fa-circle-exclamation"></i>{{/if}}
+    <div class="hudtra-config-ma {{#if multiattack.notice}}prompt{{/if}}">
+      {{#if multiattack.notice}}<i class="fa-solid fa-circle-exclamation"></i>{{/if}}
       <span>
-        {{#if multiattack.prompt}}
-        {{localize "dnd5e-hud-to-rule-them-all.multiattack.detected"}}
+        {{#if multiattack.notice}}
+        {{multiattack.notice.body}}
         {{else if multiattack.configured}}
         {{localize "dnd5e-hud-to-rule-them-all.multiattack.configured"}}
         {{else}}
@@ -90,6 +90,15 @@
         <i class="fa-solid fa-hand-fist"></i>
         {{localize "dnd5e-hud-to-rule-them-all.multiattack.open"}}
       </button>
+      {{!-- No one-click "apply": that would write a guess straight into the config.
+           The editor opening prefilled with it is the honest version. --}}
+      {{#if multiattack.notice}}
+      <button type="button" data-action="dismissMultiattack"
+              data-tooltip="dnd5e-hud-to-rule-them-all.multiattack.notice.dismissHint">
+        <i class="fa-solid fa-xmark"></i>
+        {{localize "dnd5e-hud-to-rule-them-all.multiattack.notice.dismiss"}}
+      </button>
+      {{/if}}
     </div>
 
     {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item
