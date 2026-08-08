@@ -1,6 +1,6 @@
 import { MODULE_ID, CONFIG_LIMITS } from "./const.mjs";
 import { collectConfigurable, suggestMultiattack } from "./actions.mjs";
-import { configTarget, getActorConfig, setActorConfig } from "./config.mjs";
+import { configTarget, getActorConfig, setActorConfig, multiattackKey } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -83,11 +83,29 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
     return actor ? collectConfigurable(actor).filter(row => row.pool === "action" && row.attack) : [];
   }
 
-  /** The draft, seeded from what is stored the first time it is asked for. */
+  /**
+   * Whether the draft is still nothing but the statblock's reading. Drives the "this
+   * is not stored yet" hint, so a prefill can never be mistaken for a configuration
+   * that already exists. Cleared by the first edit and by saving.
+   */
+  #suggested = false;
+
+  /**
+   * The draft, seeded the first time it is asked for - from what is stored, and
+   * failing that from the statblock.
+   *
+   * Seeded rather than blank for the same reason the config dialog's zones are: an
+   * editor that opens empty is something you must fill in before the bar works,
+   * while one that opens with detection's reading is a correction surface. This
+   * stays a suggestion in the sense the rest of the module means it - nothing is
+   * written until Save, and closing the dialog declines the offer.
+   */
   #options() {
     if (!this.#draft) {
       const stored = getActorConfig(this.actor).multiattack?.options;
-      this.#draft = Array.isArray(stored) ? foundry.utils.deepClone(stored) : [];
+      const configured = Array.isArray(stored) && stored.length > 0;
+      this.#suggested = !configured;
+      this.#draft = configured ? foundry.utils.deepClone(stored) : suggestMultiattack(this.actor);
     }
     return this.#draft;
   }
@@ -115,11 +133,12 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
     return options;
   }
 
-  /** Re-render from a mutated draft. */
+  /** Re-render from a mutated draft. Any edit makes it the user's, not detection's. */
   async #update(mutate) {
     const options = this.#syncValues();
     mutate(options);
     this.#draft = options;
+    this.#suggested = false;
     return this.render();
   }
 
@@ -141,7 +160,14 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
       actor,
       attacks,
       hasAttacks: attacks.length > 0,
-      suggestion: suggestion.length ? suggestion : null,
+      // Re-reading the statblock is only worth a button once the editor is showing
+      // something other than untouched detection output - before that it is a
+      // no-op sitting next to the thing it would produce. After any edit it turns
+      // into the way back, which is what it is for now that the editor prefills.
+      suggestion: suggestion.length && !this.#suggested ? suggestion : null,
+      // "Read from the statblock, not stored" - said only while there is something
+      // to say it about.
+      suggested: this.#suggested && options.length > 0,
       limits: CONFIG_LIMITS,
       options: options.map((option, o) => ({
         index: o,
@@ -188,11 +214,12 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
     return this.#update(options => options[o]?.parts?.splice(p, 1));
   }
 
-  /** Take the draft parsed out of the statblock. Never applied on its own. */
+  /** Back to the draft parsed out of the statblock. Never applied on its own. */
   static async #onUseSuggestion() {
     const actor = this.actor;
     if (!actor) return;
     this.#draft = suggestMultiattack(actor);
+    this.#suggested = true;
     return this.render();
   }
 

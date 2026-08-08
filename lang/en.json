@@ -95,6 +95,7 @@
   "dnd5e-hud-to-rule-them-all.multiattack.emptyOption": "No attacks yet.",
   "dnd5e-hud-to-rule-them-all.multiattack.none": "No alternatives yet. Add one, or take the suggestion from the statblock.",
   "dnd5e-hud-to-rule-them-all.multiattack.noAttacks": "This creature has nothing in the Action pool that counts as an attack. Set that up in the HUD configuration first.",
+  "dnd5e-hud-to-rule-them-all.multiattack.suggested": "Read from this creature's statblock. Nothing is stored yet — check it and press Save.",
   "dnd5e-hud-to-rule-them-all.multiattack.suggest": "Use statblock suggestion",
   "dnd5e-hud-to-rule-them-all.multiattack.suggestHint": "Reads the Multiattack text and turns each named attack into its own alternative. Check it — the text does not distinguish \"and\" from \"or\" reliably.",
   "dnd5e-hud-to-rule-them-all.multiattack.clear": "Remove all",

@@ -4,6 +4,16 @@
   {{#if hasAttacks}}
   <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.multiattack.hint"}}</p>
 
+  {{!-- Prefilled from the statblock: the editor opens as a correction surface, not
+       as a blank form. Saying so is what keeps it from looking like something that
+       is already in force. --}}
+  {{#if suggested}}
+  <p class="hudtra-ma-suggested">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    {{localize "dnd5e-hud-to-rule-them-all.multiattack.suggested"}}
+  </p>
+  {{/if}}
+
   <div class="hudtra-ma-options">
     {{#each options}}
     <section class="hudtra-ma-option">

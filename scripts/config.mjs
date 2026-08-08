@@ -78,6 +78,30 @@ export function entryKey(item, activity = null) {
 }
 
 /**
+ * A stable signature for a set of Multiattack options, so two of them can be
+ * compared: "is what the statblock reads already what is configured", and "is this
+ * the reading that was waved away before".
+ *
+ * Order-insensitive on purpose. Rearranging the alternatives in the editor changes
+ * nothing about what the creature may do, so it must not read as a different answer
+ * and raise the mark again.
+ *
+ * It lives here for the same reason entryKey() does: it is pure key shaping over
+ * stored data, so the editor and the dialog that marks it can both have it without
+ * either importing the other - which would be a cycle.
+ */
+export function multiattackKey(options) {
+  return (options ?? [])
+    .map(option => (option?.parts ?? [])
+      .map(part => `${part?.key}x${part?.count}`)
+      .sort()
+      .join("+"))
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
+/**
  * What was configured for an entry, resolved most-specific-first: a rule set on one
  * activity beats the one set on its item, which is what lets "the whole item is a
  * bonus action" coexist with "except this one activity".

@@ -989,6 +989,20 @@
     opacity: 0.75;
   }
   #hudtra-multiattack .hudtra-ma-add-part:hover { opacity: 1; }
+  /* Same orange the config dialog marks a suggestion with, for the same reason:
+     what is on screen was read off the statblock and is not stored yet. */
+  #hudtra-multiattack .hudtra-ma-suggested {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #b8651a;
+    border-radius: 0.35rem;
+    background: rgb(184 101 26 / 0.12);
+    font-size: var(--font-size-12, 0.75rem);
+  }
+  #hudtra-multiattack .hudtra-ma-suggested > i { color: #b8651a; }
   #hudtra-multiattack .hudtra-ma-empty {
     margin: 0.2rem 0;
     font-style: italic;
