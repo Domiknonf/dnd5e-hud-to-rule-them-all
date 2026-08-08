@@ -439,12 +439,18 @@ export function entryKeyForActivity(activity) {
 /**
  * A first draft of the Multiattack from the statblock's own text, for the dialog to
  * prefill. SRD phrasing is "makes two Holy Burst attacks or three Radiant Sword
- * attacks", so each attack entry is looked for by name with a count in front of it,
- * and every match becomes its own alternative - which is what "or" means.
+ * attacks", so each attack entry is looked for by name with a count in front of it.
  *
- * A suggestion, nothing more: it never writes anything and the dialog is free to
- * ignore it. The AND case ("one bite and two claws") is not guessed at all, because
- * the same sentence shape says both and getting it wrong is worse than blank.
+ * "or" is what separates the alternatives, and it is the one structural marker the
+ * text reliably has - so it, not the number of matches, decides where an option
+ * ends. Everything named within one chunk is COMBINED into a single option ("one
+ * bite and two claws" is one alternative with two parts); the chunks themselves are
+ * the choice. Treating every match as its own alternative instead was silently
+ * wrong for the AND case: it offered a creature two Multiattacks that each allowed
+ * half of the one it actually has.
+ *
+ * A suggestion, nothing more: it never writes anything, and the dialog exists
+ * precisely so the reading can be corrected.
  */
 export function suggestMultiattack(actor) {
   const attacks = enumerateEntries(actor).filter(e => e.pool === "action" && e.attack);
@@ -460,14 +466,18 @@ export function suggestMultiattack(actor) {
   if (!text) return [];
 
   const options = [];
-  for (const entry of attacks) {
-    const name = entry.item.name?.trim().toLowerCase();
-    if (!name) continue;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = text.match(new RegExp(`\\b(one|two|three|four|five|six|seven|eight|\\d+)\\b[^.]{0,20}?${escaped}`));
-    if (!match) continue;
-    const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
-    if (Number.isInteger(count) && count > 0) options.push({ parts: [{ key: entry.key, count }] });
+  for (const chunk of text.split(/\bor\b/)) {
+    const parts = [];
+    for (const entry of attacks) {
+      const name = entry.item.name?.trim().toLowerCase();
+      if (!name) continue;
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = chunk.match(new RegExp(`\\b(one|two|three|four|five|six|seven|eight|\\d+)\\b[^.]{0,20}?${escaped}`));
+      if (!match) continue;
+      const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
+      if (Number.isInteger(count) && count > 0) parts.push({ key: entry.key, count });
+    }
+    if (parts.length) options.push({ parts });
   }
   return options;
 }
