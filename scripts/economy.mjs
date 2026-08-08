@@ -112,6 +112,17 @@ export function attacksRemaining(combatant, key) {
   return Math.max(0, ...viableOptions(options, used).map(o => partCount(o, key) - (used[key] ?? 0)));
 }
 
+/**
+ * The most this entry could ever contribute to one Attack action - the best any
+ * option offers. The bar needs it as the badge's denominator; attacksRemaining()
+ * alone would only ever say "n of n".
+ */
+export function attackCapacity(combatant, key) {
+  const options = multiattackOptions(combatant);
+  if (!options || !key) return null;
+  return Math.max(0, ...options.map(o => partCount(o, key)));
+}
+
 export function freshEconomy(combatant) {
   const used = {};
   for (const key of Object.keys(RESOURCES)) used[key] = 0;

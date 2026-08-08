@@ -1,7 +1,7 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import {
   getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor,
-  multiattackOptions, attacksRemaining
+  multiattackOptions, attacksRemaining, attackCapacity
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
@@ -280,12 +280,14 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           let spent = false;
           if (isAttackEntry && hasMultiattack) {
             const left = attacksRemaining(combatant, entry.key) ?? 0;
-            const max = Math.max(left, econ.multiattack ? left : 0);
-            spent = econ.multiattack ? left <= 0 : false;
-            if (max > 1 || econ.multiattack) {
+            const max = attackCapacity(combatant, entry.key) ?? 0;
+            // Only while an action is running does 0 mean "no longer allowed" - the
+            // surviving options have ruled this attack out.
+            spent = !!econ.multiattack && left <= 0;
+            if (max > 0) {
               attacksBadge = {
-                available: left, max: Math.max(max, left),
-                hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available: left, max: Math.max(max, left) })
+                available: left, max,
+                hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available: left, max })
               };
             }
           } else if (isAttackEntry) {

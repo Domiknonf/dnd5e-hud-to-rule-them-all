@@ -73,6 +73,25 @@
       </fieldset>
     </div>
 
+    {{!-- Multiattack: a link, plus a nudge when the statblock names several
+         different attacks - exactly when one number cannot describe the creature. --}}
+    <div class="hudtra-config-ma {{#if multiattack.prompt}}prompt{{/if}}">
+      {{#if multiattack.prompt}}<i class="fa-solid fa-circle-exclamation"></i>{{/if}}
+      <span>
+        {{#if multiattack.prompt}}
+        {{localize "dnd5e-hud-to-rule-them-all.multiattack.detected"}}
+        {{else if multiattack.configured}}
+        {{localize "dnd5e-hud-to-rule-them-all.multiattack.configured"}}
+        {{else}}
+        {{localize "dnd5e-hud-to-rule-them-all.multiattack.absent"}}
+        {{/if}}
+      </span>
+      <button type="button" data-action="multiattack">
+        <i class="fa-solid fa-hand-fist"></i>
+        {{localize "dnd5e-hud-to-rule-them-all.multiattack.open"}}
+      </button>
+    </div>
+
     {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item
          straight off the character sheet, to overrule where it belongs; drag within
          a zone to set the order the bar shows. --}}

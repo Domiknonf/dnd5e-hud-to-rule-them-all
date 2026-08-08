@@ -30,6 +30,8 @@ once. Check them by hand after touching templates or imports:
 - **Every `PARTS` template renders exactly one root element** — count roots with a depth
   counter, not by balancing tags. Two siblings and zero roots both throw.
 - **No import cycles between `scripts/*.mjs`** — walk the `from "./x.mjs"` graph.
+- **Every `data-action` in a template has a handler** in some `DEFAULT_OPTIONS.actions`.
+  A button wired to nothing looks completely normal and simply does nothing when clicked.
 - **No i18n key is both a leaf and a branch.** Foundry expands the dotted keys in
   `lang/en.json` into a nested object, so shipping `…entries.attack` *and*
   `…entries.attack.yes` asks one key to be a string and an object at once. That takes
