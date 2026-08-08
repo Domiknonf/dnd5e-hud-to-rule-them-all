@@ -142,39 +142,28 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
    * ritual). Both answer the same question, "why is this not on my bar", and dragging
    * either one into a pool is how you overrule it.
    */
-  #zonesFor(actor, config) {
-    const stored = config.entries ?? {};
-    const rows = collectConfigurable(actor);
-    const zones = new Map();
+  #zonesFor(actor) {
     const zoneKeys = [...ASSIGNABLE_POOLS, "passive", HIDDEN_ZONE];
-    for (const key of zoneKeys) zones.set(key, []);
+    const zones = new Map(zoneKeys.map(k => [k, []]));
 
-    for (const row of rows) {
-      const set = stored[row.key] ?? {};
-      const auto = row.auto.pool;
-      // An out-of-combat activation has no auto pool at all -> it belongs in the
-      // "not on the bar" zone unless something put it somewhere.
-      let zone = set.hidden ? HIDDEN_ZONE : (set.pool ?? auto ?? HIDDEN_ZONE);
+    for (const row of collectConfigurable(actor)) {
+      // row.pool is the EFFECTIVE pool - configuration already applied by
+      // enumerateEntries - so a moved entry already sits in its new zone.
+      let zone = row.hidden ? HIDDEN_ZONE : (row.pool ?? HIDDEN_ZONE);
       if (!zones.has(zone)) zone = HIDDEN_ZONE;
-
-      const attack = typeof set.attack === "boolean" ? set.attack : row.auto.attack;
       zones.get(zone).push({
         key: row.key,
         name: row.name,
         detail: row.detail,
         img: row.img,
-        passive: !!row.passive,
-        sort: Number.isFinite(set.sort) ? set.sort : null,
-        attack,
-        attackOverridden: typeof set.attack === "boolean",
-        poolOverridden: !!set.pool && set.pool !== auto,
-        hidden: set.hidden === true,
-        // `sort` deliberately does NOT count as an override: reordering one zone
-        // writes a position onto every tile in it, and marking all of them would
-        // turn the whole zone orange and hand each one a reset button it does not
-        // need. The mark means "a rule was set", not "this was touched".
-        overridden: !!set.pool || typeof set.attack === "boolean" || set.hidden === true,
-        // Only the action pool cares, and only usable entries can consume an attack.
+        sort: row.sort,
+        attack: row.attack,
+        attackOverridden: row.attackOverridden,
+        hidden: row.hidden,
+        // `sort` deliberately does NOT count: reordering one zone writes a position
+        // onto every tile in it, and marking all of them would turn the whole zone
+        // orange. The mark means "a rule was set", not "this was touched".
+        overridden: row.poolOverridden || row.attackOverridden || row.hidden,
         showAttack: zone === "action"
       });
     }
@@ -232,7 +221,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested: suggestion.count })
         : game.i18n.format(`${MODULE_ID}.config.attacksPerAction.none`, { fallback: DEFAULT_ATTACKS_PER_ACTION }),
       pools,
-      zones: actor ? this.#zonesFor(actor, config) : [],
+      zones: actor ? this.#zonesFor(actor) : [],
       limits: CONFIG_LIMITS
     };
   }
@@ -339,10 +328,9 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
    * the zones from detection, since it turns a silent override into a decision.
    */
   async #assign(actor, key, zone, index) {
-    const config = getActorConfig(actor);
-    const row = collectConfigurable(actor).find(r => r.key === key);
+    const rows = collectConfigurable(actor);
+    const row = rows.find(r => r.key === key);
     if (!row) return;
-
     const auto = row.auto.pool;
 
     // Being shown as passive is NOT what decides this - a passive feat that carries
@@ -354,8 +342,8 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     if (zone === "passive" && auto !== "passive") {
       return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.config.zones.notPassive`));
     }
-    const mismatch = zone !== HIDDEN_ZONE && zone !== "passive" && auto && zone !== auto;
-    if (mismatch) {
+
+    if (zone !== HIDDEN_ZONE && zone !== "passive" && auto && zone !== auto) {
       const esc = Handlebars.escapeExpression;
       const ok = await DialogV2.confirm({
         window: { title: game.i18n.localize(`${MODULE_ID}.config.zones.confirmTitle`) },
@@ -370,35 +358,56 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       if (!ok) return;
     }
 
+    const config = getActorConfig(actor);
     const entries = foundry.utils.deepClone(config.entries ?? {});
-    const rule = { ...(entries[key] ?? {}) };
 
-    if (zone === HIDDEN_ZONE) rule.hidden = true;
-    else {
-      delete rule.hidden;
-      // Dropping something back where detection wanted it removes the rule instead of
-      // pinning the same value - otherwise "auto" could never be restored by dragging.
-      if (zone === auto || zone === "passive") delete rule.pool;
-      else rule.pool = zone;
+    // A button can cover several activities (a Planetar's Divine Aid groups three
+    // at-will spells into one), so the rule goes on every one of them - otherwise
+    // the group would come apart the moment it moved.
+    for (const k of row.keys) {
+      const rule = { ...(entries[k] ?? {}) };
+      if (zone === HIDDEN_ZONE) rule.hidden = true;
+      else {
+        delete rule.hidden;
+        // Dropping something back where detection wanted it removes the rule instead
+        // of pinning the same value - otherwise "auto" could never be restored.
+        if (zone === auto || zone === "passive") delete rule.pool;
+        else rule.pool = zone;
+      }
+      entries[k] = rule;
     }
-    entries[key] = rule;
 
-    // Renumber the target zone so the dropped entry sits where it was let go. Only
-    // this zone is touched; every other entry keeps whatever it had.
-    const current = this.#zonesFor(actor, { ...config, entries })
-      .find(z => z.key === zone)?.tiles.map(t => t.key) ?? [];
-    const from = current.indexOf(key);
-    const ordered = current.filter(k => k !== key);
-    // The index came from the rendered grid, which still counted the dragged tile.
-    // Moving an entry further down its own zone therefore has to shift back by one,
-    // or it lands one slot short of where it was dropped.
-    const target = from >= 0 && from < index ? index - 1 : index;
-    ordered.splice(Math.clamp(target, 0, ordered.length), 0, key);
+    // Renumber the target zone so the entry sits where it was let go. Computed from
+    // the CURRENT layout: the entry either was already in this zone (a reorder) or
+    // was not (an insert), and both fall out of the same two lines.
+    const tiles = this.#zonesFor(actor).find(z => z.key === zone)?.tiles ?? [];
+    const from = tiles.findIndex(t => t.key === key);
+    const ordered = tiles.map(t => t.key).filter(k => k !== key);
+    // The index came from the rendered grid, which still counted the dragged tile,
+    // so moving an entry further down its own zone has to shift back by one.
+    const at = from >= 0 && from < index ? index - 1 : index;
+    ordered.splice(Math.clamp(at, 0, ordered.length), 0, key);
+
+    const byKey = new Map(rows.map(r => [r.key, r]));
     ordered.forEach((k, i) => {
-      entries[k] = { ...(entries[k] ?? {}), sort: i };
+      for (const member of byKey.get(k)?.keys ?? [k]) {
+        entries[member] = { ...(entries[member] ?? {}), sort: i };
+      }
     });
 
     await this.#write(actor, { ...config, entries });
+  }
+
+  /** Apply a change to every config key one button covers. */
+  async #mutateEntry(key, mutate) {
+    const actor = this.actor;
+    if (!actor || !key) return;
+    const row = collectConfigurable(actor).find(r => r.key === key);
+    if (!row) return;
+    const config = getActorConfig(actor);
+    const entries = { ...(config.entries ?? {}) };
+    for (const k of row.keys) entries[k] = mutate({ ...(entries[k] ?? {}) }, row);
+    return this.#write(actor, { ...config, entries });
   }
 
   /** Persist, dropping rules that no longer say anything. */
@@ -465,40 +474,28 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
    * already says - so the button is a two-state toggle to use and tri-state to store.
    */
   static async #onToggleAttack(event, target) {
-    const actor = this.actor;
     const key = target.closest(".hudtra-tile")?.dataset.key;
-    if (!actor || !key) return;
-    const config = getActorConfig(actor);
-    const row = collectConfigurable(actor).find(r => r.key === key);
-    if (!row) return;
-    const rule = { ...(config.entries?.[key] ?? {}) };
-    const current = typeof rule.attack === "boolean" ? rule.attack : row.auto.attack;
-    const next = !current;
-    if (next === row.auto.attack) delete rule.attack;
-    else rule.attack = next;
-    return this.#write(actor, { ...config, entries: { ...(config.entries ?? {}), [key]: rule } });
+    return this.#mutateEntry(key, (rule, row) => {
+      const next = !row.attack;
+      if (next === row.auto.attack) delete rule.attack;
+      else rule.attack = next;
+      return rule;
+    });
   }
 
   static async #onToggleHidden(event, target) {
-    const actor = this.actor;
     const key = target.closest(".hudtra-tile")?.dataset.key;
-    if (!actor || !key) return;
-    const config = getActorConfig(actor);
-    const rule = { ...(config.entries?.[key] ?? {}) };
-    if (rule.hidden) delete rule.hidden;
-    else rule.hidden = true;
-    return this.#write(actor, { ...config, entries: { ...(config.entries ?? {}), [key]: rule } });
+    return this.#mutateEntry(key, (rule, row) => {
+      if (row.hidden) delete rule.hidden;
+      else rule.hidden = true;
+      return rule;
+    });
   }
 
   /** Drop every rule for one entry, back to whatever detection says. */
   static async #onResetEntry(event, target) {
-    const actor = this.actor;
     const key = target.closest(".hudtra-tile")?.dataset.key;
-    if (!actor || !key) return;
-    const config = getActorConfig(actor);
-    const entries = { ...(config.entries ?? {}) };
-    delete entries[key];
-    return this.#write(actor, { ...config, entries });
+    return this.#mutateEntry(key, () => ({}));
   }
 
   /** Take the suggestion: the configured count becomes the suggested one. */

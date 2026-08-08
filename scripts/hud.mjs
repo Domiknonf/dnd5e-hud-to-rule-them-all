@@ -236,7 +236,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       })
       .filter(p => !p.hidden);
 
-    const buckets = collectActions(actor, combatant);
+    const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(combatant);
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)

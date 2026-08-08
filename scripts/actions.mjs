@@ -247,111 +247,154 @@ function usesFor(activity, item) {
   return { value, max };
 }
 
-export function collectActions(actor, combatant) {
+
+/* ------------------------------------------------------------------ */
+/*  The single enumeration                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ONE list of "things this actor could have a HUD entry for". Both the bar and the
+ * config dialog derive from this, and that is the whole point.
+ *
+ * Three separate bugs came from having two enumerations that were supposed to agree
+ * and quietly did not: the config listed one row per activity where the bar showed
+ * one button, it called half the passives non-passive, and it listed dnd5e's cached
+ * spell copies that the bar deliberately hides. Each was patched individually; the
+ * class of bug only goes away by removing the second list.
+ *
+ * An entry is one BUTTON: an item plus the group of its activities that share a
+ * pool. An item whose activities all agree is one entry; one that spans pools (a
+ * Planetar's Divine Aid: some at-will, some as a bonus action) is one entry per
+ * pool, which is exactly how the bar draws it.
+ *
+ * `pool` is the effective pool - configuration already applied - or null for
+ * "nowhere", which is what an out-of-combat activation gets. `keys` lists every
+ * config key a rule has to be written to for this button, since a grouped button
+ * covers several activities.
+ */
+export function enumerateEntries(actor) {
+  const entries = [];
+  if (!actor) return entries;
+  const produced = new Set();
+
+  const make = (item, activities, pool, passive = false) => {
+    const first = activities[0] ?? null;
+    const rule = entryConfig(actor, item, first);
+    produced.add(item.id);
+    return {
+      key: activities.length ? entryKey(item, first) : entryKey(item),
+      keys: activities.length ? activities.map(a => entryKey(item, a)) : [entryKey(item)],
+      item, activities, pool, passive,
+      // Whether there is anything to fire. Governs one thing only: may this be
+      // dragged into a pool. A passive feat that does carry activities can be.
+      usable: activities.length > 0,
+      hidden: rule.hidden === true,
+      sort: Number.isFinite(rule.sort) ? rule.sort : null,
+      auto: {
+        pool: passive ? "passive" : (first ? bucketFor(first.activation?.type) : null),
+        attack: activities.some(a => a.type === "attack") || isAttackSubstituteItem(item)
+      },
+      attack: activities.some(countsAsAttack),
+      attackOverridden: typeof rule.attack === "boolean",
+      poolOverridden: !!rule.pool
+    };
+  };
+
+  for (const item of actor.items) {
+    if (!item.system?.activities?.size) continue;
+    // Same filter the bar uses - this is where the cached NPC-spellcasting copies
+    // get dropped, and skipping it here is what put them in the dialog.
+    if (!isUsable(item)) continue;
+    const activities = [...item.system.activities].filter(a => !isDescriptiveOnly(a));
+    if (!activities.length) continue;
+
+    const byPool = new Map();
+    const unpooled = [];
+    for (const activity of activities) {
+      const pool = poolFor(activity);
+      if (!pool) { unpooled.push(activity); continue; }
+      if (!byPool.has(pool)) byPool.set(pool, []);
+      byPool.get(pool).push(activity);
+    }
+
+    if (byPool.size) {
+      for (const [pool, group] of byPool) entries.push(make(item, group, pool));
+      if (unpooled.length) entries.push(make(item, unpooled, null));
+      continue;
+    }
+    // Nothing lands anywhere. A feat drops through to the passive section - whether
+    // it carries unusable activities (Cunning Strike) or none makes no difference to
+    // where it is shown. Anything else is simply off the bar.
+    entries.push(make(item, activities, item.type === "feat" ? "passive" : null, item.type === "feat"));
+  }
+
+  // Feats that produced nothing above: no activities at all, or only descriptive
+  // ones (an NPC's Multiattack blurb).
+  for (const item of actor.items) {
+    if (item.type !== "feat" || produced.has(item.id)) continue;
+    entries.push(make(item, [], "passive", true));
+  }
+
+  return entries;
+}
+
+/** Activity name, but only when it adds something the item name does not. */
+function activityLabel(entry) {
+  if (entry.activities.length !== 1) return "";
+  const name = entry.activities[0].name;
+  return name && name !== entry.item.name ? name : "";
+}
+
+function entryImage(entry) {
+  if (entry.activities.length === 1) {
+    const img = entry.activities[0].img;
+    if (img && !GENERIC_ACTIVITY_ICON.test(img)) return img;
+  }
+  return entry.item.img;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Consumers                                                          */
+/* ------------------------------------------------------------------ */
+
+export function collectActions(actor) {
   const buckets = {};
   for (const key of Object.keys(RESOURCES)) buckets[key] = [];
   if (!actor) return buckets;
 
-  const bucketedItems = new Set();
+  for (const entry of enumerateEntries(actor)) {
+    if (entry.hidden || !entry.pool || !buckets[entry.pool]) continue;
+    const { item, activities } = entry;
+    // A group of several activities collapses into one item-level button that defers
+    // to dnd5e's own activity picker - the same choice the sheet's roll button
+    // offers - instead of exploding into one button per activity with dnd5e's often
+    // unhelpful default names ("Use", "(free casting)").
+    const single = activities.length === 1 ? activities[0] : null;
+    const passive = entry.pool === "passive";
 
-  for (const item of actor.items) {
-    const activities = item.system?.activities;
-    if (!activities?.size) continue;
-    if (!isUsable(item)) continue;
-
-    // Group this item's activities by which economy bucket they land in. An item
-    // with several activities in the SAME bucket (Disguise Self: cast with a slot
-    // vs. free-cast; Cunning Action: Hide/Dash/Disengage/...) collapses into one
-    // item-level button that defers to dnd5e's own activity picker - the same
-    // choice the character sheet's roll button offers - instead of exploding into
-    // one button per activity with dnd5e's often-unhelpful default activity names
-    // ("Use", "(free casting)"). Activities in DIFFERENT buckets (e.g. Net: Attack
-    // = action, Utility = bonus) naturally stay separate, one per HUD section.
-    // Hiding the item hides everything on it; a per-activity flag is checked below.
-    if (entryConfig(actor, item).hidden) continue;
-
-    const byBucket = new Map();
-    for (const activity of activities) {
-      if (isDescriptiveOnly(activity)) continue;
-      if (entryConfig(actor, item, activity).hidden) continue;
-      // poolFor(), not bucketFor(): a configured pool overrides ACTIVATION_MAP, and
-      // it does so here so the entry lands in the right HUD section AND is grouped
-      // with whatever else the item puts in that same section.
-      const bucket = poolFor(activity);
-      if (!bucket) continue;
-      if (!byBucket.has(bucket)) byBucket.set(bucket, []);
-      byBucket.get(bucket).push(activity);
-    }
-
-    for (const [bucket, group] of byBucket) {
-      bucketedItems.add(item.id);
-      if (group.length > 1) {
-        buckets[bucket].push({
-          kind: "item",
-          uuid: item.uuid,
-          name: item.name,
-          subtitle: "",
-          img: item.img,
-          activityType: null,
-          itemType: item.type,
-          level: item.type === "spell" ? item.system.level : null,
-          uses: usesFor(null, item),
-          description: plainDescription(item),
-          // The button fires dnd5e's activity picker, so any attack in the group
-          // makes the whole button behave as one for affordability purposes.
-          countsAsAttack: group.some(countsAsAttack),
-          sort: entryConfig(actor, item, group[0]).sort ?? null
-        });
-        continue;
-      }
-      const activity = group[0];
-      const activityImg = activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null;
-      buckets[bucket].push({
-        kind: "activity",
-        uuid: activity.uuid,
-        name: item.name,
-        subtitle: "",
-        img: activityImg || item.img,
-        activityType: activity.type,
-        itemType: item.type,
-        level: item.type === "spell" ? item.system.level : null,
-        uses: usesFor(activity, item),
-        details: detailsFor(activity),
-        description: plainDescription(item),
-        countsAsAttack: countsAsAttack(activity),
-        sort: entryConfig(actor, item, activity).sort ?? null
-      });
-    }
-  }
-
-  // Passive, "good to know" features (Tactical Shift, Fighting Styles, ...):
-  // feat-type items that produced no usable entry above - either no activities at
-  // all or only out-of-combat ones. They can't be used or booked, so both left and
-  // middle click open the description card ("describe" instead of "use").
-  for (const item of actor.items) {
-    if (item.type !== "feat" || bucketedItems.has(item.id)) continue;
-    if (entryConfig(actor, item).hidden) continue;
-    buckets.passive.push({
-      kind: "passive",
-      action: "describe",
-      uuid: item.uuid,
+    buckets[entry.pool].push({
+      kind: passive ? "passive" : (single ? "activity" : "item"),
+      action: passive ? "describe" : "use",
+      uuid: single && !passive ? single.uuid : item.uuid,
       name: item.name,
       subtitle: "",
-      img: item.img,
-      activityType: null,
+      img: entryImage(entry),
+      activityType: single?.type ?? null,
       itemType: item.type,
-      level: null,
-      uses: usesFor(null, item),
-      description: plainDescription(item)
+      level: item.type === "spell" ? item.system.level : null,
+      uses: usesFor(single, item),
+      details: single ? detailsFor(single) : null,
+      description: plainDescription(item),
+      countsAsAttack: entry.attack,
+      sort: entry.sort
     });
   }
 
-  // A configured position always wins, and only over entries that have one - anything
-  // never placed by hand keeps its previous relative order behind them, so arranging
-  // three favourites does not scramble the other forty. Array#sort is stable, which is
-  // what makes "return 0" mean "leave in sheet order".
   const alphabetical = game.settings.get(MODULE_ID, "sortAlphabetically");
   for (const key of Object.keys(buckets)) {
+    // A configured position always wins; everything else keeps sheet order, or goes
+    // A-Z when that setting is on. Array#sort is stable, so "no opinion" really does
+    // mean "leave it alone".
     buckets[key].sort((a, b) => {
       const as = a.sort ?? Infinity;
       const bs = b.sort ?? Infinity;
@@ -376,84 +419,26 @@ export function costOfActivity(activity) {
 }
 
 /**
- * Everything on this actor the config dialog can offer a rule for, including what is
- * currently hidden (otherwise nothing could ever be un-hidden) and what the world
- * filters drop. One row per activity, plus one per activity-less feat so passive
- * entries can be hidden too.
+ * The same entries, shaped for the config dialog. One row per BUTTON, including the
+ * hidden ones (nothing could be un-hidden otherwise) and the ones with no pool.
  */
 export function collectConfigurable(actor) {
-  const rows = [];
-  if (!actor) return rows;
-
-  for (const item of actor.items) {
-    const activities = [...(item.system?.activities ?? [])].filter(a => !isDescriptiveOnly(a));
-    // Only pools something could actually land in. An activity whose activation type
-    // is out-of-combat or missing entirely contributes nothing here, exactly as it
-    // contributes nothing to collectActions' buckets.
-    const pools = new Set(activities.map(a => bucketFor(a.activation?.type)).filter(Boolean));
-
-    if (!pools.size) {
-      // Nothing bucketable. MIRROR collectActions' fallback: a feat drops through to
-      // the passive section - whether it carries unusable activities (Cunning Strike,
-      // Sneak Attack) or none at all (Dwarven Resilience) makes no difference to
-      // where it is shown, and pretending otherwise put half the passives in the
-      // wrong place here while the bar showed them together.
-      //
-      // `usable` is the distinction that DOES matter, and it only governs whether
-      // this can be dragged into a pool: something with no activity at all has
-      // nothing to fire, so a pool would be a lie.
-      if (item.type === "feat") {
-        rows.push({
-          key: entryKey(item), name: item.name, img: item.img, detail: "",
-          auto: { pool: "passive", attack: false },
-          passive: true, usable: activities.length > 0
-        });
-      } else if (activities.length) {
-        // Not a feat and nothing bucketable (a scroll with a 1-minute cast): the bar
-        // drops it, but it stays configurable so it can be pulled on deliberately.
-        rows.push({
-          key: entryKey(item), name: item.name, img: item.img, detail: "",
-          auto: { pool: null, attack: false }, usable: true
-        });
-      }
-      continue;
-    }
-
-    // MIRROR collectActions' GROUPING. An item whose activities all land in the same
-    // pool is ONE button in the bar (Cunning Action: Dash/Disengage/Hide behind
-    // dnd5e's own activity picker), so it gets ONE row here - a config list at a
-    // different granularity than the thing it configures is just a trap. Only an
-    // item that genuinely splits across pools (Net: Attack = action, Utility =
-    // bonus) needs a row per activity, because there one rule must not drag the
-    // other half along.
-    if (pools.size === 1) {
-      rows.push({
-        key: entryKey(item), name: item.name, img: item.img, detail: "",
-        usable: true,
-        auto: {
-          pool: [...pools][0],
-          attack: activities.some(a => a.type === "attack") || isAttackSubstituteItem(item)
-        }
-      });
-      continue;
-    }
-
-    for (const activity of activities) {
-      // Only name the activity when it adds something: dnd5e seeds a lot of them
-      // with the item's own name, and "Longsword - Longsword" helps nobody.
-      const label = activity.name && activity.name !== item.name ? activity.name : "";
-      rows.push({
-        key: entryKey(item, activity),
-        name: item.name,
-        detail: label,
-        img: (activity.img && !GENERIC_ACTIVITY_ICON.test(activity.img) ? activity.img : null) || item.img,
-        usable: true,
-        auto: {
-          pool: bucketFor(activity.activation?.type),
-          attack: activity.type === "attack" || isAttackSubstituteItem(item)
-        }
-      });
-    }
-  }
-  return rows.sort((a, b) => a.name.localeCompare(b.name) || a.detail.localeCompare(b.detail));
+  return enumerateEntries(actor)
+    .map(entry => ({
+      key: entry.key,
+      keys: entry.keys,
+      name: entry.item.name,
+      detail: activityLabel(entry),
+      img: entryImage(entry),
+      pool: entry.pool,
+      passive: entry.pool === "passive",
+      usable: entry.usable,
+      hidden: entry.hidden,
+      sort: entry.sort,
+      attack: entry.attack,
+      attackOverridden: entry.attackOverridden,
+      poolOverridden: entry.poolOverridden,
+      auto: entry.auto
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.detail.localeCompare(b.detail));
 }
