@@ -86,6 +86,28 @@ export function multiattackOptions(combatant) {
 const partCount = (option, key) => option?.parts?.find(p => p.key === key)?.count ?? 0;
 
 /**
+ * A tally carrying a slot for EVERY key the Multiattack mentions, zeros included.
+ *
+ * This is not cosmetic. write() goes through setFlag, which merges recursively, so
+ * an object that lost a key between two writes keeps the value it dropped. `used` is
+ * the only part of the economy that shrinks - a fresh Attack action starts a new
+ * tally - so without the zeros the first swing of the second action inherits the
+ * first action's, and every alternative gets ruled out at once (viableOptions
+ * returns nothing, every badge reads 0 and the whole Attack pool locks up).
+ *
+ * Zeros are inert everywhere they are read: viableOptions asks `>= 0`, which every
+ * option satisfies, and attacksRemaining subtracts nothing.
+ */
+function usedTally(options, used = {}) {
+  const tally = {};
+  for (const option of options ?? []) {
+    for (const part of option?.parts ?? []) if (part?.key) tally[part.key] = 0;
+  }
+  for (const [key, n] of Object.entries(used)) if (key) tally[key] = n;
+  return tally;
+}
+
+/**
  * The options still consistent with what has already been used this action.
  *
  * This is what makes the whole thing work WITHOUT asking which Multiattack the
@@ -226,10 +248,10 @@ export async function spendAttack(combatant, { label = "", uuid = null, attacks 
     // themselves down as it grows.
     const free = econ.multiattack && (attacksRemaining(combatant, key) ?? 0) > 0;
     if (free) {
-      econ.multiattack = { used: { ...econ.multiattack.used, [key]: (econ.multiattack.used?.[key] ?? 0) + 1 } };
+      econ.multiattack = { used: usedTally(options, { ...econ.multiattack.used, [key]: (econ.multiattack.used?.[key] ?? 0) + 1 }) };
       amount = 0;
     } else {
-      econ.multiattack = { used: key ? { [key]: 1 } : {} };
+      econ.multiattack = { used: usedTally(options, key ? { [key]: 1 } : {}) };
       econ.used.action = (econ.used.action ?? 0) + 1;
       amount = 1;
     }
