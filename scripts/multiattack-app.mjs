@@ -20,9 +20,11 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
  * attack that appears in several options simply leaves several open.
  */
 
-const numeric = (obj) => Object.entries(obj ?? {})
-  .sort((a, b) => Number(a[0]) - Number(b[0]))
-  .map(([, value]) => value);
+const clampCount = (value) => Math.clamp(
+  Math.floor(Number(value) || 1),
+  CONFIG_LIMITS.attacksPerAction.min,
+  CONFIG_LIMITS.attacksPerAction.max
+);
 
 export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2) {
 
@@ -50,9 +52,17 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
   #actorUuid = null;
 
   /**
-   * The options being edited. Held here rather than read from the DOM on demand
-   * because adding or removing a row re-renders, and a re-render would otherwise
-   * throw away every number typed since the last save.
+   * The options being edited, and the ONLY source of truth for the structure: how
+   * many alternatives exist and how many rows each one has.
+   *
+   * It must never be rebuilt from the form, and that is not a matter of taste. An
+   * alternative with no rows renders no form fields at all, so reading the structure
+   * back out of the DOM dropped every empty one - which is precisely the state a
+   * freshly added alternative is in. "Add alternative" followed by "Add attack" made
+   * the alternative disappear instead, because it was already gone by the time the
+   * row was inserted into it.
+   *
+   * The form supplies VALUES only (key and count), folded back in by #syncValues.
    */
   #draft = null;
 
@@ -67,36 +77,64 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
     return this;
   }
 
-  /** Current state of the form, so structural edits keep what was typed. */
-  #readForm() {
-    if (!this.element) return this.#draft ?? [];
+  /** The attack entries an alternative may name. Empty means nothing to configure. */
+  #attacks() {
+    const actor = this.actor;
+    return actor ? collectConfigurable(actor).filter(row => row.pool === "action" && row.attack) : [];
+  }
+
+  /** The draft, seeded from what is stored the first time it is asked for. */
+  #options() {
+    if (!this.#draft) {
+      const stored = getActorConfig(this.actor).multiattack?.options;
+      this.#draft = Array.isArray(stored) ? foundry.utils.deepClone(stored) : [];
+    }
+    return this.#draft;
+  }
+
+  /**
+   * Fold what is currently typed back into the draft, so a structural edit (which
+   * re-renders) keeps it. Values only - the structure is walked from the draft, and
+   * a field with no matching row is simply ignored.
+   */
+  #syncValues() {
+    const options = this.#options();
+    if (!this.element) return options;
     const FDE = foundry.applications.ux?.FormDataExtended ?? FormDataExtended;
     const raw = foundry.utils.expandObject(new FDE(this.element).object);
-    return numeric(raw.options).map(option => ({
-      parts: numeric(option?.parts)
-        .filter(part => part?.key)
-        .map(part => ({
-          key: part.key,
-          count: Math.clamp(Math.floor(Number(part.count) || 1), 1, CONFIG_LIMITS.attacksPerAction.max)
-        }))
-    }));
+    options.forEach((option, o) => {
+      const fields = raw.options?.[o]?.parts;
+      if (!fields) return;
+      (option.parts ?? []).forEach((part, p) => {
+        const field = fields[p];
+        if (!field) return;
+        if (field.key !== undefined) part.key = field.key;
+        if (field.count !== undefined) part.count = clampCount(field.count);
+      });
+    });
+    return options;
   }
 
   /** Re-render from a mutated draft. */
   async #update(mutate) {
-    const options = this.#readForm();
+    const options = this.#syncValues();
     mutate(options);
     this.#draft = options;
     return this.render();
   }
 
+  /** @override */
+  _onClose(options) {
+    super._onClose(options);
+    // An abandoned draft must not come back when the dialog is opened on the next
+    // creature; reopening always starts from what is stored.
+    this.#draft = null;
+  }
+
   async _prepareContext() {
     const actor = this.actor;
-    const attacks = actor
-      ? collectConfigurable(actor).filter(row => row.pool === "action" && row.attack)
-      : [];
-    const stored = actor ? getActorConfig(actor).multiattack?.options : null;
-    const options = this.#draft ?? (Array.isArray(stored) ? foundry.utils.deepClone(stored) : []);
+    const attacks = this.#attacks();
+    const options = this.#options();
     const suggestion = actor ? suggestMultiattack(actor) : [];
 
     return {
@@ -134,9 +172,13 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
 
   static async #onAddPart(event, target) {
     const index = Number(target.dataset.option);
+    // A new row is seeded with the first attack rather than an empty key: the select
+    // has no blank entry, so an empty key would display as the first attack anyway
+    // and the draft would disagree with what the dialog shows.
+    const first = this.#attacks()[0]?.key ?? "";
     return this.#update(options => {
       const option = options[index];
-      if (option) option.parts = [...(option.parts ?? []), { key: "", count: 1 }];
+      if (option) option.parts = [...(option.parts ?? []), { key: first, count: 1 }];
     });
   }
 
@@ -163,8 +205,15 @@ export class MultiattackConfig extends HandlebarsApplicationMixin(ApplicationV2)
     if (!actor) return;
     // Drop empty options and empty parts: a half-filled row is not a rule, and
     // storing it would make the economy think an alternative exists that allows
-    // nothing at all.
-    const options = this.#readForm().filter(option => option.parts.length);
+    // nothing at all. This is the one place emptiness is allowed to remove
+    // something - while editing, an empty alternative has to survive (see #draft).
+    const options = this.#syncValues()
+      .map(option => ({
+        parts: (option.parts ?? [])
+          .filter(part => part.key)
+          .map(part => ({ key: part.key, count: clampCount(part.count) }))
+      }))
+      .filter(option => option.parts.length);
     const config = { ...getActorConfig(actor) };
     if (options.length) config.multiattack = { options };
     else delete config.multiattack;
