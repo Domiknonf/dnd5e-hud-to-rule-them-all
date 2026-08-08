@@ -524,6 +524,10 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       config.seenAttackSuggestion = previous.seenAttackSuggestion;
     }
     if (previous.entries) config.entries = previous.entries;
+    // Same reason, and it cost a whole Multiattack: it is edited in its own dialog,
+    // so it is not a field here, and leaving it out deleted it on the next save of
+    // anything else on this form.
+    if (previous.multiattack) config.multiattack = previous.multiattack;
 
     const attacks = toInt(raw.attacksPerAction, CONFIG_LIMITS.attacksPerAction);
     if (attacks !== null) config.attacksPerAction = attacks;
