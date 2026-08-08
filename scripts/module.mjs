@@ -3,7 +3,7 @@ import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import { spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor } from "./economy.mjs";
-import { costOfActivity, countsAsAttack, attacksForActivity } from "./actions.mjs";
+import { costOfActivity, countsAsAttack, attacksForActivity, entryKeyForActivity } from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
 
@@ -17,7 +17,8 @@ Hooks.once("init", () => {
   const { loadTemplates } = foundry.applications.handlebars;
   loadTemplates([
     `modules/${MODULE_ID}/templates/hud.hbs`,
-    `modules/${MODULE_ID}/templates/config.hbs`
+    `modules/${MODULE_ID}/templates/config.hbs`,
+    `modules/${MODULE_ID}/templates/multiattack.hbs`
   ]);
 });
 
@@ -48,7 +49,7 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
   // pip itself reads as spent. Attack substitutes (Dragonborn Breath Weapon) may
   // stand in for one of those attacks, so they pass the same gate.
   const isAttack = type === "action" && countsAsAttack(activity);
-  const result = checkGate(combatant, type, { isAttack });
+  const result = checkGate(combatant, type, { isAttack, key: isAttack ? entryKeyForActivity(activity) : null });
   if (result === "allow") return true;
 
   const msg = game.i18n.format(`${MODULE_ID}.notify.exhausted`, {
@@ -82,7 +83,11 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   // spendAttack()'s first-use branch (spend the action, queue the rest) is exactly
   // the RAW behaviour.
   if (type === "action" && countsAsAttack(activity)) {
-    await spendAttack(combatant, { label, uuid: activity.uuid, attacks: attacksForActivity(activity) });
+    await spendAttack(combatant, {
+      label, uuid: activity.uuid,
+      attacks: attacksForActivity(activity),
+      key: entryKeyForActivity(activity)
+    });
     return;
   }
 

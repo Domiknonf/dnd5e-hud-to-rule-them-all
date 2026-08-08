@@ -399,6 +399,54 @@ export function enumerateEntries(actor) {
   return entries;
 }
 
+/**
+ * Which configurable ENTRY an activity belongs to. The Multiattack options are
+ * written against entry keys, and a grouped button covers several activities, so
+ * the booking path has to map back before it can look anything up.
+ */
+export function entryKeyForActivity(activity) {
+  const item = activity?.item;
+  if (!item) return null;
+  const own = entryKey(item, activity);
+  return enumerateEntries(item.actor).find(e => e.keys.includes(own))?.key ?? own;
+}
+
+/**
+ * A first draft of the Multiattack from the statblock's own text, for the dialog to
+ * prefill. SRD phrasing is "makes two Holy Burst attacks or three Radiant Sword
+ * attacks", so each attack entry is looked for by name with a count in front of it,
+ * and every match becomes its own alternative - which is what "or" means.
+ *
+ * A suggestion, nothing more: it never writes anything and the dialog is free to
+ * ignore it. The AND case ("one bite and two claws") is not guessed at all, because
+ * the same sentence shape says both and getting it wrong is worse than blank.
+ */
+export function suggestMultiattack(actor) {
+  const attacks = enumerateEntries(actor).filter(e => e.pool === "action" && e.attack);
+  if (!attacks.length) return [];
+
+  let text = "";
+  for (const item of actor?.items ?? []) {
+    const activities = item.system?.activities;
+    if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
+    text = stripEnrichers(item.system?.description?.value);
+    if (text) break;
+  }
+  if (!text) return [];
+
+  const options = [];
+  for (const entry of attacks) {
+    const name = entry.item.name?.trim().toLowerCase();
+    if (!name) continue;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = text.match(new RegExp(`\\b(one|two|three|four|five|six|seven|eight|\\d+)\\b[^.]{0,20}?${escaped}`));
+    if (!match) continue;
+    const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
+    if (Number.isInteger(count) && count > 0) options.push({ parts: [{ key: entry.key, count }] });
+  }
+  return options;
+}
+
 /** Activity name, but only when it adds something the item name does not. */
 function activityLabel(entry) {
   if (entry.activities.length !== 1) return "";
@@ -446,6 +494,7 @@ export function collectActions(actor) {
       uses: usesFor(single, item),
       details: single ? detailsFor(single) : null,
       description: plainDescription(item),
+      key: entry.key,
       countsAsAttack: entry.attack,
       attacks: entry.attacks,
       sort: entry.sort

@@ -68,6 +68,50 @@ export function getAttacksPerAction(combatant) {
   return guessAttacksPerAction(actor)?.count ?? DEFAULT_ATTACKS_PER_ACTION;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Multiattack                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The configured Multiattack, or null. Shape:
+ *   options: [ { parts: [ { key, count } ] } ]
+ * One option is one alternative (pick exactly one); several parts inside an option
+ * are combined ("one bite AND two claws").
+ */
+export function multiattackOptions(combatant) {
+  const options = getActorConfig(combatant?.actor).multiattack?.options;
+  return Array.isArray(options) && options.length ? options : null;
+}
+
+const partCount = (option, key) => option?.parts?.find(p => p.key === key)?.count ?? 0;
+
+/**
+ * The options still consistent with what has already been used this action.
+ *
+ * This is what makes the whole thing work WITHOUT asking which Multiattack the
+ * player intends: every option stays open until a use rules it out. Given "two A"
+ * or "one A and one B", clicking A leaves both alive; a second A kills the second
+ * option, a B kills the first. The bar just shows what is still possible.
+ */
+function viableOptions(options, used) {
+  return options.filter(option =>
+    Object.entries(used ?? {}).every(([key, n]) => partCount(option, key) >= n)
+  );
+}
+
+/**
+ * How many more times this entry may be used inside the CURRENT Attack action.
+ * With no action in progress this is the best any option offers, which is what the
+ * bar promises before the first swing.
+ */
+export function attacksRemaining(combatant, key) {
+  const options = multiattackOptions(combatant);
+  if (!options || !key) return null;
+  const used = getEconomy(combatant).multiattack?.used ?? null;
+  if (!used) return Math.max(0, ...options.map(o => partCount(o, key)));
+  return Math.max(0, ...viableOptions(options, used).map(o => partCount(o, key) - (used[key] ?? 0)));
+}
+
 export function freshEconomy(combatant) {
   const used = {};
   for (const key of Object.keys(RESOURCES)) used[key] = 0;
@@ -76,6 +120,7 @@ export function freshEconomy(combatant) {
     used,
     max: getMaxima(combatant),
     attacksLeft: 0,    // remaining free "attack"-type uses within the current action
+    multiattack: null, // { used: { entryKey: n } } while a configured Multiattack runs
     log: []            // audit trail, newest last -> enables undo
   };
 }
@@ -100,9 +145,15 @@ export function canAfford(combatant, type, amount = 1) {
 }
 
 /** Gate for "attack"-type activities: a queued Extra Attack is always affordable. */
-export function canAttack(combatant) {
+export function canAttack(combatant, key = null) {
   if (!combatant) return true;
   const econ = getEconomy(combatant);
+  if (multiattackOptions(combatant)) {
+    // Mid-Multiattack, only what a surviving option still allows is free; anything
+    // else has to open a fresh Attack action and pay for it.
+    if (econ.multiattack && (attacksRemaining(combatant, key) ?? 0) > 0) return true;
+    return canAfford(combatant, "action");
+  }
   if ((econ.attacksLeft ?? 0) > 0) return true;
   return canAfford(combatant, "action");
 }
@@ -111,7 +162,7 @@ export function canAttack(combatant) {
  * Enforcement decision for activity usage (module.mjs's dnd5e.preUseActivity).
  * Returns "allow" | "warn" | "block".
  */
-export function checkGate(combatant, type, { isAttack = false } = {}) {
+export function checkGate(combatant, type, { isAttack = false, key = null } = {}) {
   const mode = game.settings.get(MODULE_ID, "enforceActions");
   if (mode === "off") return "allow";
   if (!game.combat?.started) return "allow";
@@ -119,7 +170,7 @@ export function checkGate(combatant, type, { isAttack = false } = {}) {
   if (!type || type === "other") return "allow";
   if (!combatant) return "allow";
 
-  const affordable = isAttack ? canAttack(combatant) : canAfford(combatant, type);
+  const affordable = isAttack ? canAttack(combatant, key) : canAfford(combatant, type);
   return affordable ? "allow" : mode;
 }
 
@@ -147,14 +198,36 @@ export async function spend(combatant, type, { amount = 1, label = "", uuid = nu
  * (from getAttacksPerAction). Still funnels through the same flag write as spend()
  * - this is a second booking function, not a second write path (decision 2 intact).
  */
-export async function spendAttack(combatant, { label = "", uuid = null, attacks = null } = {}) {
+export async function spendAttack(combatant, { label = "", uuid = null, attacks = null, key = null } = {}) {
   if (!combatant) return false;
   if (!combatant.isOwner || !canWriteFlags(combatant)) {
-    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid, attacks });
+    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid, attacks, key });
   }
   const econ = getEconomy(combatant);
   const attacksLeftBefore = econ.attacksLeft ?? 0;
+  const multiattackBefore = econ.multiattack ? foundry.utils.deepClone(econ.multiattack) : null;
   let amount;
+
+  const options = multiattackOptions(combatant);
+  if (options) {
+    // A configured Multiattack replaces the plain counter entirely: instead of a
+    // remaining total, the state is what has been used, and the options narrow
+    // themselves down as it grows.
+    const free = econ.multiattack && (attacksRemaining(combatant, key) ?? 0) > 0;
+    if (free) {
+      econ.multiattack = { used: { ...econ.multiattack.used, [key]: (econ.multiattack.used?.[key] ?? 0) + 1 } };
+      amount = 0;
+    } else {
+      econ.multiattack = { used: key ? { [key]: 1 } : {} };
+      econ.used.action = (econ.used.action ?? 0) + 1;
+      amount = 1;
+    }
+    econ.key = turnKey(combatant.combat);
+    econ.log = [...(econ.log ?? []), { type: "action", amount, label, uuid, attacksLeft: attacksLeftBefore, multiattack: multiattackBefore, at: Date.now() }].slice(-40);
+    await write(combatant, econ);
+    return true;
+  }
+
   if (attacksLeftBefore > 0) {
     econ.attacksLeft = attacksLeftBefore - 1;
     amount = 0;
@@ -188,6 +261,7 @@ export async function refund(combatant, type = null, amount = 1) {
     type = last.type;
     amount = last.amount ?? 1;
     if (last.attacksLeft !== undefined) econ.attacksLeft = last.attacksLeft;
+    if (last.multiattack !== undefined) econ.multiattack = last.multiattack;
   }
   econ.used[type] = Math.max(0, (econ.used[type] ?? 0) - amount);
   econ.log = log;

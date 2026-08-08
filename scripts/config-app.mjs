@@ -2,7 +2,8 @@ import {
   MODULE_ID, CONFIGURABLE_POOLS, CONFIG_LIMITS, DEFAULT_ATTACKS_PER_ACTION,
   ASSIGNABLE_POOLS, RESOURCES, HIDDEN_ZONE
 } from "./const.mjs";
-import { guessAttacksPerAction, collectConfigurable } from "./actions.mjs";
+import { guessAttacksPerAction, collectConfigurable, suggestMultiattack } from "./actions.mjs";
+import { openMultiattack } from "./multiattack-app.mjs";
 import { configTarget, getActorConfig, setActorConfig, entryKey as entryKeyOf } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -111,6 +112,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       toggleAttack: HudConfig.#onToggleAttack,
       toggleHidden: HudConfig.#onToggleHidden,
       resetEntry: HudConfig.#onResetEntry,
+      multiattack: HudConfig.#onMultiattack,
       clear: HudConfig.#onClear
     }
   };
@@ -236,6 +238,13 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested: suggestion.count })
         : game.i18n.format(`${MODULE_ID}.config.attacksPerAction.none`, { fallback: DEFAULT_ATTACKS_PER_ACTION }),
       pools,
+      // The prompt only appears when the statblock actually names several different
+      // attacks and nothing is configured yet - i.e. exactly when a single "attacks
+      // per action" number is provably not enough to describe this creature.
+      multiattack: actor ? {
+        configured: (getActorConfig(actor).multiattack?.options ?? []).length,
+        prompt: !getActorConfig(actor).multiattack && suggestMultiattack(actor).length > 1
+      } : null,
       zones: actor ? this.#zonesFor(actor) : [],
       limits: CONFIG_LIMITS
     };
@@ -529,6 +538,11 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     await setActorConfig(actor, config);
     ui.notifications.info(game.i18n.format(`${MODULE_ID}.config.saved`, { name: actor.name }));
     return this.render();
+  }
+
+  static async #onMultiattack() {
+    const actor = this.actor;
+    if (actor) openMultiattack(actor);
   }
 
   static async #onPickActor(event, target) {

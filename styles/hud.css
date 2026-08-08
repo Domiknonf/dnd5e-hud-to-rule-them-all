@@ -913,6 +913,78 @@
   #hudtra-config .hudtra-tile-tools button.on { opacity: 0.9; color: #b8651a; }
   #hudtra-config .hudtra-tile-tools button.set { text-shadow: 0 0 0.4rem currentColor; }
 
+  /* ---- Multiattack: the prompt in the config dialog, and the editor ---- */
+  #hudtra-config .hudtra-config-ma {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-border-light-tertiary, rgb(128 128 128 / 0.35));
+    border-radius: 0.35rem;
+  }
+  #hudtra-config .hudtra-config-ma.prompt {
+    border-color: #b8651a;
+    background: rgb(184 101 26 / 0.12);
+  }
+  #hudtra-config .hudtra-config-ma > i { color: #b8651a; }
+  #hudtra-config .hudtra-config-ma > span { flex: 1 1 auto; min-width: 0; }
+  #hudtra-config .hudtra-config-ma > button { flex: 0 0 auto; white-space: nowrap; }
+
+  #hudtra-multiattack .hudtra-ma-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  #hudtra-multiattack .hudtra-ma-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 26rem;
+    overflow-y: auto;
+  }
+  #hudtra-multiattack .hudtra-ma-option {
+    border: 1px solid var(--color-border-light-tertiary, rgb(128 128 128 / 0.35));
+    border-radius: 0.35rem;
+    padding: 0.4rem 0.5rem;
+  }
+  #hudtra-multiattack .hudtra-ma-option > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-bottom: 0.3rem;
+  }
+  #hudtra-multiattack .hudtra-ma-option > header button {
+    width: 1.6rem;
+    border: none;
+    background: none;
+    opacity: 0.5;
+  }
+  #hudtra-multiattack .hudtra-ma-option > header button:hover { opacity: 1; }
+  #hudtra-multiattack .hudtra-ma-part {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.15rem 0;
+  }
+  #hudtra-multiattack .hudtra-ma-part input[type="number"] { flex: 0 0 3.5rem; }
+  #hudtra-multiattack .hudtra-ma-part select { flex: 1 1 auto; min-width: 0; }
+  #hudtra-multiattack .hudtra-ma-part > button {
+    flex: 0 0 auto;
+    width: 1.6rem;
+    border: none;
+    background: none;
+    opacity: 0.5;
+  }
+  #hudtra-multiattack .hudtra-ma-part > button:hover { opacity: 1; }
+  #hudtra-multiattack .hudtra-ma-times { opacity: 0.6; }
+  #hudtra-multiattack .hudtra-ma-empty {
+    margin: 0.2rem 0;
+    font-style: italic;
+    opacity: 0.6;
+  }
+  #hudtra-multiattack .hudtra-ma-tools { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
   #hudtra-config .hudtra-config-footer {
     display: flex;
     gap: 0.5rem;

@@ -1,5 +1,8 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
-import { getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor } from "./economy.mjs";
+import {
+  getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor,
+  multiattackOptions, attacksRemaining
+} from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 
@@ -255,7 +258,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // even once the action pip itself reads as spent - but the action was
         // already committed to attacking, so only attack activities (and attack
         // substitutes like the Dragonborn's Breath Weapon) stay live.
-        const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
+        // Mid-action state: either the plain counter has attacks queued, or a
+        // configured Multiattack is running and something is still allowed.
+        const hasMultiattack = !!multiattackOptions(combatant);
+        const hasFreeAttack = key === "action" && (hasMultiattack
+          ? !!econ.multiattack
+          : (econ.attacksLeft ?? 0) > 0);
         const midAttackSequence = hasFreeAttack && remaining(combatant, key) <= 0;
         const label = game.i18n.localize(`${MODULE_ID}.pool.${key}`);
         const entries = (buckets[key] ?? []).map(entry => {
@@ -265,18 +273,34 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           // more than one attack per action configured, so it's visible even before
           // the first attack (not just once mid-sequence) - answers "why can I
           // still use this" without needing the removed Multiattack description.
-          // An entry may carry its own total (the alternative Multiattack), in which
-          // case the badge has to promise THAT number rather than the actor's.
-          const total = entry.attacks ?? attacksPerAction;
+          // With a configured Multiattack the badge counts down what the surviving
+          // options still allow - that is the whole feedback loop, since nothing
+          // ever asks which alternative is being taken.
           let attacksBadge = null;
-          if (isAttackEntry && total > 1) {
-            const available = remaining(combatant, "action") > 0 ? total : (econ.attacksLeft ?? 0);
-            attacksBadge = {
-              available, max: total,
-              hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: total })
-            };
+          let spent = false;
+          if (isAttackEntry && hasMultiattack) {
+            const left = attacksRemaining(combatant, entry.key) ?? 0;
+            const max = Math.max(left, econ.multiattack ? left : 0);
+            spent = econ.multiattack ? left <= 0 : false;
+            if (max > 1 || econ.multiattack) {
+              attacksBadge = {
+                available: left, max: Math.max(max, left),
+                hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available: left, max: Math.max(max, left) })
+              };
+            }
+          } else if (isAttackEntry) {
+            // An entry may carry its own total (the alternative Multiattack), in
+            // which case the badge has to promise THAT number rather than the actor's.
+            const total = entry.attacks ?? attacksPerAction;
+            if (total > 1) {
+              const available = remaining(combatant, "action") > 0 ? total : (econ.attacksLeft ?? 0);
+              attacksBadge = {
+                available, max: total,
+                hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: total })
+              };
+            }
           }
-          const enriched = { ...entry, locked: midAttackSequence && !entry.countsAsAttack, attacksBadge };
+          const enriched = { ...entry, locked: (midAttackSequence && !entry.countsAsAttack) || spent, attacksBadge };
           enriched.action ??= "use";
           enriched.tooltipHtml = tooltipFor(enriched, label);
           return enriched;

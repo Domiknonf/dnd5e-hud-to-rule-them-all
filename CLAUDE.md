@@ -48,6 +48,7 @@ reading the code, say so rather than claiming it works.
 | `scripts/economy.mjs` | State model. The **only** place that reads or writes the economy flag |
 | `scripts/config.mjs` | Per-actor configuration, storage only. The **only** place that reads or writes the config flag. Imports nothing but `const.mjs` — see below |
 | `scripts/config-app.mjs` | The dialog that edits that config, plus the suggestion/notice logic |
+| `scripts/multiattack-app.mjs` | The Multiattack editor: alternatives and their parts |
 | `scripts/actions.mjs` | Walks actor items, buckets their activities, applies per-entry rules |
 | `scripts/hud.mjs` | The `ApplicationV2` and its action handlers |
 | `scripts/socket.mjs` | Relays player writes to the active GM |
@@ -103,10 +104,18 @@ Consequences to respect:
   `sort` (position within its pool). All but `sort` are resolved in `actions.mjs`
   (`poolFor`, `countsAsAttack`, `attacksForActivity`), so the HUD, the gate and the
   booking path all see the same answer — including usages from the sheet or a macro.
-- **`attacks` is what models the alternative Multiattack** — "two Holy Bursts *or* three
-  Radiant Swords". One number per actor cannot say that, because the total depends on
-  which attack opened the action; a number per entry can. `spendAttack` is simply *told*
-  the total instead of looking it up, so this stays inside the one booking path.
+- **Multiattack is `config.multiattack.options`**, `[{ parts: [{ key, count }] }]`. One
+  option is one alternative (take exactly one); several parts inside an option are
+  combined. "Two Holy Bursts *or* three Radiant Swords" is two options; "one bite *and*
+  two claws" is one option with two parts.
+- **Nothing asks which alternative is being taken.** `economy.viableOptions` keeps every
+  option alive until a use rules it out — click A and both "two A" and "A plus B" stay
+  open; a second A kills the latter, a B kills the former. The bar just shows what is
+  still allowed, so the interaction is the answer instead of a dialog interrupting the
+  turn. This is why the state is `multiattack.used` (what happened) rather than a
+  remaining total.
+- The per-entry `attacks` rule still exists for the simple case and is what
+  `spendAttack` uses when no Multiattack is configured.
 - **The zones are seeded by detection, not empty.** That is what makes the dialog a
   correction surface instead of something you must fill in before the bar works, and it
   is what gives the mismatch confirmation something to compare against. Dropping an
@@ -227,10 +236,7 @@ game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
 
 Do not "fix" these casually — each needs a design decision.
 
-- **Extra Attack.** Handled, including the *alternative* Multiattack ("two Holy Bursts or
-  three Radiant Swords") via the per-entry `attacks` rule. What is still open is the
-  genuinely *mixed* one — "one bite and two claws" is not a total at all, it is a budget
-  per entry, and neither the counter nor the dialog can express that.
+- **Extra Attack / Multiattack.** Handled in full, including the mixed case. See below.
 - **Reactions off-turn.** Solved. A player's bar stays on their own character all
   encounter, so their reaction pip is visible and clickable during someone else's turn.
   `setCombatant` still exists and nothing calls it — it is now only a GM convenience
