@@ -207,6 +207,15 @@ carry several activities with different activation types. Always iterate
 Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
 `OUT_OF_COMBAT_ACTIVATIONS` and are dropped, not bucketed.
 
+**Off-turn, an action-cost activity is a reaction** (`economy.poolForNow`). Nothing in
+dnd5e marks an Opportunity Attack as one — the sheet, a macro and Midi all fire the
+same activity, still declaring activation `action` — so whose turn it is is the only
+signal there is. Both hooks in `module.mjs` resolve the pool through it before doing
+anything, so the gate and the booking always agree. Only `action` moves: `legendary`
+and `lair` are off-turn *by design*, `bonus` has no off-turn form worth guessing at.
+An off-turn attack therefore never reaches `spendAttack`, which is right — an
+Opportunity Attack does not open an Attack action or queue Extra Attacks.
+
 ## Conventions
 
 - **ESM only.** `.mjs`, relative imports, no bundler, no TypeScript.

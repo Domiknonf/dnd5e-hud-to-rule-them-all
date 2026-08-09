@@ -31,6 +31,32 @@ export function combatantFor(actor) {
       ?? null;
 }
 
+/**
+ * The pool a use actually draws from RIGHT NOW, which is not always the one the
+ * activity declares.
+ *
+ * OFF-TURN, AN ACTION-COST ACTIVITY IS A REACTION. 5e has no way to take the Attack
+ * action on somebody else's turn, so a weapon swung there is an Opportunity Attack
+ * or a readied one, and both are reactions. Nothing in the system marks an
+ * Opportunity Attack as such - the sheet, a macro and Midi all fire the same
+ * activity, still declaring activation "action" - so whose turn it is is the only
+ * signal available, and for this question it is a reliable one.
+ *
+ * Deliberately narrow. Only `action` moves:
+ * - `legendary` and `lair` are off-turn BY DESIGN and must keep their own pools.
+ * - `bonus` has no off-turn form worth guessing at.
+ * - `reaction` is already right.
+ * - `other`/null are free anyway.
+ *
+ * Consequence worth knowing: a GM who fires a monster's ability while it is not
+ * that monster's turn books a reaction for it. That is what the rules say it is.
+ */
+export function poolForNow(combatant, type) {
+  if (type !== "action") return type;
+  if (!combatant || !game.combat?.started) return type;
+  return game.combat.combatant?.id === combatant.id ? type : "reaction";
+}
+
 /** Maximum pool sizes for a combatant. Actor flag overrides world settings. */
 export function getMaxima(combatant) {
   const actor = combatant?.actor;

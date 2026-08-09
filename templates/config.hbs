@@ -75,6 +75,10 @@
 
     {{!-- Multiattack: a link, plus a nudge when the statblock names several
          different attacks - exactly when one number cannot describe the creature. --}}
+    {{!-- The whole row is gone on a creature with no Multiattack: no text, and no
+         button either. Reachable from a macro via the module API if a homebrew
+         creature needs one without a Multiattack feature on its sheet. --}}
+    {{#if multiattack.relevant}}
     <div class="hudtra-config-ma {{#if multiattack.notice}}prompt{{/if}}">
       {{#if multiattack.notice}}<i class="fa-solid fa-circle-exclamation"></i>{{/if}}
       <span>
@@ -100,6 +104,7 @@
       </button>
       {{/if}}
     </div>
+    {{/if}}
 
     {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item
          straight off the character sheet, to overrule where it belongs; drag within

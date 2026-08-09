@@ -292,11 +292,12 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       pools,
       multiattack: actor ? {
         configured: (config.multiattack?.options ?? []).length,
-        // Whether this creature has a Multiattack to say anything about. The button
-        // stays either way - homebrew may well want one where the statblock has no
-        // such feature - but "no Multiattack configured" is only true of a creature
-        // that could have one, and it was being said about every Ankheg in the world.
         feature: !!multiattackFeature(actor),
+        // Whether this creature has a Multiattack to say anything about at all. An
+        // Ankheg has one Bite and no Multiattack, so the row - text AND button -
+        // stays out of its dialog entirely. Something already configured, or a
+        // notice, also counts as a reason: neither may become unreachable.
+        relevant: !!(multiattackFeature(actor) || maNotice || config.multiattack),
         // The row carries the mark and quotes the reading that caused it, the same
         // way the banner above quotes the feature name. Two texts, because "nothing
         // is configured yet" and "this no longer matches" want different sentences.
