@@ -108,6 +108,18 @@ Consequences to respect:
   All but `sort` are resolved in `actions.mjs` (`poolFor`, `countsAsAttack`,
   `attacksForActivity`, `grantsForActivity`), so the HUD, the gate and the booking
   path all see the same answer — including usages from the sheet or a macro.
+- **Three things outside the config change the economy**, all in `const.mjs`:
+  `BLOCKING_CONDITIONS` (matched on `actor.statuses`, so any module's Stunned works),
+  `EFFECT_POOL_BONUS` and `EFFECT_EXCLUSIVE_POOLS` (matched on English effect names).
+  Conditions **bar** pools rather than shrinking them — zeroing the max would empty
+  the economy row, which reads as a broken bar instead of as "you are Stunned". Haste
+  is a capacity change and belongs in `getMaxima`, NOT in `ACTION_GRANT_NAMES`: it is
+  an effect on a target, so booking it on use would hand the extra action to the
+  caster. Slow is neither — it couples two pools into one budget (`coupledOut`).
+- **`getEconomy` recomputes the maxima and the fresh ones win.** Letting the stored
+  ones override froze `max` at whatever it was when the flag was last written, so a
+  Haste landing mid-turn did nothing until the next turn reset. Nothing writes a max
+  that `getMaxima()` cannot recompute, so there is nothing there to preserve.
 - **`grants` is the only rule that gives instead of costs.** A second action is not a
   discount on the first, so it cannot be modelled as a cost of zero — it has to raise
   the pool. It lives in `econ.granted`, a per-turn full map with zeros (same

@@ -347,6 +347,26 @@
   }
   #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.3em; }
 
+  /* Barred by a condition (Stunned and its kin) rather than merely used up. The pips
+     are already drawn spent; this says it was not the creature that spent them. */
+  #hud-to-rule-them-all .hudtra-pool.blocked > i {
+    color: var(--hudtra-text-dim, #8a8078);
+  }
+  #hud-to-rule-them-all .hudtra-pool.blocked .hudtra-pips {
+    opacity: 0.5;
+  }
+  #hud-to-rule-them-all .hudtra-pool.blocked::after {
+    content: "";
+    position: absolute;
+    left: 1.4em;
+    right: -0.1em;
+    top: 50%;
+    height: 1px;
+    background: var(--hudtra-gold-dark);
+    transform: rotate(-6deg);
+    pointer-events: none;
+  }
+
   /* BG3-style pool markers: one shape + colour per pool, so a glance at the bar
      reads the economy without counting icons. */
   #hud-to-rule-them-all .hudtra-pip {

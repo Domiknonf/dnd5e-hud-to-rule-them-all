@@ -1,4 +1,7 @@
-import { MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION } from "./const.mjs";
+import {
+  MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION,
+  BLOCKING_CONDITIONS, EFFECT_POOL_BONUS, EFFECT_EXCLUSIVE_POOLS
+} from "./const.mjs";
 import { requestFromGM } from "./socket.mjs";
 import { getActorConfig } from "./config.mjs";
 import { guessAttacksPerAction } from "./actions.mjs";
@@ -57,6 +60,14 @@ export function poolForNow(combatant, type) {
   return game.combat.combatant?.id === combatant.id ? type : "reaction";
 }
 
+/** Effect names, normalised the same way item names are for the grant table. */
+function effectNames(actor) {
+  const effects = actor?.appliedEffects ?? actor?.effects ?? [];
+  return [...effects].map(e =>
+    (e?.name ?? "").trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/, "").trim()
+  );
+}
+
 /** Maximum pool sizes for a combatant. Actor flag overrides world settings. */
 export function getMaxima(combatant) {
   const actor = combatant?.actor;
@@ -70,7 +81,54 @@ export function getMaxima(combatant) {
     other: 0,
     passive: 0
   };
-  return { ...base, ...override };
+  const max = { ...base, ...override };
+  // Effects that change capacity while they last (Haste). Read off the creature
+  // that HAS the effect, which is the only way to get it onto the right one.
+  for (const name of effectNames(actor)) {
+    for (const [pool, n] of Object.entries(EFFECT_POOL_BONUS[name] ?? {})) {
+      max[pool] = Math.max(0, (max[pool] ?? 0) + n);
+    }
+  }
+  return max;
+}
+
+/**
+ * Pools this creature currently cannot use at all, because of a condition.
+ *
+ * Kept separate from the maxima on purpose: zeroing the max would make the pips
+ * vanish, and an empty economy row reads as a broken bar rather than as "you are
+ * Stunned". The pips stay, drawn as spent, and the bar says which condition did it.
+ */
+export function blockedPools(combatant) {
+  const statuses = combatant?.actor?.statuses;
+  const blocked = new Set();
+  if (!statuses?.size) return blocked;
+  for (const [status, pools] of Object.entries(BLOCKING_CONDITIONS)) {
+    if (statuses.has(status)) for (const pool of pools) blocked.add(pool);
+  }
+  return blocked;
+}
+
+/** Which conditions are doing it, so the bar can name them. */
+export function blockingConditions(combatant) {
+  const statuses = combatant?.actor?.statuses;
+  if (!statuses?.size) return [];
+  return Object.keys(BLOCKING_CONDITIONS).filter(s => statuses.has(s));
+}
+
+/**
+ * Whether `type` is barred because a pool it shares a budget with has already been
+ * spent (Slow: an action or a Bonus Action, not both).
+ */
+export function coupledOut(combatant, type) {
+  const names = effectNames(combatant?.actor);
+  const econ = getEconomy(combatant);
+  for (const name of names) {
+    const group = EFFECT_EXCLUSIVE_POOLS[name];
+    if (!group?.includes(type)) continue;
+    if (group.some(pool => pool !== type && (econ.used[pool] ?? 0) > 0)) return true;
+  }
+  return false;
 }
 
 /**
@@ -195,7 +253,12 @@ export function getEconomy(combatant) {
   const fresh = freshEconomy(combatant);
   if (!stored) return fresh;
   // Always recompute maxima (level ups, effects, settings changes) but keep `used`.
-  return foundry.utils.mergeObject(fresh, { ...stored, max: { ...fresh.max, ...(stored.max ?? {}) } }, { inplace: false });
+  // The FRESH maxima win outright. Letting the stored ones override was the same
+  // line, and it meant the opposite: max was frozen at whatever it happened to be
+  // when the flag was last written, so a Haste landing mid-turn - or a level-up, or
+  // a changed world setting - did not show until the next turn reset. Nothing ever
+  // writes a max that getMaxima() cannot recompute, so there is nothing to preserve.
+  return foundry.utils.mergeObject(fresh, { ...stored, max: fresh.max }, { inplace: false });
 }
 
 /**
@@ -215,12 +278,17 @@ export function remaining(combatant, type) {
 export function canAfford(combatant, type, amount = 1) {
   if (!combatant) return true;
   if (type === "other" || type === null) return true;
+  if (blockedPools(combatant).has(type)) return false;
+  if (coupledOut(combatant, type)) return false;
   return remaining(combatant, type) >= amount;
 }
 
 /** Gate for "attack"-type activities: a queued Extra Attack is always affordable. */
 export function canAttack(combatant, key = null) {
   if (!combatant) return true;
+  // Before the queued-attack shortcut below: a Stunned creature does not get to
+  // finish the Multiattack it had started.
+  if (blockedPools(combatant).has("action")) return false;
   const econ = getEconomy(combatant);
   if (multiattackOptions(combatant)) {
     // Mid-Multiattack, only what a surviving option still allows is free; anything

@@ -54,7 +54,8 @@
   {{#if inCombat}}
   <div class="hudtra-economy">
     {{#each pools}}
-    <div class="hudtra-pool" data-pool="{{key}}" data-tooltip-text="{{label}}: {{left}}/{{max}}">
+    <div class="hudtra-pool {{#if blocked}}blocked{{/if}}" data-pool="{{key}}"
+         data-tooltip-text="{{label}}: {{left}}/{{max}}{{#if hint}} — {{hint}}{{/if}}">
       <i class="{{icon}}"></i>
       <div class="hudtra-pips">
         {{#each pips}}<span class="hudtra-pip {{#if spent}}spent{{/if}}"></span>{{/each}}

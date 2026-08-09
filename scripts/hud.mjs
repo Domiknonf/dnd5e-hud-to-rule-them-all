@@ -1,7 +1,8 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import {
   getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor,
-  multiattackOptions, attacksRemaining, attackCapacity, poolMax
+  multiattackOptions, attacksRemaining, attackCapacity, poolMax,
+  blockedPools, blockingConditions, coupledOut
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { openConfig, attackNotice, multiattackNotice } from "./config-app.mjs";
@@ -235,6 +236,16 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const econ = getEconomy(combatant);
     const isMine = actor?.isOwner === true;
 
+    // Conditions do not shrink the pools, they bar them - so the pips stay and are
+    // drawn as spent. A Stunned creature with an empty economy row would read as a
+    // broken bar; one with four crossed-out pips reads as Stunned.
+    const blocked = blockedPools(combatant);
+    const conditions = blockingConditions(combatant)
+      .map(s => game.i18n.localize(CONFIG.DND5E?.conditionTypes?.[s]?.label ?? s));
+    const blockedHint = conditions.length
+      ? game.i18n.format(`${MODULE_ID}.blockedBy`, { conditions: conditions.join(", ") })
+      : "";
+
     const pools = Object.entries(RESOURCES)
       .filter(([key]) => key !== "other")
       .sort((a, b) => a[1].order - b[1].order)
@@ -243,15 +254,18 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // the pips are where that has to become visible.
         const max = poolMax(econ, key);
         const used = econ.used[key] ?? 0;
+        const out = blocked.has(key) || coupledOut(combatant, key);
         return {
           key,
           icon: def.icon,
           label: game.i18n.localize(`${MODULE_ID}.pool.${key}`),
           max,
           used,
-          left: max - used,
+          left: out ? 0 : max - used,
+          blocked: out,
+          hint: out ? blockedHint : "",
           hidden: max <= 0,
-          pips: Array.fromRange(Math.max(max, used)).map(i => ({ spent: i < used }))
+          pips: Array.fromRange(Math.max(max, used)).map(i => ({ spent: out || i < used }))
         };
       })
       .filter(p => !p.hidden);
@@ -319,7 +333,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           icon: def.icon,
           label,
           // Only per-turn pools can exhaust; "other" and "passive" have no budget.
-          exhausted: def.perTurn && !hasFreeAttack && remaining(combatant, key) <= 0,
+          // A barring condition beats the queued-attack shortcut: being Stunned
+          // mid-Multiattack ends it, it does not let the rest through for free.
+          exhausted: blocked.has(key) || coupledOut(combatant, key)
+            || (def.perTurn && !hasFreeAttack && remaining(combatant, key) <= 0),
           entries
         };
       })

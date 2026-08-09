@@ -136,6 +136,53 @@ export const ASSIGNABLE_POOLS = ["action", "bonus", "reaction", "legendary", "ot
  */
 export const HIDDEN_ZONE = "hidden";
 
+/**
+ * Conditions that take the economy away, and which pools each one takes.
+ *
+ * 2024 rules: Incapacitated bars the action, the Bonus Action AND the Reaction, and
+ * a creature that cannot act cannot take Legendary Actions either. Every condition
+ * below contains Incapacitated, so they all say the same thing - they are listed one
+ * by one anyway because dnd5e does not reliably propagate the rider status onto
+ * `actor.statuses`, and matching "incapacitated" alone would miss a plain Stunned.
+ *
+ * Matched against `actor.statuses` (Foundry's status ids), not effect names, so it
+ * works no matter which module applied the condition.
+ */
+export const BLOCKING_CONDITIONS = {
+  incapacitated: ["action", "bonus", "reaction", "legendary"],
+  stunned:       ["action", "bonus", "reaction", "legendary"],
+  paralyzed:     ["action", "bonus", "reaction", "legendary"],
+  unconscious:   ["action", "bonus", "reaction", "legendary"],
+  petrified:     ["action", "bonus", "reaction", "legendary"]
+};
+
+/**
+ * Active effects that CHANGE pool sizes while they last, by the effect's English
+ * name. Deltas, added on top of whatever the creature normally has.
+ *
+ * Haste belongs here and NOT in ACTION_GRANT_NAMES: it is an effect on a target, so
+ * booking it when the spell is used would hand the extra action to the caster, who
+ * is usually not the one who gets it. Read from the target's effects, it lands on
+ * the right creature and it ends when the spell does.
+ *
+ * The extra action is restricted (Dash, Disengage, Hide, Utilize, or one attack) and
+ * nothing here enforces that - the bar counts pips, it does not police which button
+ * fills them.
+ */
+export const EFFECT_POOL_BONUS = {
+  haste: { action: 1 }
+};
+
+/**
+ * Effects under which several pools share ONE budget: spending any of them spends
+ * the lot. 2024 Slow - "it can take either an action or a Bonus Action on its turn,
+ * not both" - which is not a smaller pool but a coupling between two, and there is
+ * no way to say that with maxima alone.
+ */
+export const EFFECT_EXCLUSIVE_POOLS = {
+  slow: ["action", "bonus"]
+};
+
 /** Upper bounds for the config dialog's number inputs. Sanity rails, not rules. */
 export const CONFIG_LIMITS = {
   attacksPerAction: { min: 1, max: 10 },
