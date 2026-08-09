@@ -1,7 +1,7 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import {
   getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor,
-  multiattackOptions, attacksRemaining, attackCapacity
+  multiattackOptions, attacksRemaining, attackCapacity, poolMax
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { openConfig, attackNotice, multiattackNotice } from "./config-app.mjs";
@@ -239,7 +239,9 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       .filter(([key]) => key !== "other")
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
-        const max = econ.max[key] ?? 0;
+        // poolMax, not econ.max: an Action Surge raises the pool for this turn, and
+        // the pips are where that has to become visible.
+        const max = poolMax(econ, key);
         const used = econ.used[key] ?? 0;
         return {
           key,

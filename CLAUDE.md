@@ -100,12 +100,22 @@ Consequences to respect:
   lists it once as a Bonus Action. `collectConfigurable` marks those entries `split`, the
   dialog shows a link-slash icon on them, and the drop asks "move all of it or just this
   group?" with *all of it* as the default. Do not try to guess it instead.
-- Five things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
+- Six things a rule can say: `pool` (overrides `ACTIVATION_MAP`), `attack` (overrides
   the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `attacks` (how
-  many attacks this entry grants when it *opens* the Attack action), `hidden`, and
-  `sort` (position within its pool). All but `sort` are resolved in `actions.mjs`
-  (`poolFor`, `countsAsAttack`, `attacksForActivity`), so the HUD, the gate and the
-  booking path all see the same answer — including usages from the sheet or a macro.
+  many attacks this entry grants when it *opens* the Attack action), `grants` (what
+  using it *adds* to the pools this turn — Action Surge; `false` overrides
+  `ACTION_GRANT_NAMES` to "nothing"), `hidden`, and `sort` (position within its pool).
+  All but `sort` are resolved in `actions.mjs` (`poolFor`, `countsAsAttack`,
+  `attacksForActivity`, `grantsForActivity`), so the HUD, the gate and the booking
+  path all see the same answer — including usages from the sheet or a macro.
+- **`grants` is the only rule that gives instead of costs.** A second action is not a
+  discount on the first, so it cannot be modelled as a cost of zero — it has to raise
+  the pool. It lives in `econ.granted`, a per-turn full map with zeros (same
+  merge reason as `multiattack.used`), and is read through `economy.poolMax()`.
+  Never fold it into `econ.max`: that is recomputed from settings on every read and
+  written back, so a grant folded in there is counted again on the next write.
+- **`config-app #write()` lists every field a rule may carry.** Anything unlisted is
+  deleted by the next drag, which is the per-entry twin of the `#onSubmit` trap.
 - **Multiattack is `config.multiattack.options`**, `[{ parts: [{ key, count }] }]`. One
   option is one alternative (take exactly one); several parts inside an option are
   combined. "Two Holy Bursts *or* three Radiant Swords" is two options; "one bite *and*
@@ -273,8 +283,14 @@ Do not "fix" these casually — each needs a design decision.
   (pin a combatant instead of following the turn), not a gap.
 - **Missed hooks.** If the GM client misses a turn change, no reset happens. The flag's
   `key` field records `round:turn` as the hook for a future staleness guard.
-- **Midi QoL** wraps activity usage. The dnd5e hooks still fire; verify ordering before
-  adding Midi-specific hooks.
+- **Midi QoL** wraps activity usage. VERIFIED LIVE: both `dnd5e.preUseActivity` and
+  `dnd5e.postUseActivity` do fire, in that order, around Midi's own workflow, and
+  `activity.type` / `activation.type` still read correctly (`attack` / `action`).
+  What Midi *does* change is the activity NAME — every wrapped activity calls
+  itself "Midi Attack" — which is why `GENERIC_ACTIVITY_NAMES` exists and why the
+  economy log goes through `useLabel()`. Note the hooks are not awaited by
+  Foundry, so a callback registered later reads the economy *before* our async
+  booking has landed; that is not a missed write.
 
 ## Working style in this repo
 

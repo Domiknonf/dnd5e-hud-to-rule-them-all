@@ -556,10 +556,16 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const entries = {};
     for (const [key, rule] of Object.entries(config.entries ?? {})) {
       const kept = {};
+      // Every field a rule may carry has to be listed here, or a drag anywhere in
+      // the dialog silently deletes the ones that are not - the per-entry twin of
+      // the #onSubmit trap above. `attacks` and `grants` are not edited here yet;
+      // that is exactly why they need naming.
       if (rule.pool) kept.pool = rule.pool;
       if (typeof rule.attack === "boolean") kept.attack = rule.attack;
       if (rule.hidden === true) kept.hidden = true;
       if (Number.isFinite(rule.sort)) kept.sort = rule.sort;
+      if (Number.isFinite(rule.attacks)) kept.attacks = rule.attacks;
+      if (rule.grants !== undefined) kept.grants = rule.grants;
       if (Object.keys(kept).length) entries[key] = kept;
     }
     const next = { ...config };

@@ -16,6 +16,7 @@ export function registerSocket() {
     switch (action) {
       case "spend":           return handlers.spend(combatant, data.type, data);
       case "spendAttack":     return handlers.spendAttack(combatant, data);
+      case "grant":           return handlers.grant(combatant, data.grants, data);
       case "refund":          return handlers.refund(combatant, data.type, data.amount ?? 1);
       case "resetTurn":       return handlers.resetTurn(combatant);
     }

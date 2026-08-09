@@ -173,10 +173,16 @@ export function attackCapacity(combatant, key) {
 
 export function freshEconomy(combatant) {
   const used = {};
-  for (const key of Object.keys(RESOURCES)) used[key] = 0;
+  const granted = {};
+  for (const key of Object.keys(RESOURCES)) { used[key] = 0; granted[key] = 0; }
   return {
     key: turnKey(combatant?.combat),
     used,
+    // What a feature handed out this turn (Action Surge: one more action). Kept
+    // apart from `max` because max is recomputed from settings on every read, and
+    // folding it in there would either be lost or, once written back, counted twice.
+    // A full map with zeros for the same reason usedTally is one: setFlag merges.
+    granted,
     max: getMaxima(combatant),
     attacksLeft: 0,    // remaining free "attack"-type uses within the current action
     multiattack: null, // { used: { entryKey: n } } while a configured Multiattack runs
@@ -192,9 +198,18 @@ export function getEconomy(combatant) {
   return foundry.utils.mergeObject(fresh, { ...stored, max: { ...fresh.max, ...(stored.max ?? {}) } }, { inplace: false });
 }
 
+/**
+ * A pool's size this turn: what the actor normally has, plus whatever a feature
+ * granted. Read this rather than econ.max wherever a total is shown or compared -
+ * econ.max is the baseline and does not know about Action Surge.
+ */
+export function poolMax(econ, type) {
+  return (econ?.max?.[type] ?? 0) + (econ?.granted?.[type] ?? 0);
+}
+
 export function remaining(combatant, type) {
   const econ = getEconomy(combatant);
-  return (econ.max[type] ?? 0) - (econ.used[type] ?? 0);
+  return poolMax(econ, type) - (econ.used[type] ?? 0);
 }
 
 export function canAfford(combatant, type, amount = 1) {
@@ -237,18 +252,55 @@ async function write(combatant, econ) {
   return combatant.setFlag(MODULE_ID, FLAGS.ECONOMY, econ);
 }
 
-/** Spend from a pool. Safe to call as a player: falls back to a GM relay. */
-export async function spend(combatant, type, { amount = 1, label = "", uuid = null } = {}) {
+/**
+ * Spend from a pool. Safe to call as a player: falls back to a GM relay.
+ *
+ * `grants` rides along rather than being its own call so that a feature which both
+ * costs something and gives something (Action Surge costs a bonus action in the 2024
+ * rules) is one write, not two.
+ */
+export async function spend(combatant, type, { amount = 1, label = "", uuid = null, grants = null } = {}) {
   if (!combatant || !RESOURCES[type]) return false;
   if (!combatant.isOwner || !canWriteFlags(combatant)) {
-    return requestFromGM("spend", { combatantUuid: combatant.uuid, type, amount, label, uuid });
+    return requestFromGM("spend", { combatantUuid: combatant.uuid, type, amount, label, uuid, grants });
   }
   const econ = getEconomy(combatant);
+  const grantedBefore = applyGrants(econ, grants);
   econ.used[type] = (econ.used[type] ?? 0) + amount;
   econ.key = turnKey(combatant.combat);
-  econ.log = [...(econ.log ?? []), { type, amount, label, uuid, at: Date.now() }].slice(-40);
+  econ.log = [...(econ.log ?? []), { type, amount, label, uuid, granted: grantedBefore, at: Date.now() }].slice(-40);
   await write(combatant, econ);
   return true;
+}
+
+/**
+ * Raise pools for the rest of the turn without spending anything. For a feature
+ * that costs nothing at all (2014 Action Surge is a free action), where the spend
+ * path above would never run.
+ */
+export async function grant(combatant, grants, { label = "", uuid = null } = {}) {
+  if (!combatant || !grants) return false;
+  if (!combatant.isOwner || !canWriteFlags(combatant)) {
+    return requestFromGM("grant", { combatantUuid: combatant.uuid, grants, label, uuid });
+  }
+  const econ = getEconomy(combatant);
+  const grantedBefore = applyGrants(econ, grants);
+  if (!grantedBefore) return false;
+  econ.key = turnKey(combatant.combat);
+  econ.log = [...(econ.log ?? []), { type: null, amount: 0, label, uuid, granted: grantedBefore, at: Date.now() }].slice(-40);
+  await write(combatant, econ);
+  return true;
+}
+
+/** Fold a grant into the economy, returning the previous tally so refund can undo it. */
+function applyGrants(econ, grants) {
+  if (!grants) return undefined;
+  const before = { ...(econ.granted ?? {}) };
+  for (const [pool, n] of Object.entries(grants)) {
+    if (!RESOURCES[pool] || !Number.isFinite(Number(n))) continue;
+    econ.granted[pool] = (econ.granted[pool] ?? 0) + Number(n);
+  }
+  return before;
 }
 
 /**
@@ -321,8 +373,11 @@ export async function refund(combatant, type = null, amount = 1) {
     amount = last.amount ?? 1;
     if (last.attacksLeft !== undefined) econ.attacksLeft = last.attacksLeft;
     if (last.multiattack !== undefined) econ.multiattack = last.multiattack;
+    if (last.granted !== undefined) econ.granted = last.granted;
   }
-  econ.used[type] = Math.max(0, (econ.used[type] ?? 0) - amount);
+  // A grant-only entry (a feature that costs nothing but hands out an action) has no
+  // pool to give back, and writing one would put a junk key into `used`.
+  if (type) econ.used[type] = Math.max(0, (econ.used[type] ?? 0) - amount);
   econ.log = log;
   await write(combatant, econ);
   return true;

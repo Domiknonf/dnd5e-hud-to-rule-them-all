@@ -1,6 +1,6 @@
 import {
   MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS,
-  GENERIC_ACTIVITY_ICON, ATTACK_SUBSTITUTE_NAMES
+  GENERIC_ACTIVITY_ICON, GENERIC_ACTIVITY_NAMES, ATTACK_SUBSTITUTE_NAMES, ACTION_GRANT_NAMES
 } from "./const.mjs";
 import { entryConfig, entryKey } from "./config.mjs";
 
@@ -177,6 +177,31 @@ export function countsAsAttack(activity) {
 export function attacksForActivity(activity) {
   const n = entryConfig(activity?.actor, activity?.item, activity).attacks;
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** What this item grants by name alone (ACTION_GRANT_NAMES), or null. PCs only. */
+export function grantsForItem(item) {
+  if (item?.actor?.type !== "character") return null;
+  return ACTION_GRANT_NAMES[(item.name ?? "").trim().toLowerCase()] ?? null;
+}
+
+/**
+ * What using this entry adds to the actor's pools for the rest of the turn, as
+ * `{ pool: amount }`, or null.
+ *
+ * This is what models Action Surge, and it is the one thing the economy could not
+ * express at all: every other rule says what something COSTS, while this says what
+ * it GIVES. A second action is not a discount on the first, so it cannot be a cost
+ * of zero - it has to raise the pool.
+ *
+ * Configuration wins, as everywhere: `grants` may be an explicit `{ pool: amount }`
+ * map, or `false` to say "no, this grants nothing" against the name table.
+ */
+export function grantsForActivity(activity) {
+  const rule = entryConfig(activity?.actor, activity?.item, activity).grants;
+  if (rule === false) return null;
+  if (rule && typeof rule === "object") return Object.keys(rule).length ? rule : null;
+  return grantsForItem(activity?.item);
 }
 
 /**
@@ -504,11 +529,29 @@ export function suggestMultiattack(actor) {
   return options;
 }
 
-/** Activity name, but only when it adds something the item name does not. */
+/**
+ * Activity name, but only when it adds something the item name does not - which
+ * rules out the per-type fallbacks as well as a plain repeat of the item name.
+ * Without that filter every weapon on a Midi QoL sheet reads "Greatsword - Midi
+ * Attack", because that is genuinely what the activity calls itself there.
+ */
 function activityLabel(entry) {
   if (entry.activities.length !== 1) return "";
-  const name = entry.activities[0].name;
-  return name && name !== entry.item.name ? name : "";
+  const name = (entry.activities[0].name ?? "").trim();
+  if (!name || name === entry.item.name) return "";
+  return GENERIC_ACTIVITY_NAMES.has(name.toLowerCase()) ? "" : name;
+}
+
+/**
+ * Human label for one use, for the economy log. The item name leads: with Midi QoL
+ * every activity calls itself "Midi Attack", so trusting the activity name first
+ * filled the undo trail with forty identical entries.
+ */
+export function useLabel(activity) {
+  const item = (activity?.item?.name ?? "").trim();
+  const name = (activity?.name ?? "").trim();
+  if (!name || name === item || GENERIC_ACTIVITY_NAMES.has(name.toLowerCase())) return item || name;
+  return item ? `${item} (${name})` : name;
 }
 
 function entryImage(entry) {

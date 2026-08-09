@@ -3,9 +3,12 @@ import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import {
-  spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor, poolForNow
+  spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor, poolForNow, grant
 } from "./economy.mjs";
-import { costOfActivity, countsAsAttack, attacksForActivity, entryKeyForActivity } from "./actions.mjs";
+import {
+  costOfActivity, countsAsAttack, attacksForActivity, entryKeyForActivity, grantsForActivity,
+  useLabel
+} from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
 import { openMultiattack } from "./multiattack-app.mjs";
 import { getActorConfig } from "./config.mjs";
@@ -78,9 +81,16 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   if (!combatant) return;
   // Same resolution the gate above made, so what was checked is what gets booked.
   const type = poolForNow(combatant, costOfActivity(activity));
-  if (!type || type === "other") return;
+  const label = useLabel(activity);
+  // What this use HANDS OUT (Action Surge). Resolved before the early return below,
+  // because a feature that grants an action may well cost nothing itself - and then
+  // there is no spend for it to ride along on.
+  const grants = grantsForActivity(activity);
 
-  const label = activity.name || activity.item?.name || "";
+  if (!type || type === "other") {
+    if (grants) await grant(combatant, grants, { label, uuid: activity.uuid });
+    return;
+  }
   // Extra Attack: dnd5e fires postUseActivity once per Attack-activity click, with
   // no built-in "number of attacks" step (verified live: a level 5 Fighter's second
   // Attack click is its own postUseActivity, not bundled with the first). Route
@@ -100,10 +110,13 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
       attacks: attacksForActivity(activity),
       key: entryKeyForActivity(activity)
     });
+    // Rare enough to be worth a second write rather than a fifth parameter on
+    // spendAttack: an attack that also grants something is a configured oddity.
+    if (grants) await grant(combatant, grants, { label, uuid: activity.uuid });
     return;
   }
 
-  await spend(combatant, type, { label, uuid: activity.uuid });
+  await spend(combatant, type, { label, uuid: activity.uuid, grants });
 });
 
 /* ------------------------------------------------------------------ */

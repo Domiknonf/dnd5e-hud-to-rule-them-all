@@ -47,6 +47,23 @@ export const OUT_OF_COMBAT_ACTIVATIONS = new Set([
 ]);
 
 /**
+ * PC features whose use GRANTS pool capacity for the rest of the turn, by item name,
+ * as `{ pool: amount }`.
+ *
+ * Same reasoning and the same limits as PC_EXTRA_ATTACK_NAMES: a small, fixed
+ * English SRD vocabulary that only ever appears on Player Characters, so a name
+ * lookup beats parsing freeform text. It is only the DEFAULT - the per-entry
+ * `grants` rule overrides it, which is what homebrew and translated content need.
+ *
+ * Deliberately short. Haste is not here: its extra action is restricted to a few
+ * specific actions and it arrives as an effect on a target rather than as a use, so
+ * granting a full action for it would be wrong in the common case.
+ */
+export const ACTION_GRANT_NAMES = {
+  "action surge": { action: 1 }
+};
+
+/**
  * Item names whose activities may REPLACE one attack within the Attack action
  * (2024 rules: the Dragonborn's Breath Weapon explicitly substitutes for one of
  * the attacks). Matched on the ITEM name, not the activity, because such traits
@@ -63,6 +80,24 @@ export const ATTACK_SUBSTITUTE_NAMES = new Set(["breath weapon"]);
  * Same trap as the activity-name fallback: never trust it over the item's own art.
  */
 export const GENERIC_ACTIVITY_ICON = /^systems\/dnd5e\/icons\/svg\/activity\//;
+
+/**
+ * Activity names that say nothing about the activity - they are the per-type
+ * fallback, not something a person typed. The name twin of GENERIC_ACTIVITY_ICON,
+ * and the same trap: they are truthy, so they happily shadow the item's real name.
+ *
+ * VERIFIED IN A LIVE WORLD: with Midi QoL active, every wrapped activity reports
+ * `name: "Midi Attack"` (a Greatsword's attack arrived as exactly that), which put
+ * "Greatsword - Midi Attack" in the config dialog and in the economy log for every
+ * weapon on the sheet. dnd5e's own fallback is the bare type label.
+ *
+ * Matched case-insensitively against the whole name, so a real activity someone
+ * deliberately called "Attack of Opportunity" is untouched.
+ */
+export const GENERIC_ACTIVITY_NAMES = new Set([
+  "attack", "damage", "save", "check", "heal", "utility", "summon", "enchant",
+  "cast", "order", "forward", "midi attack", "midi damage", "midi save", "midi other"
+]);
 
 /**
  * Default number of "attack"-type activity uses that share a single action.
