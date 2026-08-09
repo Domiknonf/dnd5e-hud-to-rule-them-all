@@ -179,10 +179,23 @@ export function attacksForActivity(activity) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** What this item grants by name alone (ACTION_GRANT_NAMES), or null. PCs only. */
+/**
+ * What this item grants by name alone (ACTION_GRANT_NAMES), or null.
+ *
+ * NOT restricted to Player Characters, unlike PC_EXTRA_ATTACK_NAMES and
+ * ATTACK_SUBSTITUTE_NAMES. Those two are restricted because the same name means
+ * something different on a monster (an NPC's breath weapon is a full action, not a
+ * substitute for one attack). "Action Surge" means the same thing on any sheet, so
+ * a statblock that carries it gets it.
+ *
+ * A trailing parenthetical is ignored, because sheets and older imports carry the
+ * use count in the name ("Action Surge (1/Rest)"). Safe to do here, where the value
+ * is a fixed grant - and deliberately NOT done for PC_EXTRA_ATTACK_NAMES, where
+ * "Extra Attack (2)" would be genuinely ambiguous about whether 2 is the total.
+ */
 export function grantsForItem(item) {
-  if (item?.actor?.type !== "character") return null;
-  return ACTION_GRANT_NAMES[(item.name ?? "").trim().toLowerCase()] ?? null;
+  const name = (item?.name ?? "").trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return ACTION_GRANT_NAMES[name] ?? null;
 }
 
 /**
