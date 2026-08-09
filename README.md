@@ -4,7 +4,7 @@ A combat HUD for Foundry VTT that does two things at once: show every activity a
 can actually use, grouped by action type — and track the action / bonus action / reaction
 economy. Styled as a Baldur's Gate 3-like hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `0.3.0` (pre-alpha)
+**Foundry v13** · **dnd5e 5.x** · MIT · `0.4.0` (pre-alpha)
 
 ---
 
@@ -73,31 +73,58 @@ Settings live under *Configure Settings → Module Settings*.
 
 **Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
 
-Per-actor overrides for pool sizes are read from the actor flag
-`flags.dnd5e-hud-to-rule-them-all.config.max`. Extra Attack works the same way, but is
-usually auto-detected and needs no setup: `flags.dnd5e-hud-to-rule-them-all.config.attacksPerAction`
-sets how many "attack"-type activity uses share a single action for that actor, and if
-it isn't set, the module guesses:
+### Per character — the gear on the bar
 
-- **Player Characters** — by matching the feature's name against the three known
-  English SRD names ("Extra Attack", "Two Extra Attacks", "Three Extra Attacks").
-  **English compendium content only** — a translated or renamed feature (homebrew,
-  non-English compendiums) won't be picked up and needs the manual override.
-- **NPCs** — by reading the count straight out of a Multiattack-shaped feature's own
-  description text ("makes three attacks"). This is freeform monster text with no
-  fixed vocabulary, so it's a best-effort parse, not exact for every phrasing (e.g.
-  "one bite and one claw attack" won't parse correctly) — the manual override always
-  wins over the guess either way.
+Everything the module cannot know for certain is answered here rather than guessed at,
+by whoever owns the character (the GM owns everyone).
+
+- **Drag-and-drop zones** put an entry in a different pool, reorder it within one, or
+  take it off the bar. The zones start out **seeded by detection**, so this is a
+  correction surface — not a form you have to fill in before the bar works.
+- **Attacks per Attack action** (Extra Attack), and pool sizes.
+- **Multiattack editor** for what a single number cannot say: *"two Holy Bursts **or**
+  three Radiant Swords"* is two alternatives, *"one bite **and** two claws"* is one
+  alternative with two parts. Nothing asks which one is being taken — every
+  alternative stays open until a use rules it out, and the badges show what is still
+  allowed. It opens prefilled with the statblock's own reading.
+
+Detection still runs, but only to prefill that dialog and as the fallback while
+nothing has been configured — which is what keeps a freshly dropped pack of NPCs
+usable without configuring six statblocks first. **Configuration always wins.**
+
+When detection and configuration disagree — typically after a level-up — the gear gets
+a mark and the dialog offers the change with the feature that caused it quoted by name.
+It never rewrites a configured value on its own.
+
+**English compendium content only.** The detection matches English SRD names and
+statblock phrasing; translated or renamed content needs the dialog.
+
+### What the bar tracks on its own
+
+- **Opportunity Attacks.** Nothing in dnd5e marks one, so an action-cost activity used
+  on somebody else's turn is booked as the Reaction it actually is.
+- **Action Surge** and anything else configured to *grant* pool capacity.
+- **Haste** and **Slow**, read off the effects of whoever has them.
+- **Stunned, Paralyzed, Unconscious, Petrified, Incapacitated** bar the economy
+  outright; the pips stay visible and struck through, so it reads as the condition
+  rather than as a broken bar.
+
+The GM can correct any pool by hand: click a pool to hand one pip back, right-click to
+spend one.
 
 ## Public API
 
 ```js
 const api = game.modules.get("dnd5e-hud-to-rule-them-all").api;
 
-api.getEconomy(combatant);            // { used, max, attacksLeft, log }
+api.diagnose();                       // what the module believes about the selected token
+api.getEconomy(combatant);            // { used, granted, max, attacksLeft, multiattack, log }
 await api.spend(combatant, "bonus", { label: "Cunning Action" });
 await api.refund(combatant);          // undoes the last booking
 await api.resetTurn(combatant);
+
+api.openConfig(actor);                // the gear dialog
+api.openMultiattack(actor);           // the Multiattack editor
 ```
 
 ## Development
@@ -118,14 +145,14 @@ Releases are cut by pushing a tag — the workflow stamps `module.json` and publ
 zip:
 
 ```bash
-git tag v0.3.0 && git push --tags
+git tag v0.4.0 && git push --tags
 ```
 
 ## Roadmap
 
 - [x] **M0** — scaffold, HUD renders for the active combatant
-- [ ] **M1** — economy correct across a full round, undo
-- [ ] **M3** — configurability: layout, filters, rule toggles, per-actor overrides
+- [x] **M1** — economy correct across a full round, undo
+- [x] **M3** — configurability: zones, filters, per-entry rules, per-actor overrides
 - [ ] **M4** — parity: spell slots, item uses, concentration, targeting, Extra Attack
 - [x] **M5** — BG3-style theming; keybindings and repositioning still open
 
