@@ -129,6 +129,23 @@ export function blockingConditions(combatant) {
 }
 
 /**
+ * Every pool currently sharing a budget with another, whether or not anything has
+ * been spent yet.
+ *
+ * Separate from coupledOut() because the bar has to show the coupling BEFORE it
+ * bites. coupledOut only turns true once one of the pair is gone, so on its own a
+ * Slowed creature looked exactly like an unaffected one right up to the moment the
+ * Bonus Action silently stopped working.
+ */
+export function coupledPools(combatant) {
+  const pools = new Set();
+  for (const rule of matchedEffectRules(combatant?.actor, EFFECT_EXCLUSIVE_POOLS)) {
+    for (const pool of rule.pools) pools.add(pool);
+  }
+  return pools;
+}
+
+/**
  * Whether `type` is barred because a pool it shares a budget with has already been
  * spent (Slow: an action or a Bonus Action, not both).
  */
@@ -510,6 +527,12 @@ export function diagnose(actor = null) {
 
     maxima: probe ? getMaxima(probe) : null,
     blockedByCondition: probe ? [...blockedPools(probe)] : [],
+    // Which pools share a budget, and which of them that has actually closed yet -
+    // a coupling looks like nothing at all until one of the pair is spent.
+    coupledPools: probe ? [...coupledPools(probe)] : [],
+    coupledOutNow: combatant
+      ? Object.keys(RESOURCES).filter(pool => coupledOut(combatant, pool))
+      : [],
     used: econ?.used ?? null,
     grantedThisTurn: econ?.granted ?? null,
     attacksLeft: econ?.attacksLeft ?? null,

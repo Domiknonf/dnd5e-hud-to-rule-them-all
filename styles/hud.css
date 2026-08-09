@@ -347,6 +347,14 @@
   }
   #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.3em; }
 
+  /* Slow: this pool shares one budget with another. Small, dim and after the pips -
+     it is a caveat on the pool, not a second resource. */
+  #hud-to-rule-them-all .hudtra-coupled {
+    font-size: 0.62em;
+    color: var(--hudtra-gold-dark);
+    opacity: 0.9;
+  }
+
   /* Barred by a condition (Stunned and its kin) rather than merely used up. The pips
      are already drawn spent; this says it was not the creature that spent them. */
   #hud-to-rule-them-all .hudtra-pool.blocked > i {

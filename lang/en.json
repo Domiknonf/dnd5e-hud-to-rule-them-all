@@ -10,6 +10,7 @@
   "dnd5e-hud-to-rule-them-all.pool.legendary": "Legendary Action",
   "dnd5e-hud-to-rule-them-all.pool.other": "Other",
   "dnd5e-hud-to-rule-them-all.pool.passive": "Passive",
+  "dnd5e-hud-to-rule-them-all.coupledPools": "Only one of these two this turn",
   "dnd5e-hud-to-rule-them-all.blockedBy": "{conditions}",
   "dnd5e-hud-to-rule-them-all.attacksAvailable": "{available}/{max} attacks available this action",
   "dnd5e-hud-to-rule-them-all.tooltip.range": "Range",

@@ -54,12 +54,16 @@
   {{#if inCombat}}
   <div class="hudtra-economy">
     {{#each pools}}
-    <div class="hudtra-pool {{#if blocked}}blocked{{/if}}" data-pool="{{key}}"
+    <div class="hudtra-pool {{#if blocked}}blocked{{/if}} {{#if coupled}}coupled{{/if}}"
+         data-pool="{{key}}"
          data-tooltip-text="{{label}}: {{left}}/{{max}}{{#if hint}} — {{hint}}{{/if}}">
       <i class="{{icon}}"></i>
       <div class="hudtra-pips">
         {{#each pips}}<span class="hudtra-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
       </div>
+      {{!-- Slow: these two share one budget. Said BEFORE it bites, or the Bonus
+           Action just stops working with nothing to explain it. --}}
+      {{#if coupled}}<i class="hudtra-coupled fa-solid fa-link"></i>{{/if}}
     </div>
     {{/each}}
   </div>
