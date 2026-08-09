@@ -54,9 +54,12 @@
   {{#if inCombat}}
   <div class="hudtra-economy">
     {{#each pools}}
-    <div class="hudtra-pool {{#if blocked}}blocked{{/if}} {{#if coupled}}coupled{{/if}}"
-         data-pool="{{key}}"
-         data-tooltip-text="{{label}}: {{left}}/{{max}}{{#if hint}} — {{hint}}{{/if}}">
+    {{!-- data-action only for the GM: the handler checks again, but a control nobody
+         else has must not advertise itself in everyone's tooltip either. --}}
+    <div class="hudtra-pool {{#if blocked}}blocked{{/if}} {{#if coupled}}coupled{{/if}} {{#if adjustable}}adjustable{{/if}}"
+         data-pool="{{key}}" {{#if adjustable}}data-action="adjustPool"{{/if}}
+         data-tooltip-text="{{label}}: {{left}}/{{max}}{{#if hint}} — {{hint}}{{/if}}{{#if adjustable}}
+{{localize "dnd5e-hud-to-rule-them-all.pool.adjustHint"}}{{/if}}">
       <i class="{{icon}}"></i>
       <div class="hudtra-pips">
         {{#each pips}}<span class="hudtra-pip {{#if spent}}spent{{/if}}"></span>{{/each}}

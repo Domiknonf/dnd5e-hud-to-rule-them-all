@@ -1,6 +1,6 @@
 import {
   MODULE_ID, FLAGS, RESOURCES, DEFAULT_ATTACKS_PER_ACTION,
-  BLOCKING_CONDITIONS, EFFECT_POOL_BONUS, EFFECT_EXCLUSIVE_POOLS
+  BLOCKING_CONDITIONS, EFFECT_POOL_BONUS, EFFECT_EXCLUSIVE_POOLS, EFFECT_BLOCKED_POOLS
 } from "./const.mjs";
 import { requestFromGM } from "./socket.mjs";
 import { getActorConfig } from "./config.mjs";
@@ -60,12 +60,14 @@ export function poolForNow(combatant, type) {
   return game.combat.combatant?.id === combatant.id ? type : "reaction";
 }
 
+const normaliseName = (name) =>
+  (name ?? "").trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/, "").trim();
+
+const activeEffects = (actor) => [...(actor?.appliedEffects ?? actor?.effects ?? [])];
+
 /** Effect names, normalised the same way item names are for the grant table. */
 function effectNames(actor) {
-  const effects = actor?.appliedEffects ?? actor?.effects ?? [];
-  return [...effects].map(e =>
-    (e?.name ?? "").trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/, "").trim()
-  );
+  return activeEffects(actor).map(e => normaliseName(e?.name));
 }
 
 /**
@@ -112,20 +114,34 @@ export function getMaxima(combatant) {
  * Stunned". The pips stay, drawn as spent, and the bar says which condition did it.
  */
 export function blockedPools(combatant) {
-  const statuses = combatant?.actor?.statuses;
+  const actor = combatant?.actor;
   const blocked = new Set();
-  if (!statuses?.size) return blocked;
-  for (const [status, pools] of Object.entries(BLOCKING_CONDITIONS)) {
-    if (statuses.has(status)) for (const pool of pools) blocked.add(pool);
+  const statuses = actor?.statuses;
+  if (statuses?.size) {
+    for (const [status, pools] of Object.entries(BLOCKING_CONDITIONS)) {
+      if (statuses.has(status)) for (const pool of pools) blocked.add(pool);
+    }
+  }
+  // Effects bar pools too, and not always the same ones a condition would: Slow
+  // takes the Reaction while leaving the action and the Bonus Action coupled.
+  for (const rule of matchedEffectRules(actor, EFFECT_BLOCKED_POOLS)) {
+    for (const pool of rule.pools) blocked.add(pool);
   }
   return blocked;
 }
 
-/** Which conditions are doing it, so the bar can name them. */
+/** What is doing it, so the bar can name it: condition ids, then effect names. */
 export function blockingConditions(combatant) {
-  const statuses = combatant?.actor?.statuses;
-  if (!statuses?.size) return [];
-  return Object.keys(BLOCKING_CONDITIONS).filter(s => statuses.has(s));
+  const actor = combatant?.actor;
+  const statuses = actor?.statuses;
+  const conditions = statuses?.size
+    ? Object.keys(BLOCKING_CONDITIONS).filter(s => statuses.has(s))
+    : [];
+  // For an effect, the sheet's own wording is the clearest thing to show back.
+  const effects = activeEffects(actor)
+    .filter(e => EFFECT_BLOCKED_POOLS.some(r => r.match.test(normaliseName(e?.name))))
+    .map(e => e?.name);
+  return [...conditions, ...effects];
 }
 
 /**

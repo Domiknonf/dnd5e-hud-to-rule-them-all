@@ -193,6 +193,22 @@ export const EFFECT_EXCLUSIVE_POOLS = [
   { match: /^slow(ed)?$/, pools: ["action", "bonus"] }
 ];
 
+/**
+ * Effects that take a pool away outright, the effect-name twin of
+ * BLOCKING_CONDITIONS. Same anchoring rule as the two tables above.
+ *
+ * Slow is in BOTH tables because the spell does two separate things: it couples the
+ * action and the Bonus Action ("either an action or a Bonus Action, not both") AND
+ * it bars Reactions. Modelling only the coupling - as this did at first - left a
+ * Slowed creature happily taking Opportunity Attacks.
+ *
+ * VERIFY AGAINST YOUR PHB: the "can't take Reactions" clause is certain in the 2014
+ * text and read as unchanged for 2024 here. It is one line to remove if that is wrong.
+ */
+export const EFFECT_BLOCKED_POOLS = [
+  { match: /^slow(ed)?$/, pools: ["reaction"] }
+];
+
 /** Upper bounds for the config dialog's number inputs. Sanity rails, not rules. */
 export const CONFIG_LIMITS = {
   attacksPerAction: { min: 1, max: 10 },

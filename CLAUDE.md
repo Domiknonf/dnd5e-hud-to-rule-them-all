@@ -110,7 +110,7 @@ Consequences to respect:
   path all see the same answer — including usages from the sheet or a macro.
 - **Three things outside the config change the economy**, all in `const.mjs`:
   `BLOCKING_CONDITIONS` (matched on `actor.statuses`, so any module's Stunned works),
-  `EFFECT_POOL_BONUS` and `EFFECT_EXCLUSIVE_POOLS` (anchored patterns against the
+  `EFFECT_POOL_BONUS`, `EFFECT_EXCLUSIVE_POOLS` and `EFFECT_BLOCKED_POOLS` (anchored patterns against the
   English effect name — nothing agrees on it: dnd5e ships "Haste", DAE/Midi ship
   "Hasted". **Anchor them.** A loose `/slow/` also matches the Monk's Slow Fall and
   silently couples that character's pools for the rest of the fight).
@@ -123,6 +123,10 @@ Consequences to respect:
   ones override froze `max` at whatever it was when the flag was last written, so a
   Haste landing mid-turn did nothing until the next turn reset. Nothing writes a max
   that `getMaxima()` cannot recompute, so there is nothing there to preserve.
+- **One effect may be in several tables.** Slow both couples the action with the
+  Bonus Action *and* bars the Reaction; modelling only the coupling left a Slowed
+  creature taking Opportunity Attacks. Check the whole spell, not the clause that
+  suggested the feature.
 - **`grants` is the only rule that gives instead of costs.** A second action is not a
   discount on the first, so it cannot be modelled as a cost of zero — it has to raise
   the pool. It lives in `econ.granted`, a per-turn full map with zeros (same

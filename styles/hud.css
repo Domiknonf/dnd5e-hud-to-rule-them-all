@@ -347,6 +347,19 @@
   }
   #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.3em; }
 
+  /* The GM's manual correction handle. Only a cursor and a faint lift - the economy
+     row is a readout first, and it must not start looking like a row of buttons. */
+  #hud-to-rule-them-all .hudtra-pool.adjustable {
+    cursor: pointer;
+    border-radius: 0.25em;
+    padding: 0.05em 0.2em;
+    margin: -0.05em -0.2em;
+    transition: background var(--hudtra-anim);
+  }
+  #hud-to-rule-them-all .hudtra-pool.adjustable:hover {
+    background: rgb(236 209 147 / 0.12);
+  }
+
   /* Slow: this pool shares one budget with another. Small, dim and after the pips -
      it is a caveat on the pool, not a second resource. */
   #hud-to-rule-them-all .hudtra-coupled {

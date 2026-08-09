@@ -1,6 +1,6 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import {
-  getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor,
+  getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund,
   multiattackOptions, attacksRemaining, attackCapacity, poolMax,
   blockedPools, blockingConditions, coupledOut, coupledPools
 } from "./economy.mjs";
@@ -56,6 +56,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       collapse: CombatHUD.#onCollapse,
       portrait: CombatHUD.#onPortrait,
       config: CombatHUD.#onConfig,
+      adjustPool: CombatHUD.#onAdjustPool,
       reset: CombatHUD.#onReset,
       endTurn: CombatHUD.#onEndTurn
     }
@@ -269,6 +270,9 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           left: out ? 0 : max - used,
           blocked: out,
           coupled: linked,
+          // The GM may correct any pool by hand; nobody else gets the control, so
+          // nobody else gets the hint promising it either.
+          adjustable: game.user.isGM,
           hint: blocked.has(key) ? blockedHint
             : (out || linked) ? game.i18n.localize(`${MODULE_ID}.coupledPools`) : "",
           hidden: max <= 0,
@@ -464,6 +468,39 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onConfig() {
     return openConfig(this.subjectActor);
+  }
+
+  /**
+   * GM control on the economy row: left click hands one pip back, right click takes
+   * one. Every pool that is shown, not just the action and the bonus - the same
+   * correction applies to a reaction spent on a ruling that got reversed.
+   *
+   * This is NOT a second booking site (load-bearing decision 2). That rule is about
+   * activity USAGE being counted exactly once, by dnd5e.postUseActivity; this is a
+   * manual correction that only ever happens because a person asked for it, and it
+   * goes through the same spend/refund in economy.mjs as everything else. The bar
+   * already had `reset` on the same footing.
+   *
+   * `contextmenu` reaches this because ApplicationV2 binds it alongside `click` -
+   * the same reason the middle-click popup needs its own listener and this does not.
+   */
+  static async #onAdjustPool(event, target) {
+    event.preventDefault();
+    if (!game.user.isGM) return;
+    const combatant = this.subjectCombatant;
+    const type = target.dataset.pool;
+    if (!combatant || !RESOURCES[type]) return;
+
+    if (event.type === "contextmenu") {
+      const econ = getEconomy(combatant);
+      // Do not let a click push a pool past its own size: the pips would stop
+      // matching the number, and there is no pip left to click back.
+      if ((econ.used[type] ?? 0) >= poolMax(econ, type)) return;
+      await spend(combatant, type, { label: game.i18n.localize(`${MODULE_ID}.manualAdjust`) });
+    } else {
+      await refund(combatant, type, 1);
+    }
+    return this.render();
   }
 
   static async #onReset() {
