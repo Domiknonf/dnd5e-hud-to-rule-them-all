@@ -3,7 +3,8 @@ import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import {
-  spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor, poolForNow, grant
+  spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor, poolForNow, grant,
+  diagnose
 } from "./economy.mjs";
 import {
   costOfActivity, countsAsAttack, attacksForActivity, entryKeyForActivity, grantsForActivity,
@@ -34,7 +35,10 @@ Hooks.once("ready", () => {
     // Macro entry point: openConfig(actor) for a hotkey or a token-HUD button.
     // openMultiattack(actor) is the way in for a creature whose sheet has no
     // Multiattack feature, since the dialog only offers the row to creatures that do.
-    openConfig, openMultiattack, getActorConfig
+    openConfig, openMultiattack, getActorConfig,
+    // Console entry point: api.diagnose() prints what the module believes about the
+    // selected token, so "nothing happens" has an answer that is not a guess.
+    diagnose
   };
   // Starts collapsed outside combat: the bar is available, but it does not shove
   // the macro bar aside until someone actually pulls it up (or combat starts).
@@ -161,3 +165,9 @@ Hooks.on("updateItem", refreshHUD);
 Hooks.on("deleteItem", refreshHUD);
 Hooks.on("createActiveEffect", refreshHUD);
 Hooks.on("deleteActiveEffect", refreshHUD);
+// Enabling or disabling an existing effect fires UPDATE, not create - and that is how
+// DAE commonly applies one. Without this, Haste landing on a creature that already
+// carried the (disabled) effect changed the economy and never redrew the bar.
+Hooks.on("updateActiveEffect", refreshHUD);
+// A condition applied through the token HUD's status icons rather than as an effect.
+Hooks.on("updateToken", refreshHUD);

@@ -472,6 +472,52 @@ export async function resetTurn(combatant) {
 }
 
 /**
+ * What the module currently believes about one creature's economy, for the console.
+ *
+ * Exists because "nothing happens" is otherwise unanswerable from outside: every
+ * input here - which effects are applied, what their names normalise to, which
+ * patterns matched, whether a Combatant was even found - lives in module-private
+ * functions. Printing the inputs next to the outputs turns a guess into a reading.
+ *
+ * Reports rather than repairs: nothing here writes anything.
+ */
+export function diagnose(actor = null) {
+  const subject = actor
+    ?? canvas?.tokens?.controlled?.[0]?.actor
+    ?? game.user?.character
+    ?? null;
+  const combatant = combatantFor(subject);
+  // blockedPools/getMaxima only ever reach through to .actor, so a stand-in makes
+  // the reading work outside an encounter too - where there IS no combatant, and
+  // where the economy row is hidden by design rather than by a bug.
+  const probe = combatant ?? (subject ? { actor: subject } : null);
+  const econ = combatant ? getEconomy(combatant) : null;
+  const rules = (table) => matchedEffectRules(subject, table).map(r => String(r.match));
+
+  return {
+    actor: subject?.name ?? "(none - select a token)",
+    combatStarted: !!game.combat?.started,
+    combatant: combatant?.name ?? "(none - not in the encounter)",
+    isTheirTurn: !!combatant && game.combat?.combatant?.id === combatant.id,
+    // What an action costs RIGHT NOW. "reaction" here means off-turn.
+    actionCostsNow: poolForNow(combatant, "action"),
+
+    statuses: [...(subject?.statuses ?? [])],
+    effects: [...(subject?.appliedEffects ?? subject?.effects ?? [])].map(e => e?.name),
+    effectsAsMatched: effectNames(subject),
+    matchedPoolBonus: rules(EFFECT_POOL_BONUS),
+    matchedExclusive: rules(EFFECT_EXCLUSIVE_POOLS),
+
+    maxima: probe ? getMaxima(probe) : null,
+    blockedByCondition: probe ? [...blockedPools(probe)] : [],
+    used: econ?.used ?? null,
+    grantedThisTurn: econ?.granted ?? null,
+    attacksLeft: econ?.attacksLeft ?? null,
+    multiattack: econ?.multiattack ?? null
+  };
+}
+
+/**
  * Players own their Actor but usually not the Combatant document, so a direct
  * setFlag would throw. Cheap capability probe instead of guessing.
  */
