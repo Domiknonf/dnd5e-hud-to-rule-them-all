@@ -157,8 +157,18 @@ export const BLOCKING_CONDITIONS = {
 };
 
 /**
- * Active effects that CHANGE pool sizes while they last, by the effect's English
- * name. Deltas, added on top of whatever the creature normally has.
+ * Active effects that CHANGE pool sizes while they last. Deltas, added on top of
+ * whatever the creature normally has.
+ *
+ * PATTERNS, not exact names, because nothing agrees on the name: dnd5e's own spell
+ * effect is "Haste", DAE and Midi SRD content ship "Hasted", and a concentration
+ * marker may hang a parenthetical on either (stripped before matching).
+ *
+ * ANCHORED patterns, though - not a loose /haste/ or /slow/. A substring match on
+ * "slow" also matches the Monk's **Slow Fall**, which would quietly couple that
+ * character's action and Bonus Action for the rest of the fight, and nothing about
+ * the bar would explain why. Anchoring costs one alternative per spelling and buys
+ * back the whole class of accidental matches.
  *
  * Haste belongs here and NOT in ACTION_GRANT_NAMES: it is an effect on a target, so
  * booking it when the spell is used would hand the extra action to the caster, who
@@ -167,21 +177,21 @@ export const BLOCKING_CONDITIONS = {
  *
  * The extra action is restricted (Dash, Disengage, Hide, Utilize, or one attack) and
  * nothing here enforces that - the bar counts pips, it does not police which button
- * fills them.
+ * fills them. Nor does it stack: two Hastes are still one rule, which is also RAW.
  */
-export const EFFECT_POOL_BONUS = {
-  haste: { action: 1 }
-};
+export const EFFECT_POOL_BONUS = [
+  { match: /^hast(e|ed)$/, pools: { action: 1 } }
+];
 
 /**
  * Effects under which several pools share ONE budget: spending any of them spends
  * the lot. 2024 Slow - "it can take either an action or a Bonus Action on its turn,
  * not both" - which is not a smaller pool but a coupling between two, and there is
- * no way to say that with maxima alone.
+ * no way to say that with maxima alone. Same anchoring rule as above.
  */
-export const EFFECT_EXCLUSIVE_POOLS = {
-  slow: ["action", "bonus"]
-};
+export const EFFECT_EXCLUSIVE_POOLS = [
+  { match: /^slow(ed)?$/, pools: ["action", "bonus"] }
+];
 
 /** Upper bounds for the config dialog's number inputs. Sanity rails, not rules. */
 export const CONFIG_LIMITS = {

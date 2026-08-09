@@ -110,7 +110,10 @@ Consequences to respect:
   path all see the same answer — including usages from the sheet or a macro.
 - **Three things outside the config change the economy**, all in `const.mjs`:
   `BLOCKING_CONDITIONS` (matched on `actor.statuses`, so any module's Stunned works),
-  `EFFECT_POOL_BONUS` and `EFFECT_EXCLUSIVE_POOLS` (matched on English effect names).
+  `EFFECT_POOL_BONUS` and `EFFECT_EXCLUSIVE_POOLS` (anchored patterns against the
+  English effect name — nothing agrees on it: dnd5e ships "Haste", DAE/Midi ship
+  "Hasted". **Anchor them.** A loose `/slow/` also matches the Monk's Slow Fall and
+  silently couples that character's pools for the rest of the fight).
   Conditions **bar** pools rather than shrinking them — zeroing the max would empty
   the economy row, which reads as a broken bar instead of as "you are Stunned". Haste
   is a capacity change and belongs in `getMaxima`, NOT in `ACTION_GRANT_NAMES`: it is

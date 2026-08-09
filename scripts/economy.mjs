@@ -68,6 +68,18 @@ function effectNames(actor) {
   );
 }
 
+/**
+ * The rules from a pattern table that this creature's effects currently match.
+ *
+ * One hit per RULE, not per effect: two copies of Haste are still one rule, which is
+ * both what RAW says and what stops a doubled effect from doubling the pool.
+ */
+function matchedEffectRules(actor, table) {
+  const names = effectNames(actor);
+  if (!names.length) return [];
+  return table.filter(rule => names.some(name => rule.match.test(name)));
+}
+
 /** Maximum pool sizes for a combatant. Actor flag overrides world settings. */
 export function getMaxima(combatant) {
   const actor = combatant?.actor;
@@ -84,8 +96,8 @@ export function getMaxima(combatant) {
   const max = { ...base, ...override };
   // Effects that change capacity while they last (Haste). Read off the creature
   // that HAS the effect, which is the only way to get it onto the right one.
-  for (const name of effectNames(actor)) {
-    for (const [pool, n] of Object.entries(EFFECT_POOL_BONUS[name] ?? {})) {
+  for (const rule of matchedEffectRules(actor, EFFECT_POOL_BONUS)) {
+    for (const [pool, n] of Object.entries(rule.pools)) {
       max[pool] = Math.max(0, (max[pool] ?? 0) + n);
     }
   }
@@ -121,14 +133,13 @@ export function blockingConditions(combatant) {
  * spent (Slow: an action or a Bonus Action, not both).
  */
 export function coupledOut(combatant, type) {
-  const names = effectNames(combatant?.actor);
+  const rules = matchedEffectRules(combatant?.actor, EFFECT_EXCLUSIVE_POOLS)
+    .filter(rule => rule.pools.includes(type));
+  if (!rules.length) return false;
   const econ = getEconomy(combatant);
-  for (const name of names) {
-    const group = EFFECT_EXCLUSIVE_POOLS[name];
-    if (!group?.includes(type)) continue;
-    if (group.some(pool => pool !== type && (econ.used[pool] ?? 0) > 0)) return true;
-  }
-  return false;
+  return rules.some(rule =>
+    rule.pools.some(pool => pool !== type && (econ.used[pool] ?? 0) > 0)
+  );
 }
 
 /**
