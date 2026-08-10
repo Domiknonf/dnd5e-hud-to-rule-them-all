@@ -12,6 +12,15 @@ Reihenfolge ist die Empfehlung: **P1** zuerst (zusammen ca. 25 Minuten, ohne Spi
 
 ---
 
+## Ergebnisse
+
+| Findout | Stand | Ergebnis |
+| --- | --- | --- |
+| F1 Aktivierungstypen | **erledigt** | Foundry 13.351 / dnd5e 5.3.3 / Modul 0.4.0 / Midi 13.0.64. 16 Typen, `UNBEKANNT: []` — `ACTIVATION_MAP` + `OUT_OF_COMBAT_ACTIVATIONS` decken alle ab, nichts fällt in `other`. Im Kommentar über `ACTIVATION_MAP` festgehalten. |
+| F2–F15 | offen | |
+
+---
+
 ## 0. Vorbereitung
 
 - Konsole: **F12** → Tab *Console*. Alle Snippets sind in `(() => { … })()` gekapselt, also

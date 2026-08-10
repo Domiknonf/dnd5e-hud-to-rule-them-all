@@ -27,7 +27,13 @@ export const RESOURCES = {
 /**
  * dnd5e activation type -> our bucket.
  * VERIFY AT RUNTIME: `Object.keys(CONFIG.DND5E.activityActivationTypes)` in the console.
- * Anything not listed here and not purely time-based lands in "other" (see actions.mjs).
+ * Anything not listed here and not purely time-based lands in "other" (see actions.mjs),
+ * where it costs nothing and draws no pips - so a type this table has never heard of is
+ * invisible rather than loud, which is what makes the runtime check worth doing.
+ *
+ * VERIFIED LIVE on Foundry 13.351 / dnd5e 5.3.3: the system declares exactly 16 types,
+ * and this table plus OUT_OF_COMBAT_ACTIVATIONS accounts for every one of them. Nothing
+ * falls through today. Re-run the check after a system update.
  */
 export const ACTIVATION_MAP = {
   action: "action",
