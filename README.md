@@ -1,10 +1,11 @@
 # A DnD 5e HUD To Rule Them All
 
 A combat HUD for Foundry VTT that does two things at once: show every activity a creature
-can actually use, grouped by action type — and track the action / bonus action / reaction
-economy. Styled as a Baldur's Gate 3-like hotbar across the bottom of the screen.
+can actually use, grouped by action type — and, for the creatures your players control,
+track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
+hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `0.4.0` (pre-alpha)
+**Foundry v13** · **dnd5e 5.x** · MIT · `0.5.0` (pre-alpha)
 
 ---
 
@@ -24,8 +25,11 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
 - **Activity-aware action list.** Walks every activity on every item, not just items, so
   a weapon with an attack plus a utility activity shows up in both the action and the
   bonus action group.
-- **Economy tracking.** Action, bonus action, reaction and legendary actions, tracked per
-  combatant — including reactions spent on other creatures' turns.
+- **Economy tracking, for the creatures somebody plays.** Action, bonus action, reaction
+  and legendary actions, tracked per combatant — including reactions spent on other
+  creatures' turns. A creature only the GM owns is **not** counted: it gets the same bar,
+  the same groups and the same per-pool configuration, just no pips. See
+  [Who gets counted](#who-gets-counted).
 - **One write path.** Costs are booked in `dnd5e.postUseActivity`, so a click in the HUD,
   a click on the character sheet, a macro and a Midi QoL workflow all count identically
   and none of them double-count.
@@ -73,6 +77,25 @@ Settings live under *Configure Settings → Module Settings*.
 
 **Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
 
+### Who gets counted
+
+The bar exists to help the person playing a creature keep track of what it can still
+do. That person is not the GM, who already knows a goblin has one action and reads its
+Multiattack off the statblock in front of them — so **only creatures with a player owner
+have an action economy.** Everything else about the bar is identical either way.
+
+| | Player-owned | GM-only |
+| --- | --- | --- |
+| Ability list, grouped by pool | yes | yes |
+| Which pool an entry belongs to (gear dialog) | yes | yes |
+| Legendary / reaction / bonus action **sections** | yes | yes |
+| Pips, booking, enforcement, Extra Attack counting | yes | — |
+
+It is an **ownership** question, not an `actor.type` one: a wildshaped druid, a summoned
+drake and a sidekick are all `npc` actors that somebody plays, and those keep their
+economy. Hand a boss monster to a player and it starts counting; take it back and it
+stops.
+
 ### Per character — the gear on the bar
 
 Everything the module cannot know for certain is answered here rather than guessed at,
@@ -80,24 +103,21 @@ by whoever owns the character (the GM owns everyone).
 
 - **Drag-and-drop zones** put an entry in a different pool, reorder it within one, or
   take it off the bar. The zones start out **seeded by detection**, so this is a
-  correction surface — not a form you have to fill in before the bar works.
-- **Attacks per Attack action** (Extra Attack), and pool sizes.
-- **Multiattack editor** for what a single number cannot say: *"two Holy Bursts **or**
-  three Radiant Swords"* is two alternatives, *"one bite **and** two claws"* is one
-  alternative with two parts. Nothing asks which one is being taken — every
-  alternative stays open until a use rules it out, and the badges show what is still
-  allowed. It opens prefilled with the statblock's own reading.
+  correction surface — not a form you have to fill in before the bar works. Available
+  for every creature, counted or not: this is how the GM's own bar gets organised.
+- **Attacks per Attack action** (Extra Attack), and pool sizes. Counted creatures only —
+  on a GM-only creature these do nothing, so they are not shown. Anything already stored
+  is kept, and comes back if the creature is handed to a player later.
 
-Detection still runs, but only to prefill that dialog and as the fallback while
-nothing has been configured — which is what keeps a freshly dropped pack of NPCs
-usable without configuring six statblocks first. **Configuration always wins.**
+Detection still runs, but only to prefill that dialog and as the fallback while nothing
+has been configured. **Configuration always wins.**
 
 When detection and configuration disagree — typically after a level-up — the gear gets
 a mark and the dialog offers the change with the feature that caused it quoted by name.
 It never rewrites a configured value on its own.
 
-**English compendium content only.** The detection matches English SRD names and
-statblock phrasing; translated or renamed content needs the dialog.
+**English compendium content only.** The detection matches English SRD feature names;
+translated or renamed content needs the dialog.
 
 ### What the bar tracks on its own
 
@@ -118,14 +138,16 @@ spend one.
 const api = game.modules.get("dnd5e-hud-to-rule-them-all").api;
 
 api.diagnose();                       // what the module believes about the selected token
-api.getEconomy(combatant);            // { used, granted, max, attacksLeft, multiattack, log }
+api.getEconomy(combatant);            // { used, granted, max, attacksLeft, log }
 await api.spend(combatant, "bonus", { label: "Cunning Action" });
 await api.refund(combatant);          // undoes the last booking
 await api.resetTurn(combatant);
 
 api.openConfig(actor);                // the gear dialog
-api.openMultiattack(actor);           // the Multiattack editor
 ```
+
+`diagnose()` leads with `tracked`. If that is `false`, nothing below it is meant to
+have a value — the creature has no player owner and is not being counted.
 
 ## Development
 
@@ -145,7 +167,7 @@ Releases are cut by pushing a tag — the workflow stamps `module.json` and publ
 zip:
 
 ```bash
-git tag v0.4.0 && git push --tags
+git tag v0.5.0 && git push --tags
 ```
 
 ## Roadmap
@@ -158,7 +180,9 @@ git tag v0.4.0 && git push --tags
 
 Movement tracking (former **M2**), the generic intrinsic actions (Dash, Dodge, Hide, …)
 and the Free Interaction pool shipped in early versions and were **deliberately removed**
-again — they are not coming back.
+again — they are not coming back. Neither is the **Multiattack editor**, dropped in 0.5.0
+along with the economy on GM-run creatures: it existed to describe monsters, and monsters
+are no longer counted. Every heuristic that read statblock prose went with it.
 
 ## Acknowledgements
 

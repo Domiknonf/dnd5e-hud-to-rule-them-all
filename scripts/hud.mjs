@@ -1,11 +1,10 @@
 import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
 import {
-  getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund,
-  multiattackOptions, attacksRemaining, attackCapacity, poolMax,
-  blockedPools, blockingConditions, coupledOut, coupledPools
+  getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund, poolMax,
+  blockedPools, blockingConditions, coupledOut, coupledPools, isTracked
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
-import { openConfig, attackNotice, multiattackNotice } from "./config-app.mjs";
+import { openConfig, attackNotice } from "./config-app.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -234,21 +233,33 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const combatant = this.subjectCombatant;
     const inCombat = !!combatant;
     const isMyTurn = !!combatant && game.combat?.combatant?.id === combatant.id;
-    const econ = getEconomy(combatant);
     const isMine = actor?.isOwner === true;
+
+    // Whether anything is COUNTED for this creature. A GM-run monster gets the whole
+    // bar - portrait, groups, buttons, the gear - and no economy: see
+    // economy.isTracked for why that is an ownership question and not an actor.type
+    // one. The list half of this context is deliberately untouched by it.
+    const tracked = isTracked(actor);
+    // Every economy call below reads through this rather than `combatant`, so an
+    // untracked creature makes them inert in exactly the way being outside an
+    // encounter already did - no second set of branches. `combatant` itself stays
+    // live, because the round counter and End Turn are turn state, not economy.
+    const econCombatant = tracked ? combatant : null;
+    const showEconomy = inCombat && tracked;
+    const econ = getEconomy(econCombatant);
 
     // Conditions do not shrink the pools, they bar them - so the pips stay and are
     // drawn as spent. A Stunned creature with an empty economy row would read as a
     // broken bar; one with four crossed-out pips reads as Stunned.
-    const blocked = blockedPools(combatant);
-    const coupled = coupledPools(combatant);
-    const conditions = blockingConditions(combatant)
+    const blocked = blockedPools(econCombatant);
+    const coupled = coupledPools(econCombatant);
+    const conditions = blockingConditions(econCombatant)
       .map(s => game.i18n.localize(CONFIG.DND5E?.conditionTypes?.[s]?.label ?? s));
     const blockedHint = conditions.length
       ? game.i18n.format(`${MODULE_ID}.blockedBy`, { conditions: conditions.join(", ") })
       : "";
 
-    const pools = Object.entries(RESOURCES)
+    const pools = !showEconomy ? [] : Object.entries(RESOURCES)
       .filter(([key]) => key !== "other")
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -256,7 +267,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // the pips are where that has to become visible.
         const max = poolMax(econ, key);
         const used = econ.used[key] ?? 0;
-        const spentByCoupling = coupledOut(combatant, key);
+        const spentByCoupling = coupledOut(econCombatant, key);
         const out = blocked.has(key) || spentByCoupling;
         // Shown while the coupling is merely PENDING - once it has bitten, the pool
         // is drawn as barred and saying "one of these two" as well would be noise.
@@ -282,7 +293,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       .filter(p => !p.hidden);
 
     const buckets = collectActions(actor);
-    const attacksPerAction = getAttacksPerAction(combatant);
+    const attacksPerAction = getAttacksPerAction(econCombatant);
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -290,51 +301,30 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // even once the action pip itself reads as spent - but the action was
         // already committed to attacking, so only attack activities (and attack
         // substitutes like the Dragonborn's Breath Weapon) stay live.
-        // Mid-action state: either the plain counter has attacks queued, or a
-        // configured Multiattack is running and something is still allowed.
-        const hasMultiattack = !!multiattackOptions(combatant);
-        const hasFreeAttack = key === "action" && (hasMultiattack
-          ? !!econ.multiattack
-          : (econ.attacksLeft ?? 0) > 0);
-        const midAttackSequence = hasFreeAttack && remaining(combatant, key) <= 0;
+        const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
+        const midAttackSequence = hasFreeAttack && remaining(econCombatant, key) <= 0;
         const label = game.i18n.localize(`${MODULE_ID}.pool.${key}`);
         const entries = (buckets[key] ?? []).map(entry => {
           // Resolved in collectActions, so a per-entry override is already folded in.
           const isAttackEntry = key === "action" && entry.countsAsAttack;
           // Show "available/total" on attack activities whenever this actor has
-          // more than one attack per action configured, so it's visible even before
-          // the first attack (not just once mid-sequence) - answers "why can I
-          // still use this" without needing the removed Multiattack description.
-          // With a configured Multiattack the badge counts down what the surviving
-          // options still allow - that is the whole feedback loop, since nothing
-          // ever asks which alternative is being taken.
+          // more than one attack per action, so it is visible even before the first
+          // attack (not just once mid-sequence) - it answers "why can I still use
+          // this" for a Fighter with Extra Attack.
           let attacksBadge = null;
-          let spent = false;
-          if (isAttackEntry && hasMultiattack) {
-            const left = attacksRemaining(combatant, entry.key) ?? 0;
-            const max = attackCapacity(combatant, entry.key) ?? 0;
-            // Only while an action is running does 0 mean "no longer allowed" - the
-            // surviving options have ruled this attack out.
-            spent = !!econ.multiattack && left <= 0;
-            if (max > 0) {
-              attacksBadge = {
-                available: left, max,
-                hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available: left, max })
-              };
-            }
-          } else if (isAttackEntry) {
-            // An entry may carry its own total (the alternative Multiattack), in
-            // which case the badge has to promise THAT number rather than the actor's.
+          if (isAttackEntry) {
+            // An entry may carry its own total, in which case the badge has to
+            // promise THAT number rather than the actor's.
             const total = entry.attacks ?? attacksPerAction;
             if (total > 1) {
-              const available = remaining(combatant, "action") > 0 ? total : (econ.attacksLeft ?? 0);
+              const available = remaining(econCombatant, "action") > 0 ? total : (econ.attacksLeft ?? 0);
               attacksBadge = {
                 available, max: total,
                 hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: total })
               };
             }
           }
-          const enriched = { ...entry, locked: (midAttackSequence && !entry.countsAsAttack) || spent, attacksBadge };
+          const enriched = { ...entry, locked: midAttackSequence && !entry.countsAsAttack, attacksBadge };
           enriched.action ??= "use";
           enriched.tooltipHtml = tooltipFor(enriched, label);
           return enriched;
@@ -345,9 +335,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           label,
           // Only per-turn pools can exhaust; "other" and "passive" have no budget.
           // A barring condition beats the queued-attack shortcut: being Stunned
-          // mid-Multiattack ends it, it does not let the rest through for free.
-          exhausted: blocked.has(key) || coupledOut(combatant, key)
-            || (def.perTurn && !hasFreeAttack && remaining(combatant, key) <= 0),
+          // mid-sequence ends it, it does not let the rest through for free.
+          // Nothing exhausts on an untracked creature - and this has to say so
+          // explicitly rather than lean on the null combatant, because `legendary`
+          // has no world default, so its recomputed max is 0 and the group would
+          // grey itself out on every monster that has one.
+          exhausted: tracked && (blocked.has(key) || coupledOut(econCombatant, key)
+            || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0)),
           entries
         };
       })
@@ -362,14 +356,14 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // anything visible in the bar (Extra Attack adds no new entry), so a new
     // suggestion marks the gear instead of silently overwriting what was configured.
     // Cleared from inside the dialog, per suggested value (see config.attackNotice).
-    // Two causes, one mark. A Multiattack the statblock describes but nothing has
-    // answered for is the same kind of thing: something the bar cannot know and
-    // will get wrong until somebody looks.
-    const notice = actor ? attackNotice(actor) : null;
-    const maNotice = notice ? null : (actor ? multiattackNotice(actor) : null);
+    // Only where it is counted: the dialog hides the attacks-per-action field on an
+    // untracked creature, and a mark pointing at a field that is not there is worse
+    // than no mark.
+    const notice = tracked && actor ? attackNotice(actor) : null;
     return {
       hasSubject: !!actor,
       inCombat,
+      showEconomy,
       isMyTurn,
       isMine,
       isGM: game.user.isGM,
@@ -391,12 +385,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       description,
       // The handle's first stage depends on what is currently open.
       collapseTooltip: game.i18n.localize(`${MODULE_ID}.${description ? "closeDescription" : "toggleBar"}`),
-      configNotice: !!(notice || maNotice),
+      configNotice: !!notice,
       configTooltip: notice
         ? game.i18n.format(`${MODULE_ID}.config.notice.gear`, notice)
-        : maNotice
-          ? game.i18n.format(`${MODULE_ID}.multiattack.notice.gear`, maNotice)
-          : game.i18n.localize(`${MODULE_ID}.config.open`),
+        : game.i18n.localize(`${MODULE_ID}.config.open`),
       editable: isMine || game.user.isGM
     };
   }

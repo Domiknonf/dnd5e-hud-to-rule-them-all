@@ -35,6 +35,27 @@ export function combatantFor(actor) {
 }
 
 /**
+ * Whether this creature's action economy is TRACKED at all - booked, gated, and
+ * drawn as pips. False means the bar is a pure ability launcher for it: the groups,
+ * the pool sections and the per-entry configuration all stay, nothing is counted.
+ *
+ * KEYED ON OWNERSHIP, NOT ON actor.type. The bar exists to help the person playing a
+ * creature keep track of what it can still do, and that person is not the GM: they
+ * already know a goblin has one action, they read the Multiattack off the statblock
+ * in front of them, and with `gmBypass` on (the default) the gate never stopped them
+ * anyway - so for GM creatures the pips were bookkeeping nobody read, paid for with a
+ * Combatant flag write per monster attack and a re-render on every client.
+ *
+ * `hasPlayerOwner` asks the question that actually matters. A wildshaped druid, a
+ * summoned drake and a sidekick are all `npc` actors that a player is playing, and
+ * those are exactly the ones that still need counting; an actor.type check would
+ * have taken the bar away from them along with the goblins.
+ */
+export function isTracked(actor) {
+  return actor?.hasPlayerOwner === true;
+}
+
+/**
  * The pool a use actually draws from RIGHT NOW, which is not always the one the
  * activity declares.
  *
@@ -178,99 +199,21 @@ export function coupledOut(combatant, type) {
 /**
  * How many "attack"-type activity uses share a single action this turn (Extra
  * Attack). Order: what was configured for this actor (config.mjs, set by the owner
- * or the GM in the HUD's gear dialog) > best-effort suggestion from a
- * Multiattack-shaped feature's own description text (guessAttacksPerAction, see
- * actions.mjs - only reliable for "makes N attacks" phrasing, not mixed attacks
- * like "one bite and one claw") > default of 1 (no Extra Attack).
+ * or the GM in the HUD's gear dialog) > the name lookup in guessAttacksPerAction
+ * (see actions.mjs) > default of 1 (no Extra Attack).
  *
- * The suggestion stays in the chain on purpose even though configuration is the
- * intended path now: it is what keeps a freshly dropped pack of NPCs correct
- * without configuring each statblock first, and NPC statblocks are exactly where
- * the text parsing works. Player characters are the opposite case - Extra Attack
- * is a class feature with no parseable text - so those get configured by hand.
+ * Only ever asked about a TRACKED creature, which is what let the NPC half of the
+ * detection go: it parsed "makes three attacks" out of statblock prose purely so a
+ * freshly dropped pack of monsters counted correctly without being configured
+ * first, and monsters are no longer counted at all. What is left is the fixed
+ * English name lookup for the PC class feature, which is the case that cannot be
+ * parsed and therefore the case a fallback is actually worth having.
  */
 export function getAttacksPerAction(combatant) {
   const actor = combatant?.actor;
   const n = Number(getActorConfig(actor).attacksPerAction);
   if (Number.isFinite(n) && n > 0) return n;
   return guessAttacksPerAction(actor)?.count ?? DEFAULT_ATTACKS_PER_ACTION;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Multiattack                                                        */
-/* ------------------------------------------------------------------ */
-
-/**
- * The configured Multiattack, or null. Shape:
- *   options: [ { parts: [ { key, count } ] } ]
- * One option is one alternative (pick exactly one); several parts inside an option
- * are combined ("one bite AND two claws").
- */
-export function multiattackOptions(combatant) {
-  const options = getActorConfig(combatant?.actor).multiattack?.options;
-  return Array.isArray(options) && options.length ? options : null;
-}
-
-const partCount = (option, key) => option?.parts?.find(p => p.key === key)?.count ?? 0;
-
-/**
- * A tally carrying a slot for EVERY key the Multiattack mentions, zeros included.
- *
- * This is not cosmetic. write() goes through setFlag, which merges recursively, so
- * an object that lost a key between two writes keeps the value it dropped. `used` is
- * the only part of the economy that shrinks - a fresh Attack action starts a new
- * tally - so without the zeros the first swing of the second action inherits the
- * first action's, and every alternative gets ruled out at once (viableOptions
- * returns nothing, every badge reads 0 and the whole Attack pool locks up).
- *
- * Zeros are inert everywhere they are read: viableOptions asks `>= 0`, which every
- * option satisfies, and attacksRemaining subtracts nothing.
- */
-function usedTally(options, used = {}) {
-  const tally = {};
-  for (const option of options ?? []) {
-    for (const part of option?.parts ?? []) if (part?.key) tally[part.key] = 0;
-  }
-  for (const [key, n] of Object.entries(used)) if (key) tally[key] = n;
-  return tally;
-}
-
-/**
- * The options still consistent with what has already been used this action.
- *
- * This is what makes the whole thing work WITHOUT asking which Multiattack the
- * player intends: every option stays open until a use rules it out. Given "two A"
- * or "one A and one B", clicking A leaves both alive; a second A kills the second
- * option, a B kills the first. The bar just shows what is still possible.
- */
-function viableOptions(options, used) {
-  return options.filter(option =>
-    Object.entries(used ?? {}).every(([key, n]) => partCount(option, key) >= n)
-  );
-}
-
-/**
- * How many more times this entry may be used inside the CURRENT Attack action.
- * With no action in progress this is the best any option offers, which is what the
- * bar promises before the first swing.
- */
-export function attacksRemaining(combatant, key) {
-  const options = multiattackOptions(combatant);
-  if (!options || !key) return null;
-  const used = getEconomy(combatant).multiattack?.used ?? null;
-  if (!used) return Math.max(0, ...options.map(o => partCount(o, key)));
-  return Math.max(0, ...viableOptions(options, used).map(o => partCount(o, key) - (used[key] ?? 0)));
-}
-
-/**
- * The most this entry could ever contribute to one Attack action - the best any
- * option offers. The bar needs it as the badge's denominator; attacksRemaining()
- * alone would only ever say "n of n".
- */
-export function attackCapacity(combatant, key) {
-  const options = multiattackOptions(combatant);
-  if (!options || !key) return null;
-  return Math.max(0, ...options.map(o => partCount(o, key)));
 }
 
 export function freshEconomy(combatant) {
@@ -283,11 +226,11 @@ export function freshEconomy(combatant) {
     // What a feature handed out this turn (Action Surge: one more action). Kept
     // apart from `max` because max is recomputed from settings on every read, and
     // folding it in there would either be lost or, once written back, counted twice.
-    // A full map with zeros for the same reason usedTally is one: setFlag merges.
+    // A FULL map with zeros, never a sparse one: write() goes through setFlag, which
+    // merges recursively, so a key dropped between two writes keeps its old value.
     granted,
     max: getMaxima(combatant),
     attacksLeft: 0,    // remaining free "attack"-type uses within the current action
-    multiattack: null, // { used: { entryKey: n } } while a configured Multiattack runs
     log: []            // audit trail, newest last -> enables undo
   };
 }
@@ -328,19 +271,12 @@ export function canAfford(combatant, type, amount = 1) {
 }
 
 /** Gate for "attack"-type activities: a queued Extra Attack is always affordable. */
-export function canAttack(combatant, key = null) {
+export function canAttack(combatant) {
   if (!combatant) return true;
   // Before the queued-attack shortcut below: a Stunned creature does not get to
-  // finish the Multiattack it had started.
+  // finish the attack sequence it had started.
   if (blockedPools(combatant).has("action")) return false;
-  const econ = getEconomy(combatant);
-  if (multiattackOptions(combatant)) {
-    // Mid-Multiattack, only what a surviving option still allows is free; anything
-    // else has to open a fresh Attack action and pay for it.
-    if (econ.multiattack && (attacksRemaining(combatant, key) ?? 0) > 0) return true;
-    return canAfford(combatant, "action");
-  }
-  if ((econ.attacksLeft ?? 0) > 0) return true;
+  if ((getEconomy(combatant).attacksLeft ?? 0) > 0) return true;
   return canAfford(combatant, "action");
 }
 
@@ -348,15 +284,18 @@ export function canAttack(combatant, key = null) {
  * Enforcement decision for activity usage (module.mjs's dnd5e.preUseActivity).
  * Returns "allow" | "warn" | "block".
  */
-export function checkGate(combatant, type, { isAttack = false, key = null } = {}) {
+export function checkGate(combatant, type, { isAttack = false } = {}) {
   const mode = game.settings.get(MODULE_ID, "enforceActions");
   if (mode === "off") return "allow";
   if (!game.combat?.started) return "allow";
   if (game.user.isGM && game.settings.get(MODULE_ID, "gmBypass")) return "allow";
   if (!type || type === "other") return "allow";
   if (!combatant) return "allow";
+  // Nothing is counted for this creature, so there is no empty pool to refuse on.
+  // Checked here rather than in the hook so every caller of the gate agrees.
+  if (!isTracked(combatant.actor)) return "allow";
 
-  const affordable = isAttack ? canAttack(combatant, key) : canAfford(combatant, type);
+  const affordable = isAttack ? canAttack(combatant) : canAfford(combatant, type);
   return affordable ? "allow" : mode;
 }
 
@@ -421,35 +360,14 @@ function applyGrants(econ, grants) {
  * (from getAttacksPerAction). Still funnels through the same flag write as spend()
  * - this is a second booking function, not a second write path (decision 2 intact).
  */
-export async function spendAttack(combatant, { label = "", uuid = null, attacks = null, key = null } = {}) {
+export async function spendAttack(combatant, { label = "", uuid = null, attacks = null } = {}) {
   if (!combatant) return false;
   if (!combatant.isOwner || !canWriteFlags(combatant)) {
-    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid, attacks, key });
+    return requestFromGM("spendAttack", { combatantUuid: combatant.uuid, label, uuid, attacks });
   }
   const econ = getEconomy(combatant);
   const attacksLeftBefore = econ.attacksLeft ?? 0;
-  const multiattackBefore = econ.multiattack ? foundry.utils.deepClone(econ.multiattack) : null;
   let amount;
-
-  const options = multiattackOptions(combatant);
-  if (options) {
-    // A configured Multiattack replaces the plain counter entirely: instead of a
-    // remaining total, the state is what has been used, and the options narrow
-    // themselves down as it grows.
-    const free = econ.multiattack && (attacksRemaining(combatant, key) ?? 0) > 0;
-    if (free) {
-      econ.multiattack = { used: usedTally(options, { ...econ.multiattack.used, [key]: (econ.multiattack.used?.[key] ?? 0) + 1 }) };
-      amount = 0;
-    } else {
-      econ.multiattack = { used: usedTally(options, key ? { [key]: 1 } : {}) };
-      econ.used.action = (econ.used.action ?? 0) + 1;
-      amount = 1;
-    }
-    econ.key = turnKey(combatant.combat);
-    econ.log = [...(econ.log ?? []), { type: "action", amount, label, uuid, attacksLeft: attacksLeftBefore, multiattack: multiattackBefore, at: Date.now() }].slice(-40);
-    await write(combatant, econ);
-    return true;
-  }
 
   if (attacksLeftBefore > 0) {
     econ.attacksLeft = attacksLeftBefore - 1;
@@ -484,7 +402,6 @@ export async function refund(combatant, type = null, amount = 1) {
     type = last.type;
     amount = last.amount ?? 1;
     if (last.attacksLeft !== undefined) econ.attacksLeft = last.attacksLeft;
-    if (last.multiattack !== undefined) econ.multiattack = last.multiattack;
     if (last.granted !== undefined) econ.granted = last.granted;
   }
   // A grant-only entry (a feature that costs nothing but hands out an action) has no
@@ -529,6 +446,9 @@ export function diagnose(actor = null) {
 
   return {
     actor: subject?.name ?? "(none - select a token)",
+    // First thing to check when "nothing is being counted": a GM-only creature is
+    // a launcher, not an economy, and every reading below it will be empty by design.
+    tracked: isTracked(subject),
     combatStarted: !!game.combat?.started,
     combatant: combatant?.name ?? "(none - not in the encounter)",
     isTheirTurn: !!combatant && game.combat?.combatant?.id === combatant.id,
@@ -551,8 +471,7 @@ export function diagnose(actor = null) {
       : [],
     used: econ?.used ?? null,
     grantedThisTurn: econ?.granted ?? null,
-    attacksLeft: econ?.attacksLeft ?? null,
-    multiattack: econ?.multiattack ?? null
+    attacksLeft: econ?.attacksLeft ?? null
   };
 }
 

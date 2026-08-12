@@ -5,9 +5,12 @@ Guidance for Claude Code working in this repository.
 ## What this is
 
 A Foundry VTT module: a combat HUD for D&D 5e that lists usable activities grouped by
-action type and tracks the action economy. (Movement tracking, the generic intrinsic
-actions and the Free Interaction pool existed in early versions and were deliberately
-removed — do not reintroduce them.)
+action type and, for the creatures somebody plays, tracks the action economy.
+
+Removed deliberately, in this order — **do not reintroduce any of them**: movement
+tracking, the generic intrinsic actions and the Free Interaction pool (early versions);
+the Multiattack editor and every heuristic that read monster prose (0.5.0, together with
+the economy on GM-run creatures — see the fourth load-bearing decision).
 
 **Pinned targets — do not write code for other versions:**
 
@@ -20,12 +23,14 @@ removed — do not reintroduce them.)
 There is no build, no test runner, no linter configured yet.
 
 ```bash
-node --check scripts/*.mjs     # syntax check, the only automated check that exists
+node --check scripts/*.mjs     # syntax check
+node tools/verify.mjs          # the checks below, all of them
 git tag vX.Y.Z && git push --tags   # cuts a release via .github/workflows/release.yml
 ```
 
-Two things `node --check` cannot see, both of which have already broken this module
-once. Check them by hand after touching templates or imports:
+`tools/verify.mjs` reads files and writes none. It covers everything in this list — run
+it after touching templates, imports or `lang/en.json`. Each item has broken this module
+at least once, and none of them is visible to `node --check`:
 
 - **Every `PARTS` template renders exactly one root element** — count roots with a depth
   counter, not by balancing tags. Two siblings and zero roots both throw.
@@ -38,8 +43,11 @@ once. Check them by hand after touching templates or imports:
   down the module's whole translation table — every key everywhere renders raw, which
   looks nothing like an i18n bug. `JSON.parse` cannot see it; check for any key that is
   a prefix of another key plus a dot.
+- **Every statically referenced i18n key exists in `lang/en.json`.** Interpolated ones
+  (`` `${MODULE_ID}.pool.${key}` ``) cannot be checked and are skipped — eyeball those.
 
-Verification is manual, in a running Foundry world. If a change cannot be verified by
+Passing all of that still proves very little. Verification is manual, in a running
+Foundry world. If a change cannot be verified by
 reading the code, say so rather than claiming it works.
 
 ## Architecture
@@ -50,13 +58,12 @@ reading the code, say so rather than claiming it works.
 | `scripts/economy.mjs` | State model. The **only** place that reads or writes the economy flag |
 | `scripts/config.mjs` | Per-actor configuration, storage only. The **only** place that reads or writes the config flag. Imports nothing but `const.mjs` — see below |
 | `scripts/config-app.mjs` | The dialog that edits that config, plus the suggestion/notice logic |
-| `scripts/multiattack-app.mjs` | The Multiattack editor: alternatives and their parts |
 | `scripts/actions.mjs` | Walks actor items, buckets their activities, applies per-entry rules |
 | `scripts/hud.mjs` | The `ApplicationV2` and its action handlers |
 | `scripts/socket.mjs` | Relays player writes to the active GM |
 | `scripts/module.mjs` | Hook wiring only. No business logic belongs here |
 
-### Three load-bearing decisions
+### Four load-bearing decisions
 
 **1. The economy lives in a flag on the Combatant document.**
 Key: `flags["dnd5e-hud-to-rule-them-all"].economy`. Combatant flags replicate to all
@@ -72,11 +79,10 @@ not add a second booking site.
 **3. Configuration beats detection. Detection is only ever a suggestion.**
 Key: `flags["dnd5e-hud-to-rule-them-all"].config`, on the **Actor** (not the Combatant —
 this has to outlive the encounter). Everything this module cannot know for certain is
-answered by whoever owns the character, in the gear dialog: how many attacks an Attack
-action grants, how big the pools are. The heuristics in `actions.mjs`
-(`guessAttacksPerAction` and friends) still run, but only to prefill that dialog and as
-the fallback while nothing has been configured — that fallback is what keeps a freshly
-dropped pack of NPCs usable without configuring six statblocks first.
+answered by whoever owns the character, in the gear dialog: which pool an entry belongs
+to, how many attacks an Attack action grants, how big the pools are. What is left of the
+detection (`guessAttacksPerAction`, a fixed English name lookup) still runs, but only to
+prefill that dialog and as the fallback while nothing has been configured.
 
 Consequences to respect:
 
@@ -84,8 +90,8 @@ Consequences to respect:
 - **`config.mjs` imports nothing but `const.mjs`, on purpose.** `actions.mjs` asks it what
   an entry was configured to be, while the dialog asks `actions.mjs` what to suggest.
   Keeping storage free of the detection is what stops that from being an import cycle;
-  the dialog lives in `config-app.mjs` for the same reason. There is a cycle check in the
-  verification snippet below — run it after moving imports around.
+  the dialog lives in `config-app.mjs` for the same reason. `tools/verify.mjs` checks for
+  cycles — run it after moving imports around.
 - **Per-entry rules live under `config.entries`, keyed by document ID, never by uuid.** A
   synthetic token actor's uuid carries its scene and token, so a uuid key written for one
   goblin would never match the base Actor the config is stored on. `entryKey()` builds
@@ -129,35 +135,21 @@ Consequences to respect:
   suggested the feature.
 - **`grants` is the only rule that gives instead of costs.** A second action is not a
   discount on the first, so it cannot be modelled as a cost of zero — it has to raise
-  the pool. It lives in `econ.granted`, a per-turn full map with zeros (same
-  merge reason as `multiattack.used`), and is read through `economy.poolMax()`.
-  Never fold it into `econ.max`: that is recomputed from settings on every read and
-  written back, so a grant folded in there is counted again on the next write.
+  the pool. It lives in `econ.granted`, a per-turn full map with zeros — `setFlag`
+  merges recursively, so a key dropped between two writes keeps its old value — and is
+  read through `economy.poolMax()`. Never fold it into `econ.max`: that is recomputed
+  from settings on every read and written back, so a grant folded in there is counted
+  again on the next write.
 - **`config-app #write()` lists every field a rule may carry.** Anything unlisted is
   deleted by the next drag, which is the per-entry twin of the `#onSubmit` trap.
-- **Multiattack is `config.multiattack.options`**, `[{ parts: [{ key, count }] }]`. One
-  option is one alternative (take exactly one); several parts inside an option are
-  combined. "Two Holy Bursts *or* three Radiant Swords" is two options; "one bite *and*
-  two claws" is one option with two parts.
-- **Nothing asks which alternative is being taken.** `economy.viableOptions` keeps every
-  option alive until a use rules it out — click A and both "two A" and "A plus B" stay
-  open; a second A kills the latter, a B kills the former. The bar just shows what is
-  still allowed, so the interaction is the answer instead of a dialog interrupting the
-  turn. This is why the state is `multiattack.used` (what happened) rather than a
-  remaining total.
-- The per-entry `attacks` rule still exists for the simple case and is what
-  `spendAttack` uses when no Multiattack is configured.
+- The per-entry `attacks` rule is what `spendAttack` uses when one weapon grants a
+  different number than the actor's own. It is stored but has no field in the dialog
+  yet, which is exactly why `#write()` has to name it.
 - **The zones are seeded by detection, not empty.** That is what makes the dialog a
   correction surface instead of something you must fill in before the bar works, and it
   is what gives the mismatch confirmation something to compare against. Dropping an
   entry back where detection wanted it *removes* the rule rather than pinning the same
   value — otherwise "auto" could never be restored by dragging.
-- **The Multiattack editor is seeded the same way**, from `suggestMultiattack()`, but
-  only while nothing is configured — what is stored always wins. Nothing is written
-  until Save, so closing the dialog declines the offer, and a banner says the prefill
-  is not in force yet. Unlike the zones there is no live fallback behind it:
-  `multiattackOptions()` reads config and nothing else, so an unsaved prefill has no
-  effect on the bar at all.
 - Reordering writes a `sort` onto every tile in the touched zone. `sort` therefore does
   **not** count towards an entry's "overridden" mark, or a single reorder would light up
   the whole zone.
@@ -174,23 +166,47 @@ Consequences to respect:
   holds the count that was waved away, so silencing "3" is permanent for 3 while a later
   tier suggesting 4 raises the mark again on its own. A boolean would swallow every
   future level-up and would have to be reset by hand — which defeats the feature.
-  `config.seenMultiattackSuggestion` does the same for the Multiattack, holding the
-  `multiattackKey()` signature of the reading that was answered. Re-statting a creature
-  changes the signature and raises the mark again; reordering the alternatives does not,
-  because that is the same answer. Saving the editor records it too — the reading was on
-  screen, prefilled, and the player pressed Save.
-- **The Multiattack mark is silent for what a number already covers.** A statblock
-  reading of one alternative with one attack *is* an attacks-per-action number, and
-  `attackNotice` already speaks for that. Marking it here as well would put a permanent
-  mark on every ordinary monster in the encounter. There is no one-click "apply"
-  either: applying would write a guess into the config, so the offer is the editor
-  opening prefilled with it.
 - Whatever the dialog does not render has to be carried across in `#onSubmit`: the write
   replaces the whole config object, so an unlisted field is a field that gets deleted on
-  the next save. That is now **four** fields — `entries`, `seenAttackSuggestion`,
-  `multiattack`, `seenMultiattackSuggestion` — and forgetting one has already silently
-  deleted a configured Multiattack once. Add to that list whenever you add a field.
+  the next save. That is `entries` and `seenAttackSuggestion` always, plus
+  `attacksPerAction` and `max` **on an untracked creature**, where the form does not
+  render them at all — hiding a field turns it into exactly this trap. Forgetting one
+  has already silently deleted a whole configuration once. Add to that list whenever you
+  add a field, and again whenever you make an existing field conditional.
 - When you extend this, add a field to the dialog rather than a new heuristic.
+
+**4. Only creatures with a player owner have an economy.**
+`economy.isTracked(actor)` is `actor.hasPlayerOwner === true`, and it is the switch for
+the *counting* half of the module only: booking (`dnd5e.postUseActivity`), the gate
+(`checkGate`), the turn resets, the pips, and the Extra Attack counter. The *list* half —
+which activities exist, which pool each one is in, the per-entry rules, the drag-and-drop
+zones, the Legendary/Reaction/Bonus sections — is untouched by it and works the same for
+every creature. A GM steering a monster still gets the whole bar; they just do not get
+pips.
+
+The reasoning: the bar exists to help the person playing a creature see what it can still
+do. That is not the GM, who already knows a goblin has one action — and with `gmBypass`
+on (the default) the gate never stopped them anyway, so for GM creatures the pips were
+bookkeeping nobody read, paid for with a Combatant flag write and a re-render on every
+client per monster attack.
+
+Consequences to respect:
+
+- **Ownership, never `actor.type`.** A wildshaped druid, a summoned drake and a sidekick
+  are all `npc` actors that somebody plays; an `actor.type === "npc"` check would take
+  the bar away from exactly the players it is for.
+- **Test it in `checkGate`, not in the hook**, so every caller of the gate agrees.
+- **`hud.mjs` funnels every economy read through `econCombatant`** (`tracked ? combatant
+  : null`), which makes them inert the same way being outside an encounter already did —
+  rather than growing a second set of branches. `combatant` itself stays live: the round
+  counter and End Turn are turn state, not economy.
+- **`exhausted` still has to say `tracked &&` explicitly.** It is the one thing the null
+  combatant does not handle: `legendary` has no world default, so its recomputed max is
+  0, and the group would grey itself out on every monster that has one.
+- This is what let the prose heuristics go. Their whole justification was that a freshly
+  dropped pack of NPCs had to count correctly before anyone configured it, and NPCs are
+  no longer counted. **Do not add a text parser back** — if a tracked creature needs a
+  number, it gets a field in the dialog.
 
 ### The bar's lifecycle
 
@@ -295,7 +311,11 @@ game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
 
 Do not "fix" these casually — each needs a design decision.
 
-- **Extra Attack / Multiattack.** Handled in full, including the mixed case. See below.
+- **Extra Attack.** Handled by `config.attacksPerAction` plus the per-entry `attacks`
+  rule. The mixed monster Multiattack ("one bite *and* two claws") is deliberately
+  **not** modelled any more: it only ever mattered for creatures that are no longer
+  counted at all. If a *player-owned* creature ever needs it, that is a new design
+  decision — and a dialog field, not a parser.
 - **Reactions off-turn.** Solved. A player's bar stays on their own character all
   encounter, so their reaction pip is visible and clickable during someone else's turn.
   `setCombatant` still exists and nothing calls it — it is now only a GM convenience
@@ -314,7 +334,7 @@ Do not "fix" these casually — each needs a design decision.
 ## Working style in this repo
 
 - Small, reviewable changes. This is a personal project used at a live table.
-- When touching the economy or the booking path, state which of the two load-bearing
+- When touching the economy or the booking path, state which of the four load-bearing
   decisions the change affects.
 - Prefer extending the data tables in `const.mjs` over adding branches in logic files.
 - If a change would need a new dependency, a build step, or a second write path, propose

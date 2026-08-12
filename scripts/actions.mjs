@@ -39,8 +39,6 @@ export function isDescriptiveOnly(activity) {
   return !hasRoll && !hasConsumption && !hasEffects;
 }
 
-const ATTACK_COUNT_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
-
 /**
  * PC "Extra Attack"-style feature names, English SRD content only (this module
  * assumes English compendiums - see README). Deliberately a plain name lookup, not
@@ -56,84 +54,33 @@ const PC_EXTRA_ATTACK_NAMES = {
   "three extra attacks": 4
 };
 
-function stripEnrichers(text) {
-  // Strip HTML tags AND Foundry's [[...]]{type} content-link/enricher syntax before
-  // matching - dnd5e statblocks link things via [[/item .someId]], which is long
-  // enough to blow past a naive word-gap window (verified: broke the Archmage's
-  // "makes four [[/item .mmArcaneBurst000]] attacks" but not the shorter-by-
-  // coincidence text that happened to work before).
-  return (text ?? "").replace(/<[^>]+>/g, " ").replace(/\[\[[^\]]*\]\](\{[^}]*\})?/g, " ").toLowerCase();
-}
-
 /**
- * The same text, but KEEPING what a content link is labelled with.
+ * Best-effort read of "how many attacks does this actor get per Attack action":
+ * a fixed name lookup over PC_EXTRA_ATTACK_NAMES, and nothing else.
  *
- * stripEnrichers() throws the label away with the enricher, which is right for
- * counting words between a number and "attacks" - there a long [[/item .someId]] is
- * pure noise. It is exactly wrong for suggestMultiattack(), which matches on the
- * attack's NAME: statblocks name their attacks through those very links
- * ("makes two [[/item .id]]{Holy Burst} attacks"), so stripping the label deleted
- * the only words there were to match on and the suggestion came back empty.
- *
- * Two different jobs, two different strippers - not one with a flag, because the
- * one that keeps labels must never be handed to the "makes N attacks" match, where
- * a re-inserted name would widen the gap it measures.
- */
-function stripToWords(text) {
-  const LINK = /\[\[[^\]]*\]\]|[@&]\w+\[[^\]]*\]/;
-  return (text ?? "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(new RegExp(`(?:${LINK.source})\\{([^}]*)\\}`, "g"), " $1 ")
-    .replace(new RegExp(LINK.source, "g"), " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
-/**
- * Best-effort read of "how many attacks does this actor get per Attack action".
- * Two independent, deliberately different strategies:
- * - PCs: fixed name lookup (PC_EXTRA_ATTACK_NAMES) - the feature only exists on
- *   Player Characters and always uses one of three known English names.
- * - NPCs: freeform text match on a Multiattack-shaped feature's own description
- *   (SRD phrasing: "makes three attacks"), matched against a descriptive-only
- *   utility activity (see isDescriptiveOnly) so it isn't tied to the item being
- *   named "Multiattack" specifically - monster text has no fixed vocabulary, so
- *   this one genuinely needs to parse content rather than match a name.
+ * It used to have a second strategy - parsing "makes three attacks" out of a
+ * monster's own description - whose entire justification was that a freshly
+ * dropped pack of NPCs had to count correctly before anyone configured it. Since
+ * only player-owned creatures are counted at all (see economy.isTracked), that
+ * justification is gone, and with it the module's only freeform text parser.
  *
  * Returns `{ count, feature }` or null. The feature NAME rides along because the
  * config dialog quotes it back ("New feature: Two Extra Attacks -> 3 attacks
  * recommended") - a bare number gives the player nothing to check against their
- * character sheet. Both strategies are guesses, not structured data:
- * config.attacksPerAction (see economy.getAttacksPerAction) always wins.
+ * character sheet. Still only a guess: config.attacksPerAction (see
+ * economy.getAttacksPerAction) always wins.
  */
 export function guessAttacksPerAction(actor) {
-  if (!actor) return null;
+  if (!actor || actor.type !== "character") return null;
   // Take the highest match, not the first: a Fighter past level 11 may carry both
   // the base "Extra Attack" and an upgrade feature like "Two Extra Attacks" at
   // once, and iteration order isn't guaranteed to put the current tier first.
   let best = null;
-  const consider = (count, item) => {
-    if (!Number.isInteger(count) || count <= (best?.count ?? 0)) return;
-    best = { count, feature: item.name ?? "" };
-  };
-
-  if (actor.type === "character") {
-    for (const item of actor.items ?? []) {
-      consider(PC_EXTRA_ATTACK_NAMES[item.name?.trim().toLowerCase()], item);
-    }
-  }
-
   for (const item of actor.items ?? []) {
-    const activities = item.system?.activities;
-    if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
-    const text = stripEnrichers(item.system?.description?.value);
-    const match = text.match(/\b(one|two|three|four|five|six|seven|eight|\d+)\b[^.]{0,25}?\battacks?\b/);
-    if (!match) continue;
-    const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
-    if (count > 1) consider(count, item);
+    const count = PC_EXTRA_ATTACK_NAMES[item.name?.trim().toLowerCase()];
+    if (!Number.isInteger(count) || count <= (best?.count ?? 0)) continue;
+    best = { count, feature: item.name ?? "" };
   }
-
   return best;
 }
 
@@ -165,14 +112,13 @@ export function countsAsAttack(activity) {
  * How many attacks this specific entry grants when it OPENS an Attack action, or
  * null to use the actor-wide number.
  *
- * This is what models the alternative Multiattack - "the planetar makes two Holy
- * Burst attacks or three Radiant Sword attacks". A single number per actor cannot
- * say that; a number per entry can, because the count is decided by whichever
- * attack starts the action. Still one booking path: economy.spendAttack just gets
- * told the total instead of looking it up.
+ * A per-entry total, for the case where one weapon grants a different number than
+ * the actor's own - the count is decided by whichever attack starts the action.
+ * Still one booking path: economy.spendAttack just gets told the total instead of
+ * looking it up.
  *
- * What it deliberately does NOT model is the genuinely mixed Multiattack ("one bite
- * and two claws") - that is not a total, it is a per-entry budget, and it stays open.
+ * The rule is stored but has no field in the config dialog yet; it is listed in
+ * `config-app #write()` so a drag does not delete it.
  */
 export function attacksForActivity(activity) {
   const n = entryConfig(activity?.actor, activity?.item, activity).attacks;
@@ -460,86 +406,6 @@ export function enumerateEntries(actor) {
   }
 
   return entries;
-}
-
-/**
- * Which configurable ENTRY an activity belongs to. The Multiattack options are
- * written against entry keys, and a grouped button covers several activities, so
- * the booking path has to map back before it can look anything up.
- */
-export function entryKeyForActivity(activity) {
-  const item = activity?.item;
-  if (!item) return null;
-  const own = entryKey(item, activity);
-  return enumerateEntries(item.actor).find(e => e.keys.includes(own))?.key ?? own;
-}
-
-/**
- * The Multiattack-shaped feature this creature has, or null: a monster feature that
- * is pure description (see isDescriptiveOnly) and whose text is about making
- * attacks. The same item suggestMultiattack() reads its draft out of.
- *
- * What it is for is knowing when NOT to mention the Multiattack at all. An Ankheg
- * has one Bite and no Multiattack, so telling its owner that "no Multiattack is
- * configured" is answering a question the statblock never asked - and that sentence
- * sat on every creature in the game.
- *
- * Deliberately not a name match on "Multiattack": monster features have no fixed
- * vocabulary, and this is the same shape test the rest of the file already trusts.
- */
-export function multiattackFeature(actor) {
-  for (const item of actor?.items ?? []) {
-    const activities = item.system?.activities;
-    if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
-    if (/\battacks?\b/.test(stripToWords(item.system?.description?.value))) return item;
-  }
-  return null;
-}
-
-/**
- * A first draft of the Multiattack from the statblock's own text, for the dialog to
- * prefill. SRD phrasing is "makes two Holy Burst attacks or three Radiant Sword
- * attacks", so each attack entry is looked for by name with a count in front of it.
- *
- * "or" is what separates the alternatives, and it is the one structural marker the
- * text reliably has - so it, not the number of matches, decides where an option
- * ends. Everything named within one chunk is COMBINED into a single option ("one
- * bite and two claws" is one alternative with two parts); the chunks themselves are
- * the choice. Treating every match as its own alternative instead was silently
- * wrong for the AND case: it offered a creature two Multiattacks that each allowed
- * half of the one it actually has.
- *
- * A suggestion, nothing more: it never writes anything, and the dialog exists
- * precisely so the reading can be corrected.
- */
-export function suggestMultiattack(actor) {
-  const attacks = enumerateEntries(actor).filter(e => e.pool === "action" && e.attack);
-  if (!attacks.length) return [];
-
-  let text = "";
-  for (const item of actor?.items ?? []) {
-    const activities = item.system?.activities;
-    if (!activities?.size || !Array.from(activities).some(isDescriptiveOnly)) continue;
-    text = stripToWords(item.system?.description?.value);
-    if (text) break;
-  }
-  if (!text) return [];
-
-  const options = [];
-  for (const chunk of text.split(/\bor\b/)) {
-    const parts = [];
-    for (const entry of attacks) {
-      const name = entry.item.name?.trim().toLowerCase();
-      if (!name) continue;
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const match = chunk.match(new RegExp(`\\b(one|two|three|four|five|six|seven|eight|\\d+)\\b[^.]{0,20}?${escaped}`));
-      if (!match) continue;
-      const count = ATTACK_COUNT_WORDS[match[1]] ?? Number(match[1]);
-      if (Number.isInteger(count) && count > 0) parts.push({ key: entry.key, count });
-    }
-    if (parts.length) options.push({ parts });
-  }
-  return options;
 }
 
 /**

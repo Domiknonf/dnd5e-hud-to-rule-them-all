@@ -44,6 +44,10 @@
     </div>
     {{/if}}
 
+    {{!-- Counting-only settings. A GM-run creature is not counted (economy.isTracked),
+         so these two would do nothing on one - the zones below are the whole dialog
+         for a monster. Stored values survive being hidden: see #onSubmit. --}}
+    {{#if tracked}}
     <div class="hudtra-config-numbers">
       <div class="form-group">
         <label for="hudtra-cfg-attacks">
@@ -72,38 +76,10 @@
         <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.pools.hint"}}</p>
       </fieldset>
     </div>
-
-    {{!-- Multiattack: a link, plus a nudge when the statblock names several
-         different attacks - exactly when one number cannot describe the creature. --}}
-    {{!-- The whole row is gone on a creature with no Multiattack: no text, and no
-         button either. Reachable from a macro via the module API if a homebrew
-         creature needs one without a Multiattack feature on its sheet. --}}
-    {{#if multiattack.relevant}}
-    <div class="hudtra-config-ma {{#if multiattack.notice}}prompt{{/if}}">
-      {{#if multiattack.notice}}<i class="fa-solid fa-circle-exclamation"></i>{{/if}}
-      <span>
-        {{#if multiattack.notice}}
-        {{multiattack.notice.body}}
-        {{else if multiattack.configured}}
-        {{localize "dnd5e-hud-to-rule-them-all.multiattack.configured"}}
-        {{else if multiattack.feature}}
-        {{localize "dnd5e-hud-to-rule-them-all.multiattack.absent"}}
-        {{/if}}
-      </span>
-      <button type="button" data-action="multiattack">
-        <i class="fa-solid fa-hand-fist"></i>
-        {{localize "dnd5e-hud-to-rule-them-all.multiattack.open"}}
-      </button>
-      {{!-- No one-click "apply": that would write a guess straight into the config.
-           The editor opening prefilled with it is the honest version. --}}
-      {{#if multiattack.notice}}
-      <button type="button" data-action="dismissMultiattack"
-              data-tooltip="dnd5e-hud-to-rule-them-all.multiattack.notice.dismissHint">
-        <i class="fa-solid fa-xmark"></i>
-        {{localize "dnd5e-hud-to-rule-them-all.multiattack.notice.dismiss"}}
-      </button>
-      {{/if}}
-    </div>
+    {{else}}
+    <p class="hint">
+      {{localize "dnd5e-hud-to-rule-them-all.config.untracked"}}
+    </p>
     {{/if}}
 
     {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item

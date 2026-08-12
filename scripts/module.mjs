@@ -4,14 +4,12 @@ import { registerSocket } from "./socket.mjs";
 import { getHUD, refreshHUD } from "./hud.mjs";
 import {
   spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor, poolForNow, grant,
-  diagnose
+  diagnose, isTracked
 } from "./economy.mjs";
 import {
-  costOfActivity, countsAsAttack, attacksForActivity, entryKeyForActivity, grantsForActivity,
-  useLabel
+  costOfActivity, countsAsAttack, attacksForActivity, grantsForActivity, useLabel
 } from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
-import { openMultiattack } from "./multiattack-app.mjs";
 import { getActorConfig } from "./config.mjs";
 
 /* ------------------------------------------------------------------ */
@@ -24,8 +22,7 @@ Hooks.once("init", () => {
   const { loadTemplates } = foundry.applications.handlebars;
   loadTemplates([
     `modules/${MODULE_ID}/templates/hud.hbs`,
-    `modules/${MODULE_ID}/templates/config.hbs`,
-    `modules/${MODULE_ID}/templates/multiattack.hbs`
+    `modules/${MODULE_ID}/templates/config.hbs`
   ]);
 });
 
@@ -33,9 +30,7 @@ Hooks.once("ready", () => {
   game.modules.get(MODULE_ID).api = {
     hud: getHUD(), spend, refund, resetTurn, getEconomy,
     // Macro entry point: openConfig(actor) for a hotkey or a token-HUD button.
-    // openMultiattack(actor) is the way in for a creature whose sheet has no
-    // Multiattack feature, since the dialog only offers the row to creatures that do.
-    openConfig, openMultiattack, getActorConfig,
+    openConfig, getActorConfig,
     // Console entry point: api.diagnose() prints what the module believes about the
     // selected token, so "nothing happens" has an answer that is not a guess.
     diagnose
@@ -64,7 +59,7 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
   // pip itself reads as spent. Attack substitutes (Dragonborn Breath Weapon) may
   // stand in for one of those attacks, so they pass the same gate.
   const isAttack = type === "action" && countsAsAttack(activity);
-  const result = checkGate(combatant, type, { isAttack, key: isAttack ? entryKeyForActivity(activity) : null });
+  const result = checkGate(combatant, type, { isAttack });
   if (result === "allow") return true;
 
   const msg = game.i18n.format(`${MODULE_ID}.notify.exhausted`, {
@@ -81,6 +76,11 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
  */
 Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   if (!game.combat?.started) return;
+  // A GM-run creature is not counted at all (see economy.isTracked), so there is
+  // nothing to book. Checked before the combatant lookup because this is also what
+  // keeps a monster-heavy encounter from writing a Combatant flag - and re-rendering
+  // every client's bar - on every single attack the GM rolls.
+  if (!isTracked(activity.actor)) return;
   const combatant = combatantFor(activity.actor);
   if (!combatant) return;
   // Same resolution the gate above made, so what was checked is what gets booked.
@@ -111,8 +111,7 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   if (type === "action" && countsAsAttack(activity)) {
     await spendAttack(combatant, {
       label, uuid: activity.uuid,
-      attacks: attacksForActivity(activity),
-      key: entryKeyForActivity(activity)
+      attacks: attacksForActivity(activity)
     });
     // Rare enough to be worth a second write rather than a fifth parameter on
     // spendAttack: an attack that also grants something is a configured oddity.
@@ -128,7 +127,11 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
 /* ------------------------------------------------------------------ */
 
 Hooks.on("combatStart", async (combat) => {
-  if (game.user.isActiveGM) for (const c of combat.combatants) await resetTurn(c);
+  // Only the tracked ones carry an economy to refill. On a twelve-goblin encounter
+  // this is the difference between one flag write per player and thirteen.
+  if (game.user.isActiveGM) {
+    for (const c of combat.combatants) if (isTracked(c.actor)) await resetTurn(c);
+  }
   // Symmetric to deleteCombat below: an encounter starting pulls the bar back up
   // even if it was manually slid away out of combat.
   getHUD().collapse(false);
@@ -138,7 +141,7 @@ Hooks.on("combatStart", async (combat) => {
 // v13 fires this with the previous and the new turn pointer.
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
   const combatant = combat.combatants.get(current?.combatantId);
-  if (game.user.isActiveGM && combatant) await resetTurn(combatant);
+  if (game.user.isActiveGM && combatant && isTracked(combatant.actor)) await resetTurn(combatant);
   refreshHUD();
 });
 

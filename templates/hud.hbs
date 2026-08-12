@@ -49,9 +49,12 @@
     </span>
   </div>
 
-  {{!-- Economy only exists inside an encounter: outside one there is no combatant
-       to book against, so showing pips would promise tracking that isn't happening. --}}
-  {{#if inCombat}}
+  {{!-- Economy only exists inside an encounter AND only for a creature somebody
+       plays: outside one there is no combatant to book against, and on a GM-run
+       monster nothing is counted at all (see economy.isTracked). Either way, pips
+       here would promise tracking that isn't happening. The groups below stay - the
+       bar is still that creature's ability launcher. --}}
+  {{#if showEconomy}}
   <div class="hudtra-economy">
     {{#each pools}}
     {{!-- data-action only for the GM: the handler checks again, but a control nobody
@@ -108,15 +111,18 @@
       <i class="fa-solid fa-gear"></i>
       {{#if configNotice}}<i class="hudtra-config-mark fa-solid fa-exclamation"></i>{{/if}}
     </button>
-    {{#if inCombat}}
+    {{!-- Refilling the pools only means something where there are pools. --}}
+    {{#if showEconomy}}
     <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
       <i class="fa-solid fa-rotate-left"></i>
     </button>
+    {{/if}}
+    {{!-- Turn control, not economy: the GM still ends a monster's turn from here.
+         isMyTurn already implies being in the encounter. --}}
     {{#if isMyTurn}}
     <button type="button" class="hudtra-end-turn" data-action="endTurn" data-tooltip="dnd5e-hud-to-rule-them-all.endTurn">
       <i class="fa-solid fa-forward-step"></i>
     </button>
-    {{/if}}
     {{/if}}
   </div>
   {{/if}}
