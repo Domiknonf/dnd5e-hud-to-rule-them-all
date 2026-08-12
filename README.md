@@ -39,6 +39,10 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
 - **BG3-style bar.** Bottom-anchored hotbar with square icon slots, a portrait HP ring and
   per-pool markers. Collapses out of view when you need the screen. Foundry's own macro
   hotbar hides itself while it is up.
+- **Sections you can fold away.** A crowded group is split into Weapons, Spells,
+  Features, Consumables and Gear. Click a group's name to fold the whole thing, or one of
+  the chips beside it to fold a single section — the header keeps the count, so it always
+  says how much is behind it. Remembered per user. Passives start folded.
 - **Descriptions in place.** Middle-click any slot to expand dnd5e's own item card above
   the bar, without opening a sheet or a window.
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
@@ -75,7 +79,9 @@ Settings live under *Configure Settings → Module Settings*.
 
 **Content filters** — hide unequipped gear, hide unprepared spells.
 
-**Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
+**Presentation** (per user) — HUD scale, sort order, and whether crowded groups are split
+into sections. Which groups and sections you have folded away is remembered per user and
+is set by clicking the bar itself, not in this menu.
 
 ### Who gets counted
 

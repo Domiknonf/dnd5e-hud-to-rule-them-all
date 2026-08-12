@@ -1,4 +1,4 @@
-import { MODULE_ID, RESOURCES, DEBOUNCE_MS } from "./const.mjs";
+import { MODULE_ID, RESOURCES, SECTIONS, SECTION_MIN_ENTRIES, DEBOUNCE_MS } from "./const.mjs";
 import {
   getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund, poolMax,
   blockedPools, blockingConditions, coupledOut, coupledPools, isTracked
@@ -42,6 +42,70 @@ function tooltipFor(entry, poolLabel) {
     + `</div>`;
 }
 
+/* ---------------------------------------------- */
+/*  Folding                                        */
+/* ---------------------------------------------- */
+
+/**
+ * Which groups and sections this user keeps folded away, as `{ id: true }`. Always an
+ * object - the setting is written by the bar itself (see #onToggleFold) and read on
+ * every render.
+ */
+function foldedIds() {
+  return game.settings.get(MODULE_ID, "folded") ?? {};
+}
+
+function foldTooltip(label, count, folded) {
+  return game.i18n.format(`${MODULE_ID}.fold.${folded ? "show" : "hide"}`, { label, count });
+}
+
+/**
+ * Split one group's entries into sections (see SECTIONS in const.mjs), or leave it as
+ * the single plain grid it has always been.
+ *
+ * There is one code path either way: the flat case is one nameless section, so the
+ * template has one loop over sections and not two copies of the slot markup. The three
+ * ways to stay flat, in order:
+ *
+ * 1. The user turned sectioning off.
+ * 2. The group is small enough that dividers and chips cost more than they save.
+ * 3. Everything in it is the same kind of thing anyway - a passive list is all feats,
+ *    and one section spanning the whole group says nothing while still charging for
+ *    the chrome.
+ *
+ * Sections group BEFORE the per-entry `sort` rule, which orders entries within one.
+ * That is the trade: a spell dragged to the front of the Action zone leads the spells
+ * rather than the whole group. Turning the setting off gives the flat order back.
+ */
+function sectionsFor(poolKey, entries, folded) {
+  const flat = { sectioned: false, sections: [{ key: "", collapsed: false, entries }] };
+  if (!game.settings.get(MODULE_ID, "groupSections")) return flat;
+  if (entries.length < SECTION_MIN_ENTRIES) return flat;
+
+  const byKey = new Map();
+  for (const entry of entries) {
+    if (!byKey.has(entry.section)) byKey.set(entry.section, []);
+    byKey.get(entry.section).push(entry);
+  }
+  if (byKey.size < 2) return flat;
+
+  const sections = [...byKey]
+    .sort((a, b) => (SECTIONS[a[0]]?.order ?? 99) - (SECTIONS[b[0]]?.order ?? 99))
+    .map(([key, list]) => {
+      const id = `${poolKey}:${key}`;
+      const label = game.i18n.localize(`${MODULE_ID}.section.${key}`);
+      const collapsed = folded[id] === true;
+      return {
+        key, id, label, collapsed,
+        entries: list,
+        count: list.length,
+        icon: SECTIONS[key]?.icon ?? "fa-solid fa-circle",
+        tooltip: foldTooltip(label, list.length, collapsed)
+      };
+    });
+  return { sectioned: true, sections };
+}
+
 export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static DEFAULT_OPTIONS = {
@@ -53,6 +117,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       use: CombatHUD.#onUse,
       describe: CombatHUD.#onShowDescription,
       collapse: CombatHUD.#onCollapse,
+      toggleFold: CombatHUD.#onToggleFold,
       portrait: CombatHUD.#onPortrait,
       config: CombatHUD.#onConfig,
       adjustPool: CombatHUD.#onAdjustPool,
@@ -294,6 +359,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(econCombatant);
+    const folded = foldedIds();
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -326,13 +392,27 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           }
           const enriched = { ...entry, locked: midAttackSequence && !entry.countsAsAttack, attacksBadge };
           enriched.action ??= "use";
+          // Carried on the entry rather than read back out of the template's context
+          // stack: the slot markup now sits one loop deeper (group -> section -> entry).
+          enriched.pool = key;
           enriched.tooltipHtml = tooltipFor(enriched, label);
           return enriched;
         });
+        const collapsed = folded[key] === true;
+        const { sectioned, sections } = sectionsFor(key, entries, folded);
         return {
           key,
           icon: def.icon,
           label,
+          entries,
+          collapsed,
+          count: entries.length,
+          foldTooltip: foldTooltip(label, entries.length, collapsed),
+          sections,
+          // The same section objects, named for the other job they do: the chips in
+          // the header. Null while the whole group is folded, where per-section
+          // controls would toggle something nobody can see.
+          chips: sectioned && !collapsed ? sections : null,
           // Only per-turn pools can exhaust; "other" and "passive" have no budget.
           // A barring condition beats the queued-attack shortcut: being Stunned
           // mid-sequence ends it, it does not let the rest through for free.
@@ -341,8 +421,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           // has no world default, so its recomputed max is 0 and the group would
           // grey itself out on every monster that has one.
           exhausted: tracked && (blocked.has(key) || coupledOut(econCombatant, key)
-            || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0)),
-          entries
+            || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0))
         };
       })
       .filter(g => g.entries.length);
@@ -436,6 +515,29 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     this.#collapsed = !this.#collapsed;
     this.element.classList.toggle("collapsed", this.#collapsed);
+  }
+
+  /**
+   * Fold one group ("passive") or one section of one ("action:spell") away, and
+   * remember it for this user. The header that folded it stays, with a count on it,
+   * so the way back is the thing you just clicked.
+   *
+   * Deliberately NOT the bar's own collapse (#onCollapse), which toggles a class
+   * without a re-render so the slide animates: a fold re-renders, because folded
+   * content has to be out of the DOM rather than merely invisible - a slot hidden with
+   * CSS is still a slot the browser lays out, on a bar whose Action group runs to
+   * twenty-odd of them.
+   */
+  static async #onToggleFold(event, target) {
+    const id = target.dataset.fold;
+    if (!id) return;
+    const folded = { ...foldedIds() };
+    if (folded[id]) delete folded[id];
+    else folded[id] = true;
+    // No onChange on this setting: a click re-renders right here rather than through
+    // the debounce, so the fold answers immediately.
+    await game.settings.set(MODULE_ID, "folded", folded);
+    return this.render();
   }
 
   /**

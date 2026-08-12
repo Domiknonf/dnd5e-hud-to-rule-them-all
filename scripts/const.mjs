@@ -25,6 +25,57 @@ export const RESOURCES = {
 };
 
 /**
+ * SECTIONS: the second level of grouping, INSIDE one pool. A caster's Action group is
+ * twenty-odd buttons, and "which of these is a spell" is a question the player answers
+ * by eye every single turn - so the bar answers it instead, and each section can be
+ * folded away when it is not this turn's business (see hud.mjs).
+ *
+ * Derived from `item.type`, which the SYSTEM states outright. That is why there is no
+ * config counterpart here the way there is for pools: nothing about it is a guess, so
+ * there is nothing for anyone to correct. Where an entry sits WITHIN its section is
+ * still the `sort` rule from the gear dialog.
+ *
+ * Order = display order inside the group.
+ */
+export const SECTIONS = {
+  weapon:     { icon: "fa-solid fa-gavel",         order: 10 },
+  spell:      { icon: "fa-solid fa-wand-sparkles", order: 20 },
+  feature:    { icon: "fa-solid fa-star",          order: 30 },
+  consumable: { icon: "fa-solid fa-flask",         order: 40 },
+  gear:       { icon: "fa-solid fa-toolbox",       order: 50 }
+};
+
+/**
+ * dnd5e item type -> section. Anything unlisted (equipment, tool, loot, a homebrew
+ * type) falls through to DEFAULT_SECTION, which is why `gear` is ordered last: it is
+ * the leftovers drawer.
+ */
+export const ITEM_TYPE_SECTIONS = {
+  weapon: "weapon",
+  spell: "spell",
+  consumable: "consumable",
+  // Everything a creature simply HAS. dnd5e spreads these over five item types that
+  // all read as "a feature" on the sheet; keeping them apart on the bar as well would
+  // buy sections of one entry each.
+  feat: "feature",
+  race: "feature",
+  class: "feature",
+  subclass: "feature",
+  background: "feature"
+};
+
+export const DEFAULT_SECTION = "gear";
+
+/**
+ * Below this many entries a group stays one plain grid. Sections cost a chip in the
+ * header and a divider per section, which under a handful of buttons is more furniture
+ * than the clutter it removes. Sized against the bar this was built for: an Action
+ * group of twenty-odd entries splits, the Bonus Action group of three beside it
+ * does not.
+ */
+export const SECTION_MIN_ENTRIES = 8;
+
+/**
  * dnd5e activation type -> our bucket.
  * VERIFY AT RUNTIME: `Object.keys(CONFIG.DND5E.activityActivationTypes)` in the console.
  * Anything not listed here and not purely time-based lands in "other" (see actions.mjs).

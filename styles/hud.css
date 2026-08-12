@@ -441,7 +441,16 @@
     border-left: 1px solid rgb(200 163 82 / 0.25);
     padding-left: 0.8em;
   }
+  /* Keeps a folded group as tall as an unfolded one, so folding the passives away
+     doesn't drop the whole bar's height by a row and shift everything under the
+     pointer. Two slot rows plus the header line. */
+  #hud-to-rule-them-all .hudtra-group {
+    min-height: calc(2 * var(--hudtra-slot) + 1.6em);
+  }
   #hud-to-rule-them-all .hudtra-group h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
     margin: 0 0 0.3em;
     border: none;
     font-size: 0.72em;
@@ -453,6 +462,81 @@
     text-shadow: 0 1px 2px #000;
   }
   #hud-to-rule-them-all .hudtra-group.exhausted h4 { color: var(--hudtra-text-dim); }
+
+  /* ---- fold controls (see hud.mjs sectionsFor / #onToggleFold) ----
+     The header IS the control. Buttons get their colour reset above, so the gold has
+     to be restated here; everything else (size, caps, letter-spacing) is inherited
+     from the h4 and therefore still scales with --hudtra-scale. */
+  #hud-to-rule-them-all .hudtra-group-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    /* Negative margin to match: the header line is small type, and a click target the
+       size of the word alone is a miss waiting to happen. Same trick the GM's pool
+       control uses, and it costs no layout. */
+    padding: 0.2em 0.25em;
+    margin: -0.2em -0.25em;
+    color: var(--hudtra-gold);
+  }
+  #hud-to-rule-them-all .hudtra-group-head:hover { color: var(--hudtra-gold-bright); }
+  #hud-to-rule-them-all .hudtra-group.exhausted .hudtra-group-head { color: var(--hudtra-text-dim); }
+  #hud-to-rule-them-all .hudtra-caret { font-size: 0.85em; opacity: 0.65; }
+
+  /* How much is behind a fold. Only ever rendered on something folded, which is why
+     it may look like a badge without competing with the slots' own counters. */
+  #hud-to-rule-them-all .hudtra-count {
+    padding: 0 0.4em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.7em;
+    background: rgb(0 0 0 / 0.5);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One chip per section, sitting right next to the group's own label rather than
+     pushed to the far end of the header: floated right they line up over whichever
+     section happens to be last and start reading as that section's title. Icon only
+     while the section is showing - the row has to stay narrower than the grid beneath
+     it, or the header, not the slots, decides how wide a group is. */
+  #hud-to-rule-them-all .hudtra-chips {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+  }
+  #hud-to-rule-them-all .hudtra-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    /* Larger than the header type it sits in: this is a control, and at the bar's
+       default scale the h4's own size would make it a ~13px target. */
+    font-size: 1.15em;
+    padding: 0.15em 0.4em;
+    border: 1px solid rgb(200 163 82 / 0.35);
+    border-radius: 0.8em;
+    color: var(--hudtra-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  #hud-to-rule-them-all .hudtra-chip:hover {
+    border-color: var(--hudtra-gold);
+    color: var(--hudtra-gold-bright);
+  }
+  /* Dim and dashed: the same "this is put away" language the config dialog's empty
+     zones use, and it reads as off rather than as disabled. */
+  #hud-to-rule-them-all .hudtra-chip.folded {
+    border-style: dashed;
+    opacity: 0.6;
+  }
+
+  #hud-to-rule-them-all .hudtra-sections {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+  }
+  /* Only ever matches when a group actually has several sections - an unsectioned
+     group renders exactly one grid, so no divider can appear on it. */
+  #hud-to-rule-them-all .hudtra-entries + .hudtra-entries {
+    border-left: 1px dashed rgb(200 163 82 / 0.22);
+    padding-left: 0.5em;
+  }
   /* Exhausted pool: the whole group's slots go dark and colourless. Distinct from
      .locked below, which brands individual slots with a padlock. */
   #hud-to-rule-them-all .hudtra-group.exhausted .hudtra-entries {

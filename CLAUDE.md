@@ -242,6 +242,45 @@ would show a player their character wearing the monster's pips. Everything turn-
   (`:not(.collapsed)`), so collapsing gives it back. The class is toggled without a
   re-render and `:has()` tracks that live.
 
+### Folding: sections inside a group
+
+A caster's Action group runs to twenty-odd buttons, which is one undifferentiated wall
+of art. `SECTIONS` in `const.mjs` is the second level of grouping — Weapons, Spells,
+Features, Consumables, Gear — and every group header and section chip folds what is
+under it away (`hud.mjs -> sectionsFor`, `#onToggleFold`).
+
+- **Sections come from `item.type`, and that is why there is no config for them.** It is
+  a system fact, not a reading of anything, so there is nothing for a player to correct
+  — unlike a pool assignment, which is a guess and therefore has a zone in the dialog.
+  Do not turn this into a sixth heuristic; if a section ever needs to be decided rather
+  than looked up, it needs a field in the dialog like everything else.
+- **Sectioning happens in `hud.mjs`, not in `collectActions`.** The buckets stay in the
+  order the sort settings and the `sort` rule produced, so turning the setting off gives
+  the flat order back without a second sort path. It also means sections group *before*
+  `sort`, which orders entries within one — an entry dragged to the front of a zone
+  leads its section, not the group. That trade is the price of the grouping and it is
+  documented in the setting's own hint.
+- **There is one rendering path.** An unsectioned group is a single nameless section, so
+  `hud.hbs` loops over sections once instead of carrying two copies of the slot markup.
+  Three ways to stay flat: the setting is off, the group is under
+  `SECTION_MIN_ENTRIES`, or everything in it is the same kind of thing anyway (a passive
+  list is all feats, and one section spanning the whole group says nothing).
+- **A fold is not the bar's collapse.** `#onCollapse` toggles a class without a
+  re-render so the slide animates; a fold *re-renders*, because folded content has to be
+  gone from the DOM rather than merely invisible — a slot hidden with CSS is still a slot
+  the browser lays out.
+- **The fold state is a client setting (`folded`), keyed by `pool` or `pool:section`.**
+  Per user, because it is a preference about one person's screen — two people looking at
+  the same character fold different things. It is deliberately *not* an actor flag: a
+  player would need write access to every monster the GM shows them. `passive` ships
+  folded; unfolding it stores an object without the key, so the default does not come
+  back on the next reload.
+- Every header keeps a **count** while folded, and the control that folded it is the
+  control that brings it back. Nothing on this bar may be hidden by something that is
+  not visibly the way back.
+- `.hudtra-group` carries a `min-height`: folding the passives away must not drop the
+  whole bar's height by a row and shift everything under the pointer.
+
 ## Domain model
 
 In dnd5e 4.x+ the unit of "a thing you do" is an **Activity**, not an Item. One item can
@@ -251,6 +290,15 @@ carry several activities with different activation types. Always iterate
 `activity.activation.type` maps to our pools via `ACTIVATION_MAP` in `const.mjs`.
 Time-based types (`minute`, `hour`, `shortRest`, …) are listed in
 `OUT_OF_COMBAT_ACTIVATIONS` and are dropped, not bucketed.
+
+**The item's name and art lead on a button; the activity's own are the exception.** An
+activity is one step inside a thing, not a better picture or a better name for it, and
+both of its fields are traps: `GENERIC_ACTIVITY_NAMES` and `GENERIC_ACTIVITY_ICON` cover
+dnd5e's per-type placeholders, but content that ships *real* activity art walks straight
+past that guard — Fire Bolt and Eldritch Blast wore a generic beam on the bar while the
+spell's own icon sat on the sheet. So `entryImage` and `activityLabel` both reach for the
+activity only on a **split** button, where two buttons share one item's name and art and
+the activity is the only thing telling them apart.
 
 **Off-turn, an action-cost activity is a reaction** (`economy.poolForNow`). Nothing in
 dnd5e marks an Opportunity Attack as one — the sheet, a macro and Midi all fire the

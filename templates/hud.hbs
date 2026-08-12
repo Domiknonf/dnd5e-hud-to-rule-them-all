@@ -80,23 +80,61 @@
   <div class="hudtra-groups" data-tooltip-class="hudtra-tooltip" data-tooltip-direction="UP">
     {{#each groups}}
     <section class="hudtra-group {{#if exhausted}}exhausted{{/if}}" data-group="{{key}}">
-      <h4><i class="{{icon}}"></i> {{label}}</h4>
-      <div class="hudtra-entries">
-        {{#each entries}}
-        <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}}" data-action="{{action}}"
-                data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{../key}}"
-                data-name="{{name}}"
-                data-tooltip-html="{{tooltipHtml}}">
-          {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
-          {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
-          {{!-- Same icon the config dialog marks a split entry with, meaning the
-               same thing: this item has buttons in more than one pool. --}}
-          {{#if split}}<i class="hudtra-split fa-solid fa-link-slash"></i>{{/if}}
-          {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
-          {{#if attacksBadge}}<span class="hudtra-attacks"><i class="fa-solid fa-hand-fist"></i>{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
+      {{!-- The header is the fold control: the label folds the whole group, each chip
+           one section of it. It keeps its full gold while folded and gains a count -
+           it is then the only thing left of the group, so it has to say how much is
+           behind it and stay the easiest thing there to hit. --}}
+      <h4>
+        <button type="button" class="hudtra-group-head" data-action="toggleFold"
+                data-fold="{{key}}" data-tooltip-text="{{foldTooltip}}">
+          <i class="hudtra-caret fa-solid {{#if collapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}}"></i>
+          <i class="{{icon}}"></i>
+          <span>{{label}}</span>
+          {{#if collapsed}}<span class="hudtra-count">{{count}}</span>{{/if}}
         </button>
+        {{#if chips}}
+        <span class="hudtra-chips">
+          {{#each chips}}
+          <button type="button" class="hudtra-chip {{#if collapsed}}folded{{/if}}"
+                  data-action="toggleFold" data-fold="{{id}}" data-tooltip-text="{{tooltip}}">
+            <i class="{{icon}}"></i>
+            {{!-- The count only while folded: unfolded, the slots are right there to
+                 be counted, and the chip row has to stay narrower than the grid it
+                 sits above or it widens the whole group. --}}
+            {{#if collapsed}}<span>{{count}}</span>{{/if}}
+          </button>
+          {{/each}}
+        </span>
+        {{/if}}
+      </h4>
+
+      {{!-- One loop, whether the group is sectioned or not: an unsectioned group is a
+           single nameless section (see hud.mjs sectionsFor), which is what keeps the
+           slot markup below from existing twice. --}}
+      {{#unless collapsed}}
+      <div class="hudtra-sections">
+        {{#each sections}}
+        {{#unless collapsed}}
+        <div class="hudtra-entries" data-section="{{key}}">
+          {{#each entries}}
+          <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}}" data-action="{{action}}"
+                  data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{pool}}"
+                  data-name="{{name}}"
+                  data-tooltip-html="{{tooltipHtml}}">
+            {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
+            {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
+            {{!-- Same icon the config dialog marks a split entry with, meaning the
+                 same thing: this item has buttons in more than one pool. --}}
+            {{#if split}}<i class="hudtra-split fa-solid fa-link-slash"></i>{{/if}}
+            {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
+            {{#if attacksBadge}}<span class="hudtra-attacks"><i class="fa-solid fa-hand-fist"></i>{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
+          </button>
+          {{/each}}
+        </div>
+        {{/unless}}
         {{/each}}
       </div>
+      {{/unless}}
     </section>
     {{/each}}
   </div>

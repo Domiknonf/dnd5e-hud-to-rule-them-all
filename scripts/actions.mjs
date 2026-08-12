@@ -1,6 +1,7 @@
 import {
   MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS,
-  GENERIC_ACTIVITY_ICON, GENERIC_ACTIVITY_NAMES, ATTACK_SUBSTITUTE_NAMES, ACTION_GRANT_NAMES
+  GENERIC_ACTIVITY_ICON, GENERIC_ACTIVITY_NAMES, ATTACK_SUBSTITUTE_NAMES, ACTION_GRANT_NAMES,
+  ITEM_TYPE_SECTIONS, DEFAULT_SECTION
 } from "./const.mjs";
 import { entryConfig, entryKey } from "./config.mjs";
 
@@ -433,12 +434,36 @@ export function useLabel(activity) {
   return item ? `${item} (${name})` : name;
 }
 
-function entryImage(entry) {
-  if (entry.activities.length === 1) {
+/**
+ * The art on one button. THE ITEM'S OWN ART LEADS, for the same reason its name does
+ * (see activityLabel above): an activity image is not a better picture of the thing,
+ * it is a picture of one step inside it.
+ *
+ * This used to take any activity image that was not dnd5e's per-type placeholder,
+ * which held right up until content that ships its own activity art arrived - Fire
+ * Bolt and Eldritch Blast then wore a generic beam on the bar while the spell's real
+ * icon sat on the sheet. GENERIC_ACTIVITY_ICON is therefore no longer the thing
+ * standing between the bar and a wrong picture; it now only guards the one case that
+ * still reaches for the activity.
+ *
+ * That case is a SPLIT button: two buttons from one item, sharing its name and its
+ * art, where the activity's own icon is the only thing telling them apart.
+ */
+function entryImage(entry, split = false) {
+  if (split && entry.activities.length === 1) {
     const img = entry.activities[0].img;
     if (img && !GENERIC_ACTIVITY_ICON.test(img)) return img;
   }
   return entry.item.img;
+}
+
+/**
+ * Which section of its group this belongs to (see SECTIONS in const.mjs). `item.type`
+ * is a system fact rather than a reading of anything, which is what keeps this
+ * presentation and not a sixth heuristic.
+ */
+export function sectionFor(item) {
+  return ITEM_TYPE_SECTIONS[item?.type] ?? DEFAULT_SECTION;
 }
 
 /* ------------------------------------------------------------------ */
@@ -491,9 +516,12 @@ export function collectActions(actor) {
       otherPools: pools
         .filter(p => p !== entry.pool)
         .map(p => game.i18n.localize(`${MODULE_ID}.pool.${p}`)),
-      img: entryImage(entry),
+      img: entryImage(entry, split),
       activityType: single?.type ?? null,
       itemType: item.type,
+      // Second-level grouping inside the pool, presentation only - the HUD decides
+      // whether it is worth drawing (see SECTION_MIN_ENTRIES).
+      section: sectionFor(item),
       level: item.type === "spell" ? item.system.level : null,
       uses: usesFor(single, item),
       details: single ? detailsFor(single) : null,
@@ -548,25 +576,28 @@ export function collectConfigurable(actor) {
   for (const e of entries) perItem.set(e.item.id, (perItem.get(e.item.id) ?? 0) + 1);
 
   return entries
-    .map(entry => ({
-      key: entry.key,
-      keys: entry.keys,
-      itemKey: entry.itemKey,
-      allKeys: entry.allKeys,
-      split: (perItem.get(entry.item.id) ?? 1) > 1,
-      name: entry.item.name,
-      detail: activityLabel(entry),
-      img: entryImage(entry),
-      pool: entry.pool,
-      passive: entry.pool === "passive",
-      usable: entry.usable,
-      hidden: entry.hidden,
-      sort: entry.sort,
-      attack: entry.attack,
-      attacks: entry.attacks,
-      attackOverridden: entry.attackOverridden,
-      poolOverridden: entry.poolOverridden,
-      auto: entry.auto
-    }))
+    .map(entry => {
+      const split = (perItem.get(entry.item.id) ?? 1) > 1;
+      return {
+        key: entry.key,
+        keys: entry.keys,
+        itemKey: entry.itemKey,
+        allKeys: entry.allKeys,
+        split,
+        name: entry.item.name,
+        detail: activityLabel(entry),
+        img: entryImage(entry, split),
+        pool: entry.pool,
+        passive: entry.pool === "passive",
+        usable: entry.usable,
+        hidden: entry.hidden,
+        sort: entry.sort,
+        attack: entry.attack,
+        attacks: entry.attacks,
+        attackOverridden: entry.attackOverridden,
+        poolOverridden: entry.poolOverridden,
+        auto: entry.auto
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name) || a.detail.localeCompare(b.detail));
 }
