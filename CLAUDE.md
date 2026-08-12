@@ -59,6 +59,7 @@ reading the code, say so rather than claiming it works.
 | `scripts/config.mjs` | Per-actor configuration, storage only. The **only** place that reads or writes the config flag. Imports nothing but `const.mjs` — see below |
 | `scripts/config-app.mjs` | The dialog that edits that config, plus the suggestion/notice logic |
 | `scripts/actions.mjs` | Walks actor items, buckets their activities, applies per-entry rules |
+| `scripts/spells.mjs` | Reads the actor's spell slots. Imports nothing, writes nothing |
 | `scripts/hud.mjs` | The `ApplicationV2` and its action handlers |
 | `scripts/socket.mjs` | Relays player writes to the active GM |
 | `scripts/module.mjs` | Hook wiring only. No business logic belongs here |
@@ -233,6 +234,13 @@ would show a player their character wearing the monster's pips. Everything turn-
 - Outside an encounter there is no Combatant, so nothing is booked and the economy row is
   hidden. `_prepareContext` keeps `combatant` null in that case, which is what makes every
   economy call inert instead of needing branches.
+- **The frame has a `width`, not a `max-width`, and that is load-bearing.** The bar is
+  centred, so a frame that sizes to its content moves every button on it by half of any
+  width change — folding a section, switching to a creature with fewer abilities, a
+  spell filter narrowing the list. Freeing space is not worth having the thing you were
+  about to click walk out from under the pointer. The groups are left-aligned inside the
+  fixed frame and `.hudtra-groups` scrolls when there is more than fits, so the cost is
+  empty leather on a creature with few abilities, and nothing else.
 - **Two collapse handles exist on purpose.** The one inside `.hudtra-frame` rides the
   frame's collapse transform; a transformed element becomes the containing block for its
   positioned descendants, so it cannot be pinned to the viewport. `.hudtra-reopen` is a
@@ -280,6 +288,37 @@ under it away (`hud.mjs -> sectionsFor`, `#onToggleFold`).
   not visibly the way back.
 - `.hudtra-group` carries a `min-height`: folding the passives away must not drop the
   whole bar's height by a row and shift everything under the pointer.
+- **A folded chip says what it is holding.** Icon-only is fine while a section is
+  showing — the slots are right there — but once folded, that chip is the only trace of
+  the section, so it grows the name and the count and keeps full contrast. Never dim the
+  only remaining evidence of something.
+
+### The spell strip
+
+Its own row at the top of the frame (`hud.mjs -> spellBarFor`), between the description
+panel and the bar. One chip per spell level, doing two jobs at once: how many slots are
+left there, and a filter narrowing the bar to that level.
+
+- **Which levels appear is read off the BAR, not off the spell list.** A spell hidden in
+  the gear dialog or dropped by "hide unprepared" cannot be cast from here, so a chip
+  filtering to it would filter to nothing. A level with slots but nothing on the bar
+  still shows — the slots are worth seeing — but carries no `data-action`, the same way
+  the economy row only gives the GM one.
+- **The filter narrows spells and nothing else.** It is used mid-turn while deciding what
+  to cast; taking the weapons off the bar at that moment would make it useless.
+- **It is instance state (`#spellLevel`), not a setting.** A fold means "I never want to
+  look at this", a filter means "right now I am casting a 3rd-level spell" — coming back
+  next session with your cantrips still hidden would be a bug. Cleared whenever the bar
+  changes creature, like the description panel.
+- While a filter is active it **force-opens folded spell sections**, as a transient
+  override that never rewrites the stored fold. Clicking a level and watching nothing
+  happen is not an answer; silently un-configuring what somebody folded is not one either.
+- **Pact Magic is a readout, not a filter.** A pact slot casts anything you know at its
+  level, so there is no set of spells the chip would mean. It is a separate row rather
+  than folded into its level because it refills on a short rest and is spent separately.
+- Spells inside a section sort by **level** first (cantrips up), then by the configured
+  order — `Array#sort` is stable, so the `sort` rule and the A-Z setting still decide
+  within one level.
 
 ## Domain model
 
@@ -353,6 +392,7 @@ rewrite them.
 Object.keys(CONFIG.DND5E.activityActivationTypes)   // does ACTIVATION_MAP still match?
 CONFIG.debug.hooks = true                           // does combatTurnChange fire as expected?
 game.combat.combatant.flags["dnd5e-hud-to-rule-them-all"]
+actor.system.spells   // spell1…spell9 {value,max} + pact {value,max,level}? (spells.mjs)
 ```
 
 ## Known open problems

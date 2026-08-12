@@ -41,8 +41,13 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   hotbar hides itself while it is up.
 - **Sections you can fold away.** A crowded group is split into Weapons, Spells,
   Features, Consumables and Gear. Click a group's name to fold the whole thing, or one of
-  the chips beside it to fold a single section — the header keeps the count, so it always
-  says how much is behind it. Remembered per user. Passives start folded.
+  the chips beside it to fold a single section — a folded chip names what it is holding
+  and how much of it. Remembered per user. Passives start folded.
+- **Spell strip.** A row above the bar with one chip per spell level: how many slots are
+  left there, and a click to narrow the bar to that level. Pact Magic gets its own
+  readout. Spells sort by level, cantrips first.
+- **Nothing moves.** The bar has a fixed width, so folding a section, filtering by level
+  or switching creatures never slides the buttons out from under your pointer.
 - **Descriptions in place.** Middle-click any slot to expand dnd5e's own item card above
   the bar, without opening a sheet or a window.
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)

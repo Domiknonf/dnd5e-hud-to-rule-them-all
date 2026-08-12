@@ -64,7 +64,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.45em;
-    max-width: min(97vw, 120em);
+    /* WIDTH, NOT MAX-WIDTH, and that is load-bearing. The frame is centred, so a frame
+       that sizes to its content moves every button on it by half of any width change -
+       folding a section away, switching to a creature with fewer abilities, even an
+       exhausted group disappearing all slid the bar sideways under the pointer. A
+       fixed width turns folding into "this space is now free" instead of "everything
+       moves". The groups are left-aligned inside it and .hudtra-groups scrolls when
+       there is more than fits, so nothing is lost at either end. */
+    width: min(97vw, 120em);
     padding: 0.45em 0.75em 0.4em;
     border: 1px solid var(--hudtra-gold-dark);
     border-bottom: none;
@@ -519,12 +526,89 @@
     border-color: var(--hudtra-gold);
     color: var(--hudtra-gold-bright);
   }
-  /* Dim and dashed: the same "this is put away" language the config dialog's empty
-     zones use, and it reads as off rather than as disabled. */
+  /* Folded: dashed, like the config dialog's empty zones, and NOT dimmed - this chip
+     is now the only trace of a section that is no longer on the bar, so it has to be
+     the most readable thing in the header, not the least. It grows a name and a count
+     for the same reason. */
   #hud-to-rule-them-all .hudtra-chip.folded {
     border-style: dashed;
-    opacity: 0.6;
+    border-color: var(--hudtra-gold-dark);
+    background: rgb(0 0 0 / 0.35);
+    color: var(--hudtra-gold);
   }
+  #hud-to-rule-them-all .hudtra-chip-name {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  #hud-to-rule-them-all .hudtra-chip .hudtra-count {
+    padding: 0 0.3em;
+    font-size: 0.9em;
+    color: var(--hudtra-gold-bright);
+  }
+
+  /* ---- spell strip (see hud.mjs spellBarFor) ----
+     Its own row above the bar: slots left per level, and a filter down to one level.
+     Full width and always in the same place, so it never moves the slots below it. */
+  #hud-to-rule-them-all .hudtra-spells {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3em;
+    padding-bottom: 0.4em;
+    border-bottom: 1px solid rgb(200 163 82 / 0.25);
+  }
+  #hud-to-rule-them-all .hudtra-spells-mark {
+    margin-inline: 0.15em 0.3em;
+    color: var(--hudtra-gold);
+    font-size: 0.85em;
+  }
+  #hud-to-rule-them-all .hudtra-level {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.15em 0.45em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.4em;
+    background: rgb(0 0 0 / 0.35);
+    font-size: 0.85em;
+    line-height: 1.4;
+  }
+  #hud-to-rule-them-all .hudtra-level-badge {
+    min-width: 1.1em;
+    text-align: center;
+    font-weight: 600;
+    color: var(--hudtra-gold-bright);
+  }
+  #hud-to-rule-them-all .hudtra-level-slots {
+    font-variant-numeric: tabular-nums;
+    color: var(--hudtra-text);
+  }
+  /* Only the ones that are actually buttons: a level with nothing to filter to carries
+     no data-action, so it must not light up under the pointer either. */
+  #hud-to-rule-them-all button.hudtra-level:not(.quiet):hover {
+    border-color: var(--hudtra-gold);
+    background: rgb(236 209 147 / 0.1);
+  }
+  /* The picked level. Loud on purpose: while this is lit, part of the bar is not
+     being shown, and that must never be something you have to go looking for. */
+  #hud-to-rule-them-all .hudtra-level.active {
+    border-color: var(--hudtra-gold-bright);
+    background: rgb(236 209 147 / 0.22);
+    box-shadow: 0 0 0.5em rgb(236 209 147 / 0.35);
+  }
+  /* No slots left at this level. Still readable - "0/3" is the answer to the question
+     being asked - just clearly spent. */
+  #hud-to-rule-them-all .hudtra-level.empty { opacity: 0.55; }
+  #hud-to-rule-them-all .hudtra-level.empty .hudtra-level-slots { text-decoration: line-through; }
+  /* Slots at a level with nothing on the bar to cast: a readout, so it must not look
+     like the buttons around it. */
+  #hud-to-rule-them-all .hudtra-level.quiet,
+  #hud-to-rule-them-all .hudtra-level.pact {
+    border-style: dashed;
+    cursor: default;
+  }
+  #hud-to-rule-them-all .hudtra-level-all { color: var(--hudtra-gold); }
+  #hud-to-rule-them-all .hudtra-level-all i { font-size: 0.9em; }
 
   #hud-to-rule-them-all .hudtra-sections {
     display: flex;
