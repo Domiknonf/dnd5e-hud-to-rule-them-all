@@ -5,7 +5,7 @@ can actually use, grouped by action type — and, for the creatures your players
 track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
 hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `0.5.0` (pre-alpha)
+**Foundry v13** · **dnd5e 5.x** · MIT · `0.6.0` (pre-alpha)
 
 ---
 
@@ -173,7 +173,7 @@ Releases are cut by pushing a tag — the workflow stamps `module.json` and publ
 zip:
 
 ```bash
-git tag v0.5.0 && git push --tags
+git tag v0.6.0 && git push --tags
 ```
 
 ## Roadmap
