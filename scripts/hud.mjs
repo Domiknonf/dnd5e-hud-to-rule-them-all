@@ -235,7 +235,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       toggleLevel: CombatHUD.#onToggleLevel,
       portrait: CombatHUD.#onPortrait,
       config: CombatHUD.#onConfig,
-      adjustPool: CombatHUD.#onAdjustPool,
+      // The ONE action here that needs the right mouse button as well. An action
+      // declared as a bare function answers to button 0 only - ApplicationV2 defaults
+      // `buttons` to [0], so the contextmenu listener it binds never reached this
+      // handler and right-clicking a pool did nothing at all. Declaring the buttons is
+      // the supported way to opt in (foundryvtt/foundryvtt#10704).
+      adjustPool: { handler: CombatHUD.#onAdjustPool, buttons: [0, 2] },
       reset: CombatHUD.#onReset,
       endTurn: CombatHUD.#onEndTurn
     }
@@ -731,8 +736,11 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * goes through the same spend/refund in economy.mjs as everything else. The bar
    * already had `reset` on the same footing.
    *
-   * `contextmenu` reaches this because ApplicationV2 binds it alongside `click` -
-   * the same reason the middle-click popup needs its own listener and this does not.
+   * `contextmenu` reaches this only because the action is declared as
+   * `{ handler, buttons: [0, 2] }` in DEFAULT_OPTIONS. ApplicationV2 does bind the
+   * contextmenu listener for every application, but it drops the event unless the
+   * action opts into button 2 - which is why right-click silently did nothing here
+   * until the declaration changed. A bare function means left-click only.
    */
   static async #onAdjustPool(event, target) {
     event.preventDefault();
