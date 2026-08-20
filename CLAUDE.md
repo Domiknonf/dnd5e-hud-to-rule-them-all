@@ -305,7 +305,19 @@ left there, and a filter narrowing the bar to that level.
   still shows — the slots are worth seeing — but carries no `data-action`, the same way
   the economy row only gives the GM one.
 - **The filter narrows spells and nothing else.** It is used mid-turn while deciding what
-  to cast; taking the weapons off the bar at that moment would make it useless.
+  to cast; taking the weapons off the bar at that moment would make it useless. What it
+  *does* do is switch `SECTION_MIN_ENTRIES` off, so the group keeps its sections while
+  filtered — otherwise the filtered group drops under the threshold, goes flat, and puts
+  a sword, a breath weapon and two spells in one undivided row at exactly the moment the
+  boundary matters most.
+- **The lit chip is the whole control.** Clicking it again clears the filter, so there is
+  no separate "show all" button. That only holds while the chip is still on the strip, so
+  the filter clears itself when its level leaves the bar — `spellBarFor` returns the
+  effective level and `_prepareContext` writes it back to `#spellLevel`.
+- **Slots are pips, not a number** (`SPELL_PIP_LIMIT` guards the homebrew case). Four
+  dots answer "how many are left" without being read, which is the question the row
+  exists for. Cantrips get no pips *and no "none" dash*: they are at-will, so an empty
+  slot area is the complete answer and a dash would invent a resource.
 - **It is instance state (`#spellLevel`), not a setting.** A fold means "I never want to
   look at this", a filter means "right now I am casting a 3rd-level spell" — coming back
   next session with your cantrips still hidden would be a bug. Cleared whenever the bar

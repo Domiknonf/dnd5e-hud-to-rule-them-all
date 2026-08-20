@@ -76,6 +76,15 @@ export const DEFAULT_SECTION = "gear";
 export const SECTION_MIN_ENTRIES = 8;
 
 /**
+ * Above this many slots at one level, the strip stops drawing a pip per slot and falls
+ * back to "3/4". Pips answer "how many do I have left" without reading anything, which
+ * is the whole point - but a row of fifteen of them is a number again, only harder to
+ * read and wide enough to push the strip around. 5e never goes past four, so this is a
+ * guard against homebrew and effects, not a case anybody meets.
+ */
+export const SPELL_PIP_LIMIT = 6;
+
+/**
  * dnd5e activation type -> our bucket.
  * VERIFY AT RUNTIME: `Object.keys(CONFIG.DND5E.activityActivationTypes)` in the console.
  * Anything not listed here and not purely time-based lands in "other" (see actions.mjs).

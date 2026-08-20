@@ -607,8 +607,32 @@
     border-style: dashed;
     cursor: default;
   }
-  #hud-to-rule-them-all .hudtra-level-all { color: var(--hudtra-gold); }
-  #hud-to-rule-them-all .hudtra-level-all i { font-size: 0.9em; }
+  /* One pip per slot, same language as the economy row's pips: a resource you can
+     count without reading. Smaller than those, because a spell level is a readout on
+     a chip and the pools are the bar's headline number. */
+  #hud-to-rule-them-all .hudtra-spell-pips {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+  }
+  #hud-to-rule-them-all .hudtra-spell-pip {
+    width: 0.5em;
+    height: 0.5em;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: var(--hudtra-gold);
+    box-shadow: 0 0 0.25em rgb(200 163 82 / 0.55);
+  }
+  /* Spent: an outline, not a gap. --hudtra-spent is nearly invisible against the
+     chip's own dark ground, and a slot you cannot see is one you cannot count - the
+     empty ring is what makes "one of four left" readable without the number. */
+  #hud-to-rule-them-all .hudtra-spell-pip.spent {
+    background: transparent;
+    border-color: var(--hudtra-gold-dark);
+    box-shadow: none;
+  }
+  /* Spells at this level, but no slots to cast them from. */
+  #hud-to-rule-them-all .hudtra-level-none { color: var(--hudtra-text-dim); }
 
   #hud-to-rule-them-all .hudtra-sections {
     display: flex;

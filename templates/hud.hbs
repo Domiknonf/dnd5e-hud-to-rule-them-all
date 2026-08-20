@@ -44,7 +44,18 @@
             {{#if filterable}}data-action="toggleLevel"{{/if}} data-level="{{level}}"
             data-tooltip-text="{{tooltip}}">
       <span class="hudtra-level-badge">{{short}}</span>
+      {{!-- One pip per slot, filled while it is still there: "how many do I have left"
+           without reading anything. Past SPELL_PIP_LIMIT it falls back to a number. --}}
+      {{#if pips}}
+      <span class="hudtra-spell-pips">
+        {{#each pips}}<span class="hudtra-spell-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
+      </span>
+      {{/if}}
       {{#if slots}}<span class="hudtra-level-slots">{{slots}}</span>{{/if}}
+      {{!-- Spells at this level but no slot pool for them - a warlock's leveled spells,
+           or a creature that has none. A dash says "looked, there are none" where a
+           blank would just look unfinished. --}}
+      {{#if slotless}}<span class="hudtra-level-slots hudtra-level-none">–</span>{{/if}}
     </button>
     {{/each}}
     {{!-- Pact Magic is a readout, not a filter: a pact slot casts anything you know at
@@ -53,16 +64,13 @@
     <span class="hudtra-level pact {{#if spellBar.pact.empty}}empty{{/if}}"
           data-tooltip-text="{{spellBar.pact.tooltip}}">
       <span class="hudtra-level-badge">{{spellBar.pact.short}}</span>
-      <span class="hudtra-level-slots">{{spellBar.pact.slots}}</span>
+      {{#if spellBar.pact.pips}}
+      <span class="hudtra-spell-pips">
+        {{#each spellBar.pact.pips}}<span class="hudtra-spell-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
+      </span>
+      {{/if}}
+      {{#if spellBar.pact.slots}}<span class="hudtra-level-slots">{{spellBar.pact.slots}}</span>{{/if}}
     </span>
-    {{/if}}
-    {{!-- The way back, without having to remember which chip is lit. --}}
-    {{#if spellBar.active}}
-    <button type="button" class="hudtra-level hudtra-level-all" data-action="toggleLevel"
-            data-level="" data-tooltip-text="{{spellAllTooltip}}">
-      <i class="fa-solid fa-xmark"></i>
-      <span>{{localize "dnd5e-hud-to-rule-them-all.spells.all"}}</span>
-    </button>
     {{/if}}
   </div>
   {{/if}}

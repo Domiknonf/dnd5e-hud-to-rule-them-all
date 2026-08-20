@@ -1,4 +1,6 @@
-import { MODULE_ID, RESOURCES, SECTIONS, SECTION_MIN_ENTRIES, DEBOUNCE_MS } from "./const.mjs";
+import {
+  MODULE_ID, RESOURCES, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT, DEBOUNCE_MS
+} from "./const.mjs";
 import {
   getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund, poolMax,
   blockedPools, blockingConditions, coupledOut, coupledPools, isTracked
@@ -88,7 +90,11 @@ function foldTooltip(label, count, folded) {
 function sectionsFor(poolKey, entries, folded, filtering = false) {
   const flat = { sectioned: false, sections: [{ key: "", collapsed: false, entries }] };
   if (!game.settings.get(MODULE_ID, "groupSections")) return flat;
-  if (entries.length < SECTION_MIN_ENTRIES) return flat;
+  // While a level is picked out, the size threshold is off. Filtering leaves a small
+  // group almost by definition, and going flat at exactly that moment is what put a
+  // sword, a breath weapon and two spells in one undivided row - the one moment the
+  // boundary between "spell" and "not a spell" matters most.
+  if (!filtering && entries.length < SECTION_MIN_ENTRIES) return flat;
 
   const byKey = new Map();
   for (const entry of entries) {
@@ -153,15 +159,31 @@ function spellBarFor(actor, buckets, active) {
   const keys = [...new Set([...counts.keys(), ...leveled.keys()])].sort((a, b) => a - b);
   if (!keys.length && !pact) return null;
 
-  const slotsOf = (row) => row ? `${row.value}/${row.max}` : "";
+  // The lit chip is the only way to un-filter, so a filter can only survive while its
+  // chip is still there to be clicked. A level whose last spell just left the bar
+  // clears itself rather than leaving the bar narrowed with nothing to click.
+  const filterable = (level) => (counts.get(level) ?? 0) > 0;
+  const effective = active !== null && keys.includes(active) && filterable(active) ? active : null;
+
+  /**
+   * One pip per slot, filled while it is still there. A number answers "how many"
+   * only after you read it; four dots answer it at a glance, which is the whole
+   * question this row exists for. Past SPELL_PIP_LIMIT it goes back to being a
+   * number, because a row of pips that has to be counted is just a worse number.
+   */
+  const slotsOf = (row) => {
+    if (!row) return { pips: null, slots: "" };
+    if (row.max > SPELL_PIP_LIMIT) return { pips: null, slots: `${row.value}/${row.max}` };
+    return { pips: Array.fromRange(row.max).map(i => ({ spent: i >= row.value })), slots: "" };
+  };
+
   const levels = keys.map(level => {
     const row = leveled.get(level) ?? null;
-    const spells = counts.get(level) ?? 0;
     // dnd5e's own level names, localized by the system - "Cantrip", "1st Level", …
     const label = game.i18n.localize(CONFIG.DND5E?.spellLevels?.[level] ?? "") || String(level);
-    const filterable = spells > 0;
-    const isActive = active === level;
-    const hint = filterable
+    const canFilter = filterable(level);
+    const isActive = effective === level;
+    const hint = canFilter
       ? game.i18n.localize(`${MODULE_ID}.spells.${isActive ? "filterOff" : "filterOn"}`)
       : game.i18n.localize(`${MODULE_ID}.spells.nothingHere`);
     return {
@@ -169,13 +191,19 @@ function spellBarFor(actor, buckets, active) {
       // Cantrips have no number to show, so they get a letter. Everything else is
       // its own numeral - short enough to stay legible at the bar's smallest scale.
       short: level === 0 ? game.i18n.localize(`${MODULE_ID}.spells.cantripShort`) : String(level),
-      slots: slotsOf(row),
+      ...slotsOf(row),
+      // A level with spells but no slot pool of its own - a warlock's leveled spells,
+      // or a creature that simply has none. Said outright rather than left blank, so
+      // "where are my slots" has an answer on the chip itself. NOT for cantrips:
+      // those are at-will, so an empty slot area is the correct and complete answer
+      // there, and a dash would invent a resource that does not exist.
+      slotless: !row && level > 0,
       empty: !!row && row.value <= 0,
-      filterable,
+      filterable: canFilter,
       active: isActive,
-      tooltip: row
-        ? `${label} · ${game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, row)}\n${hint}`
-        : `${label}\n${hint}`
+      tooltip: row ? `${label} · ${game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, row)}\n${hint}`
+        : level === 0 ? `${label}\n${hint}`
+        : `${label} · ${game.i18n.localize(`${MODULE_ID}.spells.noSlots`)}\n${hint}`
     };
   });
 
@@ -183,14 +211,12 @@ function spellBarFor(actor, buckets, active) {
     levels,
     pact: pact && {
       short: game.i18n.localize(`${MODULE_ID}.spells.pactShort`),
-      slots: slotsOf(pact),
+      ...slotsOf(pact),
       empty: pact.value <= 0,
       tooltip: `${game.i18n.format(`${MODULE_ID}.spells.pactLabel`, pact)} · `
         + game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, pact)
     },
-    // Only ever shown while something is filtered, as the way back that does not
-    // require remembering which chip is lit.
-    active: active !== null
+    active: effective
   };
 }
 
@@ -466,7 +492,11 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // one of them is picked out - otherwise choosing a level would take away the only
     // control that undoes it.
     const spellBar = spellBarFor(actor, buckets, this.#spellLevel);
-    const spellLevel = spellBar ? this.#spellLevel : null;
+    // Written back, not just read: the strip decides whether the filter is still valid
+    // (its chip has to exist to be un-clicked), and this is what keeps the field, the
+    // lit chip and the entries below from disagreeing.
+    this.#spellLevel = spellBar?.active ?? null;
+    const spellLevel = this.#spellLevel;
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -573,7 +603,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       round: game.combat?.round ?? 0,
       pools,
       spellBar,
-      spellAllTooltip: game.i18n.localize(`${MODULE_ID}.spells.showAll`),
       groups,
       description,
       // The handle's first stage depends on what is currently open.
@@ -655,17 +684,15 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Pick a spell level out on the strip, or - clicking the lit chip, or the "all"
-   * chip beside it - put every level back. Session state only, on the instance: see
-   * #spellLevel for why this one is not remembered.
-   *
-   * A blank `data-level` is the "all" chip, which is why this reads the attribute
-   * rather than trusting a number to be there.
+   * Pick a spell level out on the strip; clicking the lit chip puts every level back.
+   * That is the whole control - the chip that narrowed the bar is the chip that widens
+   * it again, so there is no separate "show all" button to find. Session state only,
+   * on the instance: see #spellLevel for why this one is not remembered.
    */
   static async #onToggleLevel(event, target) {
-    const raw = target.dataset.level;
-    const level = raw === "" || raw === undefined ? null : Number(raw);
-    this.#spellLevel = (level === null || this.#spellLevel === level) ? null : level;
+    const level = Number(target.dataset.level);
+    if (!Number.isFinite(level)) return;
+    this.#spellLevel = this.#spellLevel === level ? null : level;
     return this.render();
   }
 
