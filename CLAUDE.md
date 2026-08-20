@@ -256,7 +256,39 @@ would show a player their character wearing the monster's pips. Everything turn-
   (`:not(.collapsed)`), so collapsing gives it back. The class is toggled without a
   re-render and `:has()` tracks that live.
 
+### Two layouts, one switch
+
+`economy.isPlayed(actor)` — `hasPlayerOwner`, nothing else — decides how the bar is
+drawn, not just whether it counts:
+
+| | Played (PC, chain-pact imp, summon, wildshape) | GM-only (goblin, statblock) |
+| --- | --- | --- |
+| Layout | one BG3 grid, headerless | pool columns with headers |
+| Pool shown as | a marker on each slot (`.hudtra-cost`) | the column header |
+| Categories | tabs above the grid | fold chips in each header |
+| Rows | `+` / `-`, client setting `gridRows` | two, fixed |
+
+The reasoning is decision 4's: a person arranges their own character once and lives
+with it; nobody arranges twelve goblins, so those keep a bar that fills itself.
+
+- **It reads `isPlayed`, never `isTracked`.** `isTracked` carries the `trackEveryone`
+  escape hatch for counting, and a GM turning counting on for testing must not be
+  handed a layout that expects to be curated.
+- **The empty slots are painted, not rendered** — a tiled SVG frame behind the grid, one
+  tile per slot pitch. That is what makes the field a full rectangle at any width and
+  any `--hudtra-scale` without measuring how many columns fit, and it costs no DOM on a
+  bar that already builds a tooltip per slot. Every wrapper between the flex row and the
+  grid has to pass the width through, or the field stops where the filled slots do.
+- **One template, one loop.** The grid is a single group with `header: false` and one
+  nameless section, so `hud.hbs` did not grow a second copy of the slot markup — the
+  same trick the unsectioned group already used.
+- The cost marker uses the same shape and colour per pool as the economy pips, so a
+  green circle means the same thing in both places. CSS hides it in the grouped layout,
+  where the header already says it.
+
 ### Folding: sections inside a group
+
+Applies to the **GM layout** only — a played creature has tabs instead.
 
 A caster's Action group runs to twenty-odd buttons, which is one undifferentiated wall
 of art. `SECTIONS` in `const.mjs` is the second level of grouping — Weapons, Spells,

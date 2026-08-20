@@ -1,4 +1,4 @@
-import { MODULE_ID } from "./const.mjs";
+import { MODULE_ID, GRID_ROWS } from "./const.mjs";
 import { refreshHUD } from "./hud.mjs";
 import { HudConfig } from "./config-app.mjs";
 
@@ -56,6 +56,19 @@ export function registerSettings() {
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
   reg("groupSections",      { ...CLIENT, type: Boolean, default: true });
   reg("scale",              { ...CLIENT, type: Number, default: 1, range: { min: 0.6, max: 1.6, step: 0.05 } });
+
+  /**
+   * How many slot rows the played-creature grid has. Written by the +/- buttons on the
+   * bar itself, so it needs no menu entry - BG3 puts the same pair next to End Turn.
+   * Client-scoped: it is a question about how much of one person's screen the bar may
+   * take, and two people looking at the same character answer it differently.
+   */
+  game.settings.register(MODULE_ID, "gridRows", {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: GRID_ROWS.default
+  });
 
   /**
    * Which groups and sections this user has folded away, as `{ id: true }` - a pool

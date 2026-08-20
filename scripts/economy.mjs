@@ -63,7 +63,25 @@ export function combatantFor(actor) {
 export function isTracked(actor) {
   if (!actor) return false;
   if (game.settings.get(MODULE_ID, "trackEveryone") === true) return true;
-  return actor.hasPlayerOwner === true;
+  return isPlayed(actor);
+}
+
+/**
+ * Does somebody PLAY this creature? The same question isTracked asks, minus the
+ * testing escape hatch - and the split matters.
+ *
+ * This is the switch for the bar's LAYOUT: a played creature gets the BG3 model (a
+ * fixed grid you arrange once, with the pool as a marker on each slot), a GM-only
+ * creature gets the auto-grouped bar it has always had. Nobody is going to arrange
+ * twelve goblins by hand, and everybody arranges their own character.
+ *
+ * It must NOT read `trackEveryone`: that setting exists so a GM can count monsters
+ * while testing, and it would be absurd for a counting switch to hand every goblin a
+ * layout that expects to be curated. Counting and layout ask the same question; only
+ * counting has an override.
+ */
+export function isPlayed(actor) {
+  return actor?.hasPlayerOwner === true;
 }
 
 /**

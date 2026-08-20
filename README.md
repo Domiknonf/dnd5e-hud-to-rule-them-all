@@ -39,7 +39,12 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
 - **BG3-style bar.** Bottom-anchored hotbar with square icon slots, a portrait HP ring and
   per-pool markers. Collapses out of view when you need the screen. Foundry's own macro
   hotbar hides itself while it is up.
-- **Sections you can fold away.** A crowded group is split into Weapons, Spells,
+- **Two layouts, decided by ownership.** A creature somebody plays gets a BG3-style
+  hotbar: one grid of slots with the empty ones drawn in, the action cost as a marker on
+  each slot, category tabs above it and `+`/`-` for how many rows you want. A creature
+  only the GM owns keeps the auto-grouped columns — nobody arranges twelve goblins by
+  hand. A chain-pact imp or a summoned drake counts as played, because someone plays it.
+- **Sections you can fold away** (GM layout). A crowded group is split into Weapons, Spells,
   Features, Consumables and Gear. Click a group's name to fold the whole thing, or one of
   the chips beside it to fold a single section — a folded chip names what it is holding
   and how much of it. Remembered per user. Passives start folded.

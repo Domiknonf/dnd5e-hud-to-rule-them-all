@@ -85,6 +85,22 @@ export const SECTION_MIN_ENTRIES = 8;
 export const SPELL_PIP_LIMIT = 6;
 
 /**
+ * How many slot rows the played-creature grid may have, and what it starts with. BG3
+ * puts `+` and `-` next to End Turn for exactly this; two rows is what fits under a
+ * portrait without the bar growing taller than it already is.
+ */
+export const GRID_ROWS = { min: 1, max: 4, default: 2 };
+
+/**
+ * The category tabs above that grid, in order. `passive` is last and deliberately
+ * included: passives are not actions and have no business filling hotbar slots, but
+ * they are still the answer to "what does this creature have", so they get a tab
+ * rather than a permanent row. Keys are SECTIONS keys plus "passive", so both come out
+ * of the same table and nothing here needs its own label.
+ */
+export const GRID_TABS = ["weapon", "spell", "feature", "consumable", "gear", "passive"];
+
+/**
  * dnd5e activation type -> our bucket.
  * VERIFY AT RUNTIME: `Object.keys(CONFIG.DND5E.activityActivationTypes)` in the console.
  * Anything not listed here and not purely time-based lands in "other" (see actions.mjs).

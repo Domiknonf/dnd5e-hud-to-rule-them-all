@@ -1,9 +1,10 @@
 import {
-  MODULE_ID, RESOURCES, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT, DEBOUNCE_MS
+  MODULE_ID, RESOURCES, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
+  GRID_ROWS, GRID_TABS, DEBOUNCE_MS
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund, poolMax,
-  blockedPools, blockingConditions, coupledOut, coupledPools, isTracked
+  blockedPools, blockingConditions, coupledOut, coupledPools, isTracked, isPlayed
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
@@ -220,6 +221,65 @@ function spellBarFor(actor, buckets, active) {
   };
 }
 
+/* ---------------------------------------------- */
+/*  The played-creature grid                       */
+/* ---------------------------------------------- */
+
+/**
+ * BG3's model, for creatures somebody plays (economy.isPlayed): ONE grid of slots
+ * instead of a column per pool, with the pool drawn as a marker on each slot. The
+ * empty slots are painted by CSS rather than rendered, so the field is always a full
+ * rectangle at any width without anybody counting columns.
+ *
+ * Categories become tabs above the grid instead of chips inside every group header.
+ * Passives get a tab of their own and are OUT of the default grid: they are not
+ * actions and have no business filling hotbar slots, but they are still the answer to
+ * "what does this creature have".
+ *
+ * The order is pool first, then whatever the sort settings and the `sort` rule
+ * produced - so a creature's attacks still lead, and the gear dialog still decides
+ * inside a pool, exactly as in the grouped bar.
+ */
+function gridFor(buckets, category) {
+  const showing = category ?? null;
+  const entries = [];
+  for (const key of Object.keys(RESOURCES).sort((a, b) => RESOURCES[a].order - RESOURCES[b].order)) {
+    // Passives only ever appear on their own tab, never mixed into the action grid.
+    if (key === "passive" ? showing !== "passive" : showing === "passive") continue;
+    for (const entry of buckets[key] ?? []) {
+      if (showing && showing !== "passive" && entry.section !== showing) continue;
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
+/** The tab strip: every category this creature actually has something in. */
+function tabsFor(buckets, category) {
+  const counts = new Map();
+  for (const [key, bucket] of Object.entries(buckets)) {
+    for (const entry of bucket) {
+      const tab = key === "passive" ? "passive" : entry.section;
+      counts.set(tab, (counts.get(tab) ?? 0) + 1);
+    }
+  }
+  return GRID_TABS
+    .filter(key => counts.has(key))
+    .map(key => {
+      const label = game.i18n.localize(
+        key === "passive" ? `${MODULE_ID}.pool.passive` : `${MODULE_ID}.section.${key}`
+      );
+      const active = category === key;
+      return {
+        key, label,
+        count: counts.get(key),
+        active,
+        icon: key === "passive" ? RESOURCES.passive.icon : (SECTIONS[key]?.icon ?? "fa-solid fa-circle"),
+        tooltip: game.i18n.format(`${MODULE_ID}.tab.${active ? "off" : "on"}`, { label })
+      };
+    });
+}
+
 export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static DEFAULT_OPTIONS = {
@@ -233,6 +293,8 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       collapse: CombatHUD.#onCollapse,
       toggleFold: CombatHUD.#onToggleFold,
       toggleLevel: CombatHUD.#onToggleLevel,
+      toggleCategory: CombatHUD.#onToggleCategory,
+      rows: CombatHUD.#onRows,
       portrait: CombatHUD.#onPortrait,
       config: CombatHUD.#onConfig,
       // The ONE action here that needs the right mouse button as well. An action
@@ -264,6 +326,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * bar next session with your cantrips still hidden would be a bug, not a memory.
    */
   #spellLevel = null;
+
+  /**
+   * Category tab the played-creature grid is narrowed to (a SECTIONS key, or
+   * "passive"), or null for "everything that is an action". Instance state for the
+   * same reason #spellLevel is: it answers "what am I looking for right now".
+   */
+  #category = null;
 
   /** Who the bar showed last render, so a change can close a stale description. */
   #shownActorUuid = null;
@@ -427,6 +496,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       // the next one, and silently hiding half of a wizard's bar because a warlock
       // was selected earlier is the worst kind of stale state.
       this.#spellLevel = null;
+      this.#category = null;
     }
     const combatant = this.subjectCombatant;
     const inCombat = !!combatant;
@@ -502,7 +572,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // lit chip and the entries below from disagreeing.
     this.#spellLevel = spellBar?.active ?? null;
     const spellLevel = this.#spellLevel;
-    const groups = Object.entries(RESOURCES)
+    const poolGroups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
         // A queued Extra Attack (econ.attacksLeft) keeps the action group usable
@@ -512,6 +582,17 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
         const midAttackSequence = hasFreeAttack && remaining(econCombatant, key) <= 0;
         const label = game.i18n.localize(`${MODULE_ID}.pool.${key}`);
+        // Only per-turn pools can exhaust; "other" and "passive" have no budget.
+        // A barring condition beats the queued-attack shortcut: being Stunned
+        // mid-sequence ends it, it does not let the rest through for free.
+        // Nothing exhausts on an untracked creature - and this has to say so
+        // explicitly rather than lean on the null combatant, because `legendary`
+        // has no world default, so its recomputed max is 0 and the group would
+        // grey itself out on every monster that has one.
+        // Computed BEFORE the entries, because in the grid there is no group left to
+        // grey out: it rides along on each slot instead.
+        const exhausted = tracked && (blocked.has(key) || coupledOut(econCombatant, key)
+          || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0));
         // The level filter narrows the SPELLS and nothing else: a filter that also
         // took your weapons off the bar would be useless in the one moment it is
         // used, which is mid-turn while deciding what to cast.
@@ -542,6 +623,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
             // Carried on the entry rather than read back out of the template's context
             // stack: the slot markup now sits one loop deeper (group -> section -> entry).
             enriched.pool = key;
+            enriched.exhausted = exhausted;
             enriched.tooltipHtml = tooltipFor(enriched, label);
             return enriched;
           });
@@ -560,19 +642,36 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           // the header. Null while the whole group is folded, where per-section
           // controls would toggle something nobody can see.
           chips: sectioned && !collapsed ? sections : null,
-          // Only per-turn pools can exhaust; "other" and "passive" have no budget.
-          // A barring condition beats the queued-attack shortcut: being Stunned
-          // mid-sequence ends it, it does not let the rest through for free.
-          // Nothing exhausts on an untracked creature - and this has to say so
-          // explicitly rather than lean on the null combatant, because `legendary`
-          // has no world default, so its recomputed max is 0 and the group would
-          // grey itself out on every monster that has one.
-          exhausted: tracked && (blocked.has(key) || coupledOut(econCombatant, key)
-            || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0))
+          // Pool columns carry a header; the grid below is one headerless field.
+          header: true,
+          exhausted
         };
       })
       .filter(g => g.entries.length);
 
+    // TWO LAYOUTS, ONE SWITCH (see economy.isPlayed). A creature somebody plays gets
+    // BG3's single grid - the pool moves onto each slot as a marker, the categories
+    // move into tabs above it. A GM-only creature keeps the auto-grouped columns:
+    // nobody curates twelve goblins, and the headers are how that bar is read.
+    const played = isPlayed(actor);
+    const enriched = Object.fromEntries(poolGroups.map(g => [g.key, g.entries]));
+    const tabs = played ? tabsFor(enriched, this.#category) : [];
+    // Same self-clearing rule the spell filter follows: a tab that is no longer there
+    // cannot be un-picked, so the filter drops rather than emptying the grid.
+    if (played && this.#category && !tabs.some(t => t.key === this.#category)) this.#category = null;
+    const gridEntries = played ? gridFor(enriched, this.#category) : [];
+    const groups = played
+      ? (gridEntries.length
+        ? [{ key: "grid", header: false, exhausted: false, entries: gridEntries,
+             collapsed: false, chips: null,
+             sections: [{ key: "", collapsed: false, entries: gridEntries }] }]
+        : [])
+      : poolGroups;
+
+    const rows = Math.clamp(
+      Number(game.settings.get(MODULE_ID, "gridRows")) || GRID_ROWS.default,
+      GRID_ROWS.min, GRID_ROWS.max
+    );
     const hp = actor?.system?.attributes?.hp ?? null;
     const isDying = !!hp && hp.value <= 0;
     const rollsDeathSave = isDying && actor?.type === "character";
@@ -608,6 +707,18 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       round: game.combat?.round ?? 0,
       pools,
       spellBar,
+      // The column beside the portrait exists for either half: a wizard out of combat
+      // has no pips and still wants to see slots.
+      resources: showEconomy || !!spellBar,
+      played,
+      tabs,
+      // The grid's height in rows. Clamped on read as well as on write: the setting is
+      // a number a user could have edited to anything.
+      gridRows: rows,
+      canAddRow: rows < GRID_ROWS.max,
+      canRemoveRow: rows > GRID_ROWS.min,
+      addRowTooltip: game.i18n.localize(`${MODULE_ID}.grid.addRow`),
+      removeRowTooltip: game.i18n.localize(`${MODULE_ID}.grid.removeRow`),
       groups,
       description,
       // The handle's first stage depends on what is currently open.
@@ -698,6 +809,33 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const level = Number(target.dataset.level);
     if (!Number.isFinite(level)) return;
     this.#spellLevel = this.#spellLevel === level ? null : level;
+    return this.render();
+  }
+
+  /**
+   * Narrow the grid to one category, or - clicking the lit tab - back to everything.
+   * The same two-state control the spell levels are, for the same reason: the tab that
+   * narrowed the grid is the tab that widens it, so there is nothing extra to find.
+   */
+  static async #onToggleCategory(event, target) {
+    const key = target.dataset.category;
+    if (!key) return;
+    this.#category = this.#category === key ? null : key;
+    return this.render();
+  }
+
+  /**
+   * Add or drop a row of slots, BG3's `+` / `-` next to End Turn. A client setting, so
+   * it survives a reload and stays that person's answer - the template only renders
+   * the button that has somewhere to go, and this clamps again anyway.
+   */
+  static async #onRows(event, target) {
+    const delta = Number(target.dataset.delta);
+    if (!Number.isFinite(delta)) return;
+    const now = Number(game.settings.get(MODULE_ID, "gridRows")) || GRID_ROWS.default;
+    const next = Math.clamp(now + delta, GRID_ROWS.min, GRID_ROWS.max);
+    if (next === now) return;
+    await game.settings.set(MODULE_ID, "gridRows", next);
     return this.render();
   }
 

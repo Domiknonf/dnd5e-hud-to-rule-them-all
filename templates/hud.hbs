@@ -29,49 +29,19 @@
   </button>
   {{/if}}
 
-  {{!-- Spell strip, between the description panel and the bar itself. Two jobs in one
-       row: how many slots are left per level, and a filter down to one of them. Only
-       rendered for a creature that has spells or slots at all - nobody else needs the
-       row, and the frame's width no longer depends on it either way. --}}
-  {{#if spellBar}}
-  <div class="hudtra-spells">
-    <i class="hudtra-spells-mark fa-solid fa-wand-sparkles"
-       data-tooltip="dnd5e-hud-to-rule-them-all.spells.title"></i>
-    {{#each spellBar.levels}}
-    {{!-- data-action only where there is something to filter TO: a level with slots
-         but nothing on the bar is a readout, and must not promise a click. --}}
-    <button type="button" class="hudtra-level {{#if active}}active{{/if}} {{#if empty}}empty{{/if}} {{#unless filterable}}quiet{{/unless}}"
-            {{#if filterable}}data-action="toggleLevel"{{/if}} data-level="{{level}}"
-            data-tooltip-text="{{tooltip}}">
-      <span class="hudtra-level-badge">{{short}}</span>
-      {{!-- One pip per slot, filled while it is still there: "how many do I have left"
-           without reading anything. Past SPELL_PIP_LIMIT it falls back to a number. --}}
-      {{#if pips}}
-      <span class="hudtra-spell-pips">
-        {{#each pips}}<span class="hudtra-spell-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
-      </span>
-      {{/if}}
-      {{#if slots}}<span class="hudtra-level-slots">{{slots}}</span>{{/if}}
-      {{!-- Spells at this level but no slot pool for them - a warlock's leveled spells,
-           or a creature that has none. A dash says "looked, there are none" where a
-           blank would just look unfinished. --}}
-      {{#if slotless}}<span class="hudtra-level-slots hudtra-level-none">–</span>{{/if}}
+  {{!-- Category tabs, BG3's row above the hotbar. Only for a creature somebody plays:
+       a GM-run statblock keeps its pool columns, which are already the categories it
+       needs. Each tab narrows the grid; the lit one clears it again. --}}
+  {{#if played}}
+  <div class="hudtra-tabs">
+    {{#each tabs}}
+    <button type="button" class="hudtra-tab {{#if active}}on{{/if}}"
+            data-action="toggleCategory" data-category="{{key}}" data-tooltip-text="{{tooltip}}">
+      <i class="{{icon}}"></i>
+      <span>{{label}}</span>
+      <span class="hudtra-tab-n">{{count}}</span>
     </button>
     {{/each}}
-    {{!-- Pact Magic is a readout, not a filter: a pact slot casts anything you know at
-         its level, so there is no set of spells it would narrow to. --}}
-    {{#if spellBar.pact}}
-    <span class="hudtra-level pact {{#if spellBar.pact.empty}}empty{{/if}}"
-          data-tooltip-text="{{spellBar.pact.tooltip}}">
-      <span class="hudtra-level-badge">{{spellBar.pact.short}}</span>
-      {{#if spellBar.pact.pips}}
-      <span class="hudtra-spell-pips">
-        {{#each spellBar.pact.pips}}<span class="hudtra-spell-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
-      </span>
-      {{/if}}
-      {{#if spellBar.pact.slots}}<span class="hudtra-level-slots">{{spellBar.pact.slots}}</span>{{/if}}
-    </span>
-    {{/if}}
   </div>
   {{/if}}
 
@@ -100,8 +70,9 @@
        monster nothing is counted at all (see economy.isTracked). Either way, pips
        here would promise tracking that isn't happening. The groups below stay - the
        bar is still that creature's ability launcher. --}}
-  {{#if showEconomy}}
+  {{#if resources}}
   <div class="hudtra-economy">
+    <div class="hudtra-pools">
     {{#each pools}}
     {{!-- data-action only for the GM: the handler checks again, but a control nobody
          else has must not advertise itself in everyone's tooltip either. --}}
@@ -118,14 +89,64 @@
       {{#if coupled}}<i class="hudtra-coupled fa-solid fa-link"></i>{{/if}}
     </div>
     {{/each}}
+    </div>
+
+    {{!-- Spell slots live in this column, with the other resources, rather than in a
+         row of their own above the bar: they answer the same question the pips do.
+         Each level also filters the bar; the lit one clears the filter again. --}}
+    {{#if spellBar}}
+    <div class="hudtra-spellslots">
+      {{#each spellBar.levels}}
+      {{!-- data-action only where there is something to filter TO: a level with slots
+           but nothing on the bar is a readout, and must not promise a click. --}}
+      <button type="button" class="hudtra-level {{#if active}}active{{/if}} {{#if empty}}empty{{/if}} {{#unless filterable}}quiet{{/unless}}"
+              {{#if filterable}}data-action="toggleLevel"{{/if}} data-level="{{level}}"
+              data-tooltip-text="{{tooltip}}">
+        <span class="hudtra-level-badge">{{short}}</span>
+        {{!-- One pip per slot, filled while it is still there: "how many do I have
+             left" without reading anything. Past SPELL_PIP_LIMIT it is a number. --}}
+        {{#if pips}}
+        <span class="hudtra-spell-pips">
+          {{#each pips}}<span class="hudtra-spell-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
+        </span>
+        {{/if}}
+        {{#if slots}}<span class="hudtra-level-slots">{{slots}}</span>{{/if}}
+        {{!-- Spells at this level but no slot pool for them - a warlock's leveled
+             spells, or a creature that has none. A dash says "looked, there are none"
+             where a blank would just look unfinished. --}}
+        {{#if slotless}}<span class="hudtra-level-slots hudtra-level-none">–</span>{{/if}}
+      </button>
+      {{/each}}
+      {{!-- Pact Magic is a readout, not a filter: a pact slot casts anything you know
+           at its level, so there is no set of spells it would narrow to. --}}
+      {{#if spellBar.pact}}
+      <span class="hudtra-level pact {{#if spellBar.pact.empty}}empty{{/if}}"
+            data-tooltip-text="{{spellBar.pact.tooltip}}">
+        <span class="hudtra-level-badge">{{spellBar.pact.short}}</span>
+        {{#if spellBar.pact.pips}}
+        <span class="hudtra-spell-pips">
+          {{#each spellBar.pact.pips}}<span class="hudtra-spell-pip {{#if spent}}spent{{/if}}"></span>{{/each}}
+        </span>
+        {{/if}}
+        {{#if spellBar.pact.slots}}<span class="hudtra-level-slots">{{spellBar.pact.slots}}</span>{{/if}}
+      </span>
+      {{/if}}
+    </div>
+    {{/if}}
   </div>
   {{/if}}
 
   {{!-- data-tooltip-class/-direction are looked up on ancestors by core's
        TooltipManager, so they're declared once here for every slot. --}}
-  <div class="hudtra-groups" data-tooltip-class="hudtra-tooltip" data-tooltip-direction="UP">
+  {{!-- Two layouts, one container. A played creature gets ONE headerless field whose
+       empty slots are painted by CSS (see .hudtra-grid), so the hotbar is always a
+       full rectangle at any width; a GM-run creature keeps its pool columns with their
+       fold controls. --}}
+  <div class="hudtra-groups {{#if played}}hudtra-grid{{/if}}" style="--hudtra-rows: {{gridRows}}"
+       data-tooltip-class="hudtra-tooltip" data-tooltip-direction="UP">
     {{#each groups}}
     <section class="hudtra-group {{#if exhausted}}exhausted{{/if}}" data-group="{{key}}">
+      {{#if header}}
       {{!-- The header is the fold control: the label folds the whole group, each chip
            one section of it. It keeps its full gold while folded and gains a count -
            it is then the only thing left of the group, so it has to say how much is
@@ -153,6 +174,7 @@
         </span>
         {{/if}}
       </h4>
+      {{/if}}
 
       {{!-- One loop, whether the group is sectioned or not: an unsectioned group is a
            single nameless section (see hud.mjs sectionsFor), which is what keeps the
@@ -163,11 +185,16 @@
         {{#unless collapsed}}
         <div class="hudtra-entries" data-section="{{key}}">
           {{#each entries}}
-          <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}}" data-action="{{action}}"
+          <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}} {{#if exhausted}}spent{{/if}}" data-action="{{action}}"
                   data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{pool}}"
                   data-name="{{name}}"
                   data-tooltip-html="{{tooltipHtml}}">
             {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
+            {{!-- What this costs, as the shape its pool uses in the resource column.
+                 In the grid it is the only thing left saying so - there is no column
+                 header any more - and CSS hides it again in the grouped layout, where
+                 the header already says it. --}}
+            <i class="hudtra-cost" data-pool="{{pool}}"></i>
             {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
             {{!-- Same icon the config dialog marks a split entry with, meaning the
                  same thing: this item has buttons in more than one pool. --}}
@@ -184,6 +211,22 @@
     </section>
     {{/each}}
   </div>
+
+  {{!-- BG3 puts these next to End Turn, and so do we: how tall the hotbar is, is a
+       question about one person's screen. Only rendered where there is a grid to
+       resize, and only the button that has somewhere left to go. --}}
+  {{#if played}}
+  <div class="hudtra-rows">
+    <button type="button" data-action="rows" data-delta="1"
+            {{#unless canAddRow}}disabled{{/unless}} data-tooltip-text="{{addRowTooltip}}">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+    <button type="button" data-action="rows" data-delta="-1"
+            {{#unless canRemoveRow}}disabled{{/unless}} data-tooltip-text="{{removeRowTooltip}}">
+      <i class="fa-solid fa-minus"></i>
+    </button>
+  </div>
+  {{/if}}
 
   {{#if editable}}
   <div class="hudtra-controls">

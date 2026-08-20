@@ -333,12 +333,17 @@
   /* ---- action economy pools ---- */
   #hud-to-rule-them-all .hudtra-economy {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.45em;
+    align-items: stretch;
+    gap: 0.55em;
     flex: 0 0 auto;
     padding-inline: 0.6em;
     border-inline: 1px solid rgb(200 163 82 / 0.25);
+  }
+  #hud-to-rule-them-all .hudtra-pools {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.45em;
   }
   #hud-to-rule-them-all .hudtra-pool {
     position: relative;
@@ -546,25 +551,63 @@
     color: var(--hudtra-gold-bright);
   }
 
-  /* ---- spell strip (see hud.mjs spellBarFor) ----
-     Its own row above the bar: slots left per level, and a filter down to one level.
-     Full width and always in the same place, so it never moves the slots below it. */
-  #hud-to-rule-them-all .hudtra-spells {
+  /* ---- category tabs above the grid (played creatures only) ----
+     BG3's row of category buttons. They sit ON the frame's top edge, which is what
+     makes them read as tabs of the bar rather than as a second toolbar floating
+     above it - the mistake the old spell strip made. */
+  #hud-to-rule-them-all .hudtra-tabs {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     flex-wrap: wrap;
     gap: 0.3em;
-    padding-bottom: 0.4em;
+    padding-bottom: 0.35em;
     border-bottom: 1px solid rgb(200 163 82 / 0.25);
   }
-  #hud-to-rule-them-all .hudtra-spells-mark {
-    margin-inline: 0.15em 0.3em;
-    color: var(--hudtra-gold);
-    font-size: 0.85em;
-  }
-  #hud-to-rule-them-all .hudtra-level {
+  #hud-to-rule-them-all .hudtra-tab {
     display: inline-flex;
     align-items: center;
+    gap: 0.4em;
+    padding: 0.2em 0.6em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-bottom: none;
+    border-radius: 0.35em 0.35em 0 0;
+    background: rgb(0 0 0 / 0.35);
+    color: var(--hudtra-text-dim);
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  #hud-to-rule-them-all .hudtra-tab:hover { color: var(--hudtra-text); border-color: var(--hudtra-gold); }
+  #hud-to-rule-them-all .hudtra-tab.on {
+    color: var(--hudtra-gold-bright);
+    border-color: var(--hudtra-gold);
+    background: linear-gradient(180deg, rgb(236 209 147 / 0.18), transparent);
+  }
+  #hud-to-rule-them-all .hudtra-tab-n {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
+  }
+
+  /* ---- spell slots, beside the pools in the resource cluster ----
+     BESIDE, not under: stacked, nine rows of resources are taller than the hotbar
+     itself and the whole bar grows to match. Two short stacks stay as tall as the
+     slots next to them. */
+  #hud-to-rule-them-all .hudtra-spellslots {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15em;
+    padding-left: 0.55em;
+    border-left: 1px solid rgb(200 163 82 / 0.25);
+  }
+  #hud-to-rule-them-all .hudtra-spellslots .hudtra-level {
+    padding: 0.05em 0.35em;
+    font-size: 0.78em;
+  }
+  #hud-to-rule-them-all .hudtra-level {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
     gap: 0.35em;
     padding: 0.15em 0.45em;
     border: 1px solid var(--hudtra-gold-dark);
@@ -657,6 +700,35 @@
     gap: 0.3em;
   }
 
+  /* ---- the played-creature grid (BG3) ----
+     One headerless field of slots, `--hudtra-rows` tall (the +/- buttons write it).
+     THE EMPTY SLOTS ARE PAINTED, NOT RENDERED: a tiled SVG frame behind the grid,
+     one tile per slot pitch. That is what makes the field a full rectangle at every
+     width and every scale without anybody measuring how many columns fit - and it
+     costs no DOM, which matters on a bar that already builds a tooltip per slot. */
+  #hud-to-rule-them-all .hudtra-groups.hudtra-grid { gap: 0; }
+  /* The field has to REACH the far edge, or the painted empty slots stop where the
+     filled ones do and the bar looks half-drawn. Every wrapper between the flex row
+     and the grid has to hand the width through. */
+  #hud-to-rule-them-all .hudtra-grid .hudtra-group {
+    min-height: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #hud-to-rule-them-all .hudtra-grid .hudtra-sections { width: 100%; }
+  #hud-to-rule-them-all .hudtra-grid .hudtra-entries {
+    width: 100%;
+    justify-content: start;
+    grid-template-rows: repeat(var(--hudtra-rows, 2), var(--hudtra-slot));
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect x='1' y='1' width='90.3' height='90.3' rx='10' fill='rgb(0,0,0,0.22)' stroke='rgb(200,163,82,0.22)' stroke-width='2' stroke-dasharray='7 5'/%3E%3C/svg%3E");
+    background-size: calc(var(--hudtra-slot) + 0.3em) calc(var(--hudtra-slot) + 0.3em);
+    background-repeat: repeat;
+    /* The painted field is exactly as tall as the rows, so a half-drawn row can never
+       appear under the last one. */
+    background-clip: content-box;
+    height: calc(var(--hudtra-rows, 2) * var(--hudtra-slot) + (var(--hudtra-rows, 2) - 1) * 0.3em);
+  }
+
   #hud-to-rule-them-all .hudtra-slot {
     position: relative;
     width: var(--hudtra-slot);
@@ -696,6 +768,68 @@
     border-style: dashed;
     opacity: 0.85;
   }
+
+  /* Cost marker: the same shape and colour the pool wears in the resource column, so
+     "green circle" means the same thing in both places. Only in the grid - in the
+     grouped layout the column header already says it, and a marker on every slot
+     would just be noise. */
+  #hud-to-rule-them-all .hudtra-cost { display: none; }
+  #hud-to-rule-them-all .hudtra-grid .hudtra-cost {
+    display: block;
+    position: absolute;
+    left: 0.18em;
+    top: 0.18em;
+    width: 0.62em;
+    height: 0.62em;
+    background: var(--hudtra-pool-c, var(--hudtra-gold));
+    box-shadow: 0 0 0.2em #000, 0 0 0.35em color-mix(in oklab, var(--hudtra-pool-c, var(--hudtra-gold)) 60%, transparent);
+  }
+  #hud-to-rule-them-all .hudtra-cost[data-pool="action"] {
+    --hudtra-pool-c: var(--hudtra-pool-action);
+    border-radius: 50%;
+  }
+  #hud-to-rule-them-all .hudtra-cost[data-pool="bonus"] {
+    --hudtra-pool-c: var(--hudtra-pool-bonus);
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  #hud-to-rule-them-all .hudtra-cost[data-pool="reaction"] {
+    --hudtra-pool-c: var(--hudtra-pool-reaction);
+    transform: rotate(45deg) scale(0.85);
+    border-radius: 0.1em;
+  }
+  #hud-to-rule-them-all .hudtra-cost[data-pool="legendary"] {
+    --hudtra-pool-c: var(--hudtra-pool-legendary);
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  }
+  /* "other" and "passive" have no cost to state. */
+  #hud-to-rule-them-all .hudtra-cost[data-pool="other"],
+  #hud-to-rule-them-all .hudtra-cost[data-pool="passive"] { display: none; }
+
+  /* The pool this slot draws from is used up. In the grouped bar the whole column goes
+     dark; in the grid there is no column, so the slot carries it. */
+  #hud-to-rule-them-all .hudtra-grid .hudtra-slot.spent {
+    filter: grayscale(0.75) brightness(0.55);
+  }
+
+  /* Rows control, BG3's +/- beside End Turn. */
+  #hud-to-rule-them-all .hudtra-rows {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25em;
+    flex: 0 0 auto;
+  }
+  #hud-to-rule-them-all .hudtra-rows button {
+    width: 1.6em;
+    height: 1.6em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 0.3em;
+    background: rgb(0 0 0 / 0.35);
+    color: var(--hudtra-gold);
+    font-size: 0.85em;
+  }
+  #hud-to-rule-them-all .hudtra-rows button:hover:not(:disabled) { border-color: var(--hudtra-gold-bright); }
+  #hud-to-rule-them-all .hudtra-rows button:disabled { opacity: 0.35; cursor: default; }
 
   /* Locked mid-Extra-Attack: only attack activities stay live, everything else
      gets the padlock treatment. */
