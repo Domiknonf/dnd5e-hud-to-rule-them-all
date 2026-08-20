@@ -49,6 +49,43 @@ export function registerSettings() {
   reg("hideUnprepared",     { ...WORLD, type: Boolean, default: true });
 
   /* --- Per-user presentation -------------------------------- */
+  /**
+   * Typography is taste, and taste is not something a module gets to settle for
+   * somebody else's table. Three stacks rather than a free-text font name: a
+   * mistyped family is a silent downgrade nobody can see the cause of.
+   */
+  reg("font", {
+    ...CLIENT, type: String, default: "fantasy",
+    choices: {
+      fantasy: `${MODULE_ID}.settings.font.fantasy`,
+      clean:   `${MODULE_ID}.settings.font.clean`,
+      system:  `${MODULE_ID}.settings.font.system`
+    }
+  });
+  /**
+   * How many rows of slots a pool stacks into. A trade, not a preference with a
+   * right answer: every extra row makes the bar one slot taller and roughly a
+   * third narrower, and which of the two is scarce depends on the screen and on
+   * whether the table plays casters or a pack of goblins.
+   */
+  reg("slotRows",           { ...CLIENT, type: Number, default: 3, range: { min: 1, max: 4, step: 1 } });
+  reg("groupByCategory",    { ...CLIENT, type: Boolean, default: true });
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
   reg("scale",              { ...CLIENT, type: Number, default: 1, range: { min: 0.6, max: 1.6, step: 0.05 } });
+
+  /**
+   * Which category rails the user has folded away, as "pool/section" keys. Hidden
+   * from the settings sheet on purpose: it is written by clicking a rail, and a
+   * list of opaque keys is not something anyone should edit by hand.
+   *
+   * An ARRAY, not a map of booleans. game.settings.set stores whatever it is given
+   * and un-collapsing has to REMOVE a key - with an object that means relying on
+   * replace-not-merge semantics, while an array simply cannot leave a stale `true`
+   * behind. Registered directly because the hidden setting has no name or hint to
+   * localize, and deliberately without `onChange: refreshHUD`: the handler toggles
+   * the class itself, and a whole-bar re-render to hide six icons is waste.
+   */
+  game.settings.register(MODULE_ID, "collapsedSections", {
+    scope: "client", config: false, type: Array, default: []
+  });
 }

@@ -1,0 +1,140 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>hudtra layout harness</title>
+<link rel="stylesheet" href="styles/hud.css">
+<style>
+  /* Harness only: stand in for the canvas and for FontAwesome. */
+  html,body{margin:0;height:100%;background:#22303a;font-family:system-ui,sans-serif;}
+  .fa-solid::before{content:"\25C6";font-style:normal;}
+  .hudtra-slot img{background:#5a4b33;}
+</style>
+</head><body>
+<section id="hud-to-rule-them-all" class="hudtra">
+<div class="hudtra-root">
+<div class="hudtra-frame" style="--hudtra-scale: 1; --hudtra-rows: 3">
+  <button type="button" class="hudtra-collapse"><i class="fa-solid"></i></button>
+  <div class="hudtra-main">
+
+  <div class="hudtra-char">
+    <div class="hudtra-portrait-ring" style="--hudtra-hp-pct: 72">
+      <button type="button" class="hudtra-portrait-btn"><img class="hudtra-portrait" src="" alt=""></button>
+      <span class="hudtra-hp-label">41/57</span>
+    </div>
+    <span class="hudtra-name">Elara</span>
+    <span class="hudtra-vitals"><span class="hudtra-ac"><i class="fa-solid"></i> 16</span><span class="hudtra-round">Round 3</span></span>
+  </div>
+
+  <div class="hudtra-economy">
+    <div class="hudtra-pool adjustable" data-pool="action" data-action="adjustPool"><i class="fa-solid"></i>
+      <div class="hudtra-pips"><span class="hudtra-pip"></span></div></div>
+    <div class="hudtra-pool adjustable" data-pool="bonus" data-action="adjustPool"><i class="fa-solid"></i>
+      <div class="hudtra-pips"><span class="hudtra-pip spent"></span></div></div>
+    <div class="hudtra-pool adjustable" data-pool="reaction" data-action="adjustPool"><i class="fa-solid"></i>
+      <div class="hudtra-pips"><span class="hudtra-pip"></span></div></div>
+  </div>
+
+  <div class="hudtra-groups">
+    <!-- ACTION: weapons + cantrips + 1st + 2nd + items + features -->
+    <section class="hudtra-group" data-group="action">
+      <h4><i class="fa-solid"></i> Action</h4>
+      <div class="hudtra-sections">
+        <div class="hudtra-section" data-section="weapon">
+          <button class="hudtra-section-head"><i class="hudtra-section-chev fa-solid"></i><span class="hudtra-section-name">Weapons</span><span class="hudtra-section-count">3</span></button>
+          <div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""><span class="hudtra-attacks"><i class="fa-solid"></i>2/2</span></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+        <div class="hudtra-section" data-section="spell:0">
+          <button class="hudtra-section-head"><i class="hudtra-section-chev fa-solid"></i><span class="hudtra-section-name">Cantrips</span><span class="hudtra-section-count">4</span></button>
+          <div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+        <div class="hudtra-section" data-section="spell:1">
+          <button class="hudtra-section-head"><i class="hudtra-section-chev fa-solid"></i><span class="hudtra-section-name">1st Level</span><span class="hudtra-section-count">5</span></button>
+          <div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""><span class="hudtra-uses">3/4</span></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+        <div class="hudtra-section collapsed" data-section="spell:2">
+          <button class="hudtra-section-head"><i class="hudtra-section-chev fa-solid"></i><span class="hudtra-section-name">2nd Level</span><span class="hudtra-section-count">6</span></button>
+          <div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+        <div class="hudtra-section" data-section="item">
+          <button class="hudtra-section-head"><i class="hudtra-section-chev fa-solid"></i><span class="hudtra-section-name">Items</span><span class="hudtra-section-count">2</span></button>
+          <div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""><span class="hudtra-uses">2/2</span></button>
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+        <div class="hudtra-section" data-section="feature">
+          <button class="hudtra-section-head"><i class="hudtra-section-chev fa-solid"></i><span class="hudtra-section-name">Features</span><span class="hudtra-section-count">2</span></button>
+          <div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""><i class="hudtra-split fa-solid"></i></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BONUS: one kind only -> no rail at all -->
+    <section class="hudtra-group" data-group="bonus">
+      <h4><i class="fa-solid"></i> Bonus Action</h4>
+      <div class="hudtra-sections">
+        <div class="hudtra-section" data-section="all"><div class="hudtra-section-head is-blank">&nbsp;</div><div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot locked"><img src=""><i class="hudtra-lock fa-solid"></i></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hudtra-group exhausted" data-group="reaction">
+      <h4><i class="fa-solid"></i> Reaction</h4>
+      <div class="hudtra-sections">
+        <div class="hudtra-section" data-section="all"><div class="hudtra-section-head is-blank">&nbsp;</div><div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hudtra-group" data-group="passive">
+      <h4><i class="fa-solid"></i> Passive</h4>
+      <div class="hudtra-sections">
+        <div class="hudtra-section" data-section="all"><div class="hudtra-section-head is-blank">&nbsp;</div><div class="hudtra-entries">
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+            <button class="hudtra-slot"><img src=""></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="hudtra-controls">
+    <div class="hudtra-controls-stack">
+      <button class="hudtra-config-btn has-notice"><i class="fa-solid"></i><i class="hudtra-config-mark fa-solid"></i></button>
+      <button class="hudtra-reset"><i class="fa-solid"></i></button>
+    </div>
+    <button class="hudtra-end-turn"><span class="hudtra-end-turn-label">End turn</span><i class="fa-solid"></i></button>
+  </div>
+
+  </div>
+</div>
+</div>
+</section>
+</body></html>

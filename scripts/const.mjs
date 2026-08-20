@@ -25,6 +25,43 @@ export const RESOURCES = {
 };
 
 /**
+ * Sub-sections WITHIN a pool group. The pool answers "what does this cost"; this
+ * answers "what kind of thing is it", and on a bar with forty buttons the second
+ * question is the one that actually finds anything.
+ *
+ * Value = display order, left to right. Spells subdivide by level and reserve the
+ * whole block between their order and the next one (see actions.sectionOf).
+ */
+export const ENTRY_CATEGORY_ORDER = {
+  weapon:  10,
+  spell:   20,
+  item:    30,
+  feature: 40
+};
+
+/**
+ * dnd5e `item.type` -> section. Deliberately the item type and nothing cleverer:
+ * it is the one classification the system itself maintains, it is already on every
+ * entry (`collectActions` carries `itemType`), and it never needs a name to match.
+ *
+ * Anything unlisted - feat, class, subclass, race, background, facility, and
+ * whatever a future system version adds - falls through to DEFAULT_CATEGORY, which
+ * is why this table can stay short instead of tracking dnd5e's type list.
+ */
+export const ITEM_TYPE_CATEGORY = {
+  weapon: "weapon",
+  spell: "spell",
+  consumable: "item",
+  equipment: "item",
+  tool: "item",
+  container: "item",
+  backpack: "item",
+  loot: "item"
+};
+
+export const DEFAULT_CATEGORY = "feature";
+
+/**
  * dnd5e activation type -> our bucket.
  * VERIFY AT RUNTIME: `Object.keys(CONFIG.DND5E.activityActivationTypes)` in the console.
  * Anything not listed here and not purely time-based lands in "other" (see actions.mjs).

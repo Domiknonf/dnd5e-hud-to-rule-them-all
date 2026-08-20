@@ -1,6 +1,7 @@
 import {
   MODULE_ID, RESOURCES, ACTIVATION_MAP, OUT_OF_COMBAT_ACTIVATIONS,
-  GENERIC_ACTIVITY_ICON, GENERIC_ACTIVITY_NAMES, ATTACK_SUBSTITUTE_NAMES, ACTION_GRANT_NAMES
+  GENERIC_ACTIVITY_ICON, GENERIC_ACTIVITY_NAMES, ATTACK_SUBSTITUTE_NAMES, ACTION_GRANT_NAMES,
+  ENTRY_CATEGORY_ORDER, ITEM_TYPE_CATEGORY, DEFAULT_CATEGORY
 } from "./const.mjs";
 import { entryConfig, entryKey } from "./config.mjs";
 
@@ -652,6 +653,78 @@ export function collectActions(actor) {
     });
   }
   return buckets;
+}
+
+/**
+ * Which section one entry belongs to, plus where that section sorts.
+ *
+ * Spells are the one category that subdivides, because "Spells" on a caster is not
+ * a section, it is the whole bar - a level 9 character's Action pool is thirty
+ * spells and four other things. Level is the division the player already thinks in
+ * (it is how the sheet, the spellbook and the slot tracker are all organised), so
+ * it is the one used here. Nothing else subdivides: five weapons are five weapons.
+ *
+ * `order` multiplies the category order so a spell level can never sort past the
+ * next category - Cantrips through 9th all live inside the block the spell category
+ * reserved.
+ */
+function sectionOf(entry) {
+  const category = ITEM_TYPE_CATEGORY[entry.itemType] ?? DEFAULT_CATEGORY;
+  const base = (ENTRY_CATEGORY_ORDER[category] ?? ENTRY_CATEGORY_ORDER[DEFAULT_CATEGORY]) * 100;
+  if (category !== "spell") return { id: category, category, level: null, order: base };
+  const level = entry.level ?? 0;
+  return { id: `spell:${level}`, category, level, order: base + level };
+}
+
+/**
+ * dnd5e already localizes the spell level names ("Cantrip", "1st Level", ...) and
+ * they are what the character sheet says, so they are used verbatim rather than
+ * translated a second time here. Only the plural cantrip heading is ours - the
+ * system's label is singular, and every other heading on this bar is a plural.
+ */
+function sectionLabel({ category, level }) {
+  if (category !== "spell") return game.i18n.localize(`${MODULE_ID}.category.${category}`);
+  if (!level) return game.i18n.localize(`${MODULE_ID}.category.cantrip`);
+  const label = CONFIG.DND5E?.spellLevels?.[level];
+  return label
+    ? game.i18n.localize(label)
+    : game.i18n.format(`${MODULE_ID}.category.spellLevel`, { level });
+}
+
+/**
+ * One pool's entries, split into ordered sections. Called with what collectActions
+ * already sorted, and Array#sort is stable there - so partitioning here keeps every
+ * per-entry `sort` rule and the A-Z setting intact WITHIN a section. That is the
+ * whole contract: sections decide the blocks, the existing rules decide the order
+ * inside one.
+ *
+ * Two cases return a single section with no label, and both matter:
+ * - the setting is off, which has to leave the old flat grid exactly as it was;
+ * - the pool only ever produced one section anyway, where a rail reading "Weapons"
+ *   under a heading reading "Action" is chrome that says nothing. An NPC with four
+ *   attacks and nothing else therefore keeps precisely the bar it had.
+ */
+export function sectionsFor(entries) {
+  if (!entries.length) return [];
+  const plain = [{ id: "all", entries }];
+  if (!game.settings.get(MODULE_ID, "groupByCategory")) return plain;
+
+  const grouped = new Map();
+  for (const entry of entries) {
+    const info = sectionOf(entry);
+    if (!grouped.has(info.id)) grouped.set(info.id, { ...info, entries: [] });
+    grouped.get(info.id).entries.push(entry);
+  }
+  if (grouped.size < 2) return plain;
+
+  return [...grouped.values()]
+    .sort((a, b) => a.order - b.order)
+    .map(section => ({
+      id: section.id,
+      label: sectionLabel(section),
+      count: section.entries.length,
+      entries: section.entries
+    }));
 }
 
 /**

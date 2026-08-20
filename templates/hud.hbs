@@ -9,7 +9,7 @@
 {{!-- --hudtra-scale drives the whole bar's em-based sizing (per-user "HUD scale"
      setting); --hudtra-hp-pct feeds the portrait's conic-gradient HP ring. Both are
      presentation-only context fields. --}}
-<div class="hudtra-frame" style="--hudtra-scale: {{scale}}">
+<div class="hudtra-frame" style="--hudtra-scale: {{scale}}; --hudtra-rows: {{rows}}">
 
   {{!-- One collapse handle, rendered at the top edge of whatever is currently the
        topmost element: the description panel if open, the bar itself otherwise.
@@ -78,20 +78,45 @@
     {{#each groups}}
     <section class="hudtra-group {{#if exhausted}}exhausted{{/if}}" data-group="{{key}}">
       <h4><i class="{{icon}}"></i> {{label}}</h4>
-      <div class="hudtra-entries">
-        {{#each entries}}
-        <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}}" data-action="{{action}}"
-                data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{../key}}"
-                data-name="{{name}}"
-                data-tooltip-html="{{tooltipHtml}}">
-          {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
-          {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
-          {{!-- Same icon the config dialog marks a split entry with, meaning the
-               same thing: this item has buttons in more than one pool. --}}
-          {{#if split}}<i class="hudtra-split fa-solid fa-link-slash"></i>{{/if}}
-          {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
-          {{#if attacksBadge}}<span class="hudtra-attacks"><i class="fa-solid fa-hand-fist"></i>{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
-        </button>
+      <div class="hudtra-sections">
+        {{!-- Weapons / Cantrips / 1st Level / ... / Items / Features. A section
+             without a label is the undivided pool (see actions.sectionsFor) and
+             draws no rail, so a creature with one kind of entry keeps a plain
+             grid instead of growing chrome that says nothing. --}}
+        {{#each sections}}
+        <div class="hudtra-section {{#if collapsed}}collapsed{{/if}}" data-section="{{id}}">
+          {{#if label}}
+          <button type="button" class="hudtra-section-head" data-action="toggleSection"
+                  data-tooltip-text="{{toggleTooltip}}">
+            <i class="hudtra-section-chev fa-solid fa-chevron-down"></i>
+            <span class="hudtra-section-name">{{label}}</span>
+            <span class="hudtra-section-count">{{count}}</span>
+          </button>
+          {{else}}
+          {{!-- The undivided pool still reserves the heading row. Without it the
+               slot grids of a creature with one kind of entry would sit a row
+               higher than everyone else's, and the bar would change height as you
+               click from a goblin to a wizard. The nbsp is what gives an empty
+               element the same line box the real heading has. --}}
+          <div class="hudtra-section-head is-blank" aria-hidden="true">&nbsp;</div>
+          {{/if}}
+          <div class="hudtra-entries">
+            {{#each entries}}
+            <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}}" data-action="{{action}}"
+                    data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{../../key}}"
+                    data-name="{{name}}"
+                    data-tooltip-html="{{tooltipHtml}}">
+              {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
+              {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
+              {{!-- Same icon the config dialog marks a split entry with, meaning the
+                   same thing: this item has buttons in more than one pool. --}}
+              {{#if split}}<i class="hudtra-split fa-solid fa-link-slash"></i>{{/if}}
+              {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
+              {{#if attacksBadge}}<span class="hudtra-attacks"><i class="fa-solid fa-hand-fist"></i>{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
+            </button>
+            {{/each}}
+          </div>
+        </div>
         {{/each}}
       </div>
     </section>
@@ -100,23 +125,30 @@
 
   {{#if editable}}
   <div class="hudtra-controls">
-    {{!-- The mark appears when detection suggests a different attack count than the
-         configured one (typically after a level-up) and is cleared from inside the
-         dialog. Hint only - nothing is rewritten behind the player's back. --}}
-    <button type="button" class="hudtra-config-btn {{#if configNotice}}has-notice{{/if}}"
-            data-action="config" data-tooltip-text="{{configTooltip}}">
-      <i class="fa-solid fa-gear"></i>
-      {{#if configNotice}}<i class="hudtra-config-mark fa-solid fa-exclamation"></i>{{/if}}
-    </button>
-    {{#if inCombat}}
-    <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
-      <i class="fa-solid fa-rotate-left"></i>
-    </button>
+    <div class="hudtra-controls-stack">
+      {{!-- The mark appears when detection suggests a different attack count than the
+           configured one (typically after a level-up) and is cleared from inside the
+           dialog. Hint only - nothing is rewritten behind the player's back. --}}
+      <button type="button" class="hudtra-config-btn {{#if configNotice}}has-notice{{/if}}"
+              data-action="config" data-tooltip-text="{{configTooltip}}">
+        <i class="fa-solid fa-gear"></i>
+        {{#if configNotice}}<i class="hudtra-config-mark fa-solid fa-exclamation"></i>{{/if}}
+      </button>
+      {{#if inCombat}}
+      <button type="button" class="hudtra-reset" data-action="reset" data-tooltip="dnd5e-hud-to-rule-them-all.resetTurn">
+        <i class="fa-solid fa-rotate-left"></i>
+      </button>
+      {{/if}}
+    </div>
+    {{!-- BG3 puts one big disc at the right end of the bar and nothing else, which
+         is the point: on your turn there is exactly one thing you are looking for.
+         It keeps the icon under the label so the control still reads at small
+         --hudtra-scale, where the word alone would be unreadable. --}}
     {{#if isMyTurn}}
     <button type="button" class="hudtra-end-turn" data-action="endTurn" data-tooltip="dnd5e-hud-to-rule-them-all.endTurn">
+      <span class="hudtra-end-turn-label">{{localize "dnd5e-hud-to-rule-them-all.endTurn"}}</span>
       <i class="fa-solid fa-forward-step"></i>
     </button>
-    {{/if}}
     {{/if}}
   </div>
   {{/if}}

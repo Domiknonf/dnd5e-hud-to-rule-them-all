@@ -4,7 +4,7 @@ import {
   multiattackOptions, attacksRemaining, attackCapacity, poolMax,
   blockedPools, blockingConditions, coupledOut, coupledPools
 } from "./economy.mjs";
-import { collectActions } from "./actions.mjs";
+import { collectActions, sectionsFor } from "./actions.mjs";
 import { openConfig, attackNotice, multiattackNotice } from "./config-app.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -56,6 +56,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       collapse: CombatHUD.#onCollapse,
       portrait: CombatHUD.#onPortrait,
       config: CombatHUD.#onConfig,
+      toggleSection: CombatHUD.#onToggleSection,
       adjustPool: CombatHUD.#onAdjustPool,
       reset: CombatHUD.#onReset,
       endTurn: CombatHUD.#onEndTurn
@@ -182,6 +183,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   _onRender(context, options) {
     super._onRender(context, options);
     this.element.classList.toggle("collapsed", this.#collapsed);
+    // On <body>, not on our own element: core's tooltip is rendered outside the
+    // application root, so a font choice set on the bar could never reach the
+    // hover card. One attribute above both is the only place that covers them.
+    document.body.dataset.hudtraFont = game.settings.get(MODULE_ID, "font");
   }
 
   /**
@@ -283,6 +288,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(combatant);
+    // Folded rails, as "pool/section" keys. Read once for the whole render rather
+    // than per section - it is a client setting, i.e. a JSON parse on every get.
+    const folded = new Set(game.settings.get(MODULE_ID, "collapsedSections") ?? []);
+    const foldHint = game.i18n.localize(`${MODULE_ID}.category.toggle`);
     const groups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -339,6 +348,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           enriched.tooltipHtml = tooltipFor(enriched, label);
           return enriched;
         });
+        // Weapons / Spells (by level) / Items / Features. A section with no label
+        // is the "nothing to divide here" case and draws no rail - see sectionsFor.
+        const sections = sectionsFor(entries).map(section => ({
+          ...section,
+          collapsed: !!section.label && folded.has(`${key}/${section.id}`),
+          toggleTooltip: section.label ? `${section.label} (${section.count}) — ${foldHint}` : ""
+        }));
         return {
           key,
           icon: def.icon,
@@ -348,10 +364,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
           // mid-Multiattack ends it, it does not let the rest through for free.
           exhausted: blocked.has(key) || coupledOut(combatant, key)
             || (def.perTurn && !hasFreeAttack && remaining(combatant, key) <= 0),
-          entries
+          sections
         };
       })
-      .filter(g => g.entries.length);
+      .filter(g => g.sections.length);
 
     const hp = actor?.system?.attributes?.hp ?? null;
     const isDying = !!hp && hp.value <= 0;
@@ -382,6 +398,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       // and draws the portrait's HP ring from --hudtra-hp-pct.
       hpPct: hp?.max > 0 ? Math.round(100 * Math.clamp(hp.value, 0, hp.max) / hp.max) : 0,
       scale: game.settings.get(MODULE_ID, "scale") ?? 1,
+      // Clamped here rather than trusted: this lands inside a CSS repeat(), where
+      // a 0 or a stray string invalidates the whole grid-template-rows declaration
+      // and every pool falls into a single column.
+      rows: Math.clamp(Math.round(game.settings.get(MODULE_ID, "slotRows") ?? 3), 1, 4),
       isDying,
       portraitTooltip: game.i18n.localize(`${MODULE_ID}.${rollsDeathSave ? "deathSave" : "openSheet"}`),
       ac: actor?.system?.attributes?.ac?.value ?? null,
@@ -468,6 +488,30 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onConfig() {
     return openConfig(this.subjectActor);
+  }
+
+  /**
+   * Fold one category rail away, or bring it back.
+   *
+   * Deliberately NOT a re-render: the class is toggled on the section already in
+   * the DOM, so folding is instant instead of rebuilding every slot and every
+   * tooltip in the bar to hide six icons. Same two-part state the whole bar's
+   * collapse handle uses - the setting write is the durable half, and the template
+   * reads it back on the next render, so a click that races one loses nothing.
+   *
+   * Keyed by pool AND section: "Cantrips" under Action and "Cantrips" under Bonus
+   * Action are two different rails, and folding a caster's action list should not
+   * take their Bonus Action list with it.
+   */
+  static async #onToggleSection(event, target) {
+    const section = target.closest(".hudtra-section");
+    const pool = target.closest("[data-group]")?.dataset.group;
+    if (!section?.dataset.section || !pool) return;
+    const collapsed = section.classList.toggle("collapsed");
+    const state = new Set(game.settings.get(MODULE_ID, "collapsedSections") ?? []);
+    const key = `${pool}/${section.dataset.section}`;
+    if (collapsed) state.add(key); else state.delete(key);
+    return game.settings.set(MODULE_ID, "collapsedSections", [...state]);
   }
 
   /**

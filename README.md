@@ -32,9 +32,15 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
 - **Three enforcement levels.** Track silently, warn, or block the usage outright.
 - **Extra Attack.** Several attacks share one action instead of each burning their own.
   The Dragonborn's Breath Weapon counts as one of those attacks, per the 2024 rules.
-- **BG3-style bar.** Bottom-anchored hotbar with square icon slots, a portrait HP ring and
-  per-pool markers. Collapses out of view when you need the screen. Foundry's own macro
-  hotbar hides itself while it is up.
+- **BG3-style bar.** Bottom-anchored hotbar with square icon slots, a portrait HP ring,
+  per-pool markers and one large End Turn disc at the right end. Collapses out of view when
+  you need the screen. Foundry's own macro hotbar hides itself while it is up.
+- **Sorted by kind, foldable.** Each pool splits into Weapons, Spells (Cantrips, 1st Level,
+  2nd Level, …), Items and Features, separated by a crimson divider. Click a heading to
+  fold that group away — a full caster's Action pool stops being one wall of thirty icons.
+  Pools with only one kind of entry keep a plain grid and grow no headings.
+- **Three type settings.** The bar's display face is a per-user choice: Foundry's own
+  Modesto, a condensed sans, or your system font.
 - **Descriptions in place.** Middle-click any slot to expand dnd5e's own item card above
   the bar, without opening a sheet or a window.
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
@@ -71,7 +77,8 @@ Settings live under *Configure Settings → Module Settings*.
 
 **Content filters** — hide unequipped gear, hide unprepared spells.
 
-**Presentation** (per user) — HUD scale, sort order, visibility on other creatures' turns.
+**Presentation** (per user) — HUD scale, sort order, grouping by kind, visibility on other
+creatures' turns.
 
 ### Per character — the gear on the bar
 

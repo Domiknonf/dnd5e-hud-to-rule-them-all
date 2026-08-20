@@ -2,30 +2,79 @@
    specificity fights without resorting to !important. */
 @layer modules {
 
-  /* DELIBERATE DEPARTURE from this module's usual "respect Foundry's theme"
-     convention: the BG3-style bar commits to one fixed dark leather-and-gold look,
+  /* ================================================================
+     THE BAR
+     ================================================================
+     DELIBERATE DEPARTURE from this module's usual "respect Foundry's theme"
+     convention: the bar commits to one fixed look modelled on Baldur's Gate 3 -
+     a near-black panel, aged bronze edges, parchment text, crimson dividers -
      so the palette below is hardcoded instead of derived from Foundry's theme
      variables. Structural values (font size, z-index) still come from core.
-     The palette is shared with :is(#tooltip, .locked-tooltip).hudtra-tooltip - core's tooltip element
-     lives outside our application root, so it can't inherit these. */
+
+     Everything downstream is expressed in these tokens and in `em`, which is
+     what lets --hudtra-scale resize the entire bar from one declaration and
+     what makes a palette change a one-line edit rather than a search.
+
+     The palette is shared with :is(#tooltip, .locked-tooltip).hudtra-tooltip -
+     core's tooltip element lives outside our application root, so it cannot
+     inherit these. */
   #hud-to-rule-them-all,
   :is(#tooltip, .locked-tooltip).hudtra-tooltip {
-    --hudtra-gold: #c8a352;
-    --hudtra-gold-bright: #ecd193;
-    --hudtra-gold-dark: #6e5626;
-    --hudtra-leather-hi: #342b23;
-    --hudtra-leather-lo: #151009;
-    --hudtra-text: #e8ddc4;
-    --hudtra-text-dim: #a89877;
-    --hudtra-spent: #45403a;
-    --hudtra-danger: #c0392b;
-    --hudtra-hp: #57a64a;
-    --hudtra-pool-action: #57a64a;
-    --hudtra-pool-bonus: #e0862b;
-    --hudtra-pool-reaction: #a75ce0;
-    --hudtra-pool-legendary: #d8ab2d;
-    --hudtra-slot: 3.1em;
-    --hudtra-anim: 120ms; /* zeroed under prefers-reduced-motion */
+    /* --- surfaces: warm near-black, not brown leather --- */
+    --hudtra-void:      #060505;
+    --hudtra-panel-hi:  #262019;
+    --hudtra-panel-mid: #16120f;
+    --hudtra-panel-lo:  #0a0807;
+    --hudtra-well:      #131010;   /* recessed areas: slot beds, tooltip body */
+
+    /* --- metal: bronze does the structure, gold does the emphasis --- */
+    --hudtra-bronze:    #6d5730;
+    --hudtra-bronze-hi: #a8874a;
+    --hudtra-gold:      #d9bd80;
+    --hudtra-gold-hi:   #f6e9c6;
+
+    /* --- ink --- */
+    --hudtra-text:      #ddd2bb;
+    --hudtra-text-dim:  #8f8471;
+
+    /* --- accents --- */
+    --hudtra-crimson:    #8c231a;
+    --hudtra-crimson-hi: #cf4234;
+    --hudtra-danger:     #b8352a;
+    --hudtra-hp:         #5f9e46;
+    --hudtra-spent:      #211d1a;
+
+    --hudtra-pool-action:    #5f9e46;
+    --hudtra-pool-bonus:     #d98026;
+    --hudtra-pool-reaction:  #9a5bd6;
+    --hudtra-pool-legendary: #d3a92c;
+
+    /* --- type ---
+       Two faces, both shipped by Foundry/dnd5e, both with a full fallback chain
+       because a missing family here is a silent downgrade rather than a break.
+       Display carries identity (character name, pool headings, End Turn); UI
+       carries everything that has to stay legible at 0.6em. These two lines are
+       the whole typography of the bar - the per-user "font" setting below does
+       nothing but re-point them. */
+    --hudtra-font-display: "Modesto Condensed", "Bruno Ace", "Cinzel", "Palatino Linotype", Georgia, serif;
+    --hudtra-font-ui: "Roboto Condensed", "Signika", "Segoe UI", system-ui, sans-serif;
+
+    --hudtra-slot: 3.15em;
+    --hudtra-anim: 130ms; /* zeroed under prefers-reduced-motion */
+  }
+
+  /* Per-user typography (settings "font"). Written onto <body> in hud.mjs
+     _onRender, which is the only element above BOTH the bar and core's tooltip -
+     the tooltip is rendered outside our application root and would otherwise keep
+     the default face while the bar changed. */
+  body[data-hudtra-font="clean"]
+    :is(#hud-to-rule-them-all, #tooltip.hudtra-tooltip, .locked-tooltip.hudtra-tooltip) {
+    --hudtra-font-display: "Roboto Condensed", "Signika", "Segoe UI", system-ui, sans-serif;
+  }
+  body[data-hudtra-font="system"]
+    :is(#hud-to-rule-them-all, #tooltip.hudtra-tooltip, .locked-tooltip.hudtra-tooltip) {
+    --hudtra-font-display: system-ui, "Segoe UI", sans-serif;
+    --hudtra-font-ui: system-ui, "Segoe UI", sans-serif;
   }
 
   #hud-to-rule-them-all {
@@ -55,37 +104,65 @@
   #hud-to-rule-them-all *::before,
   #hud-to-rule-them-all *::after { box-sizing: border-box; }
 
+  /* ---- the panel ----
+     Three things do the work and none of them is a texture: a vertical fall from
+     lit top edge to black bottom, a hairline of bronze along the very top that
+     fades out at both ends, and a second rule inset from the border. That pair of
+     rules is what reads as a made frame instead of a div with a border. */
   #hud-to-rule-them-all .hudtra-frame {
     pointer-events: all;
     position: relative;
     /* All sizing below is em-based so this one line scales the whole bar. */
     font-size: calc(var(--font-size-13, 13px) * var(--hudtra-scale, 1));
+    font-family: var(--hudtra-font-ui);
     color: var(--hudtra-text);
     display: flex;
     flex-direction: column;
     gap: 0.45em;
-    max-width: min(97vw, 120em);
-    padding: 0.45em 0.75em 0.4em;
-    border: 1px solid var(--hudtra-gold-dark);
+    max-width: min(97vw, 128em);
+    padding: 0.55em 1em 0.5em;
+    border: 1px solid var(--hudtra-bronze);
     border-bottom: none;
-    border-radius: 0.6em 0.6em 0 0;
+    border-radius: 0.5em 0.5em 0 0;
     background:
-      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.06), transparent 60%),
-      repeating-linear-gradient(115deg, rgb(255 255 255 / 0.015) 0 2px, transparent 2px 5px),
-      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+      radial-gradient(120% 140% at 50% 0%, rgb(255 255 255 / 0.05), transparent 55%),
+      linear-gradient(180deg, var(--hudtra-panel-hi) 0%, var(--hudtra-panel-mid) 42%, var(--hudtra-panel-lo) 100%);
     box-shadow:
-      inset 0 1px 0 rgb(236 209 147 / 0.25),
-      inset 0 0 2.5em rgb(0 0 0 / 0.55),
-      0 -0.2em 1em rgb(0 0 0 / 0.5);
-    /* Collapse slides the bar below the viewport; the tab (top: -1.3em) stays. */
+      inset 0 0 3em rgb(0 0 0 / 0.55),
+      0 -0.35em 1.6em rgb(0 0 0 / 0.7);
     transition: transform calc(var(--hudtra-anim) * 2.2) ease;
+  }
+  /* The lit top hairline. Fading at the ends keeps the panel from looking like a
+     rectangle someone drew a line on. */
+  #hud-to-rule-them-all .hudtra-frame::before {
+    content: "";
+    position: absolute;
+    left: 0.5em;
+    right: 0.5em;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent, var(--hudtra-bronze-hi) 12%, var(--hudtra-gold-hi) 50%,
+      var(--hudtra-bronze-hi) 88%, transparent);
+    opacity: 0.75;
+    pointer-events: none;
+  }
+  /* The second rule, inset from the border. */
+  #hud-to-rule-them-all .hudtra-frame::after {
+    content: "";
+    position: absolute;
+    inset: 0.28em 0.28em -1px;
+    border: 1px solid rgb(168 135 74 / 0.16);
+    border-bottom: none;
+    border-radius: 0.35em 0.35em 0 0;
+    pointer-events: none;
   }
   #hud-to-rule-them-all.collapsed .hudtra-frame { transform: translateY(100%); }
 
   #hud-to-rule-them-all .hudtra-main {
     display: flex;
     align-items: stretch;
-    gap: 0.7em;
+    gap: 0.9em;
   }
 
   /* ---- collapse tab, peeking above the top edge of its parent ----
@@ -93,18 +170,19 @@
      hud.hbs) - both are containing blocks, so one rule covers both cases. ---- */
   #hud-to-rule-them-all .hudtra-collapse {
     position: absolute;
-    top: -1.3em;
-    right: 1.2em;
-    height: 1.3em;
-    padding: 0 0.7em;
-    border: 1px solid var(--hudtra-gold-dark);
+    top: -1.25em;
+    right: 1.6em;
+    height: 1.25em;
+    padding: 0 0.85em;
+    border: 1px solid var(--hudtra-bronze);
     border-bottom: none;
-    border-radius: 0.4em 0.4em 0 0;
-    background: linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
-    color: var(--hudtra-gold);
-    font-size: 0.9em;
+    border-radius: 0.3em 0.3em 0 0;
+    background: linear-gradient(180deg, var(--hudtra-panel-hi), var(--hudtra-panel-lo));
+    color: var(--hudtra-bronze-hi);
+    font-size: 0.85em;
+    transition: color var(--hudtra-anim);
   }
-  #hud-to-rule-them-all .hudtra-collapse:hover { color: var(--hudtra-gold-bright); }
+  #hud-to-rule-them-all .hudtra-collapse:hover { color: var(--hudtra-gold-hi); }
   #hud-to-rule-them-all .hudtra-collapse i {
     transition: transform calc(var(--hudtra-anim) * 2.2) ease;
   }
@@ -124,16 +202,16 @@
     right: 0.8rem;
     bottom: 0;
     height: 1.5rem;
-    padding: 0 0.9rem;
-    border: 1px solid var(--hudtra-gold-dark);
+    padding: 0 1rem;
+    border: 1px solid var(--hudtra-bronze);
     border-bottom: none;
-    border-radius: 0.4rem 0.4rem 0 0;
-    background: linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
-    color: var(--hudtra-gold);
+    border-radius: 0.3rem 0.3rem 0 0;
+    background: linear-gradient(180deg, var(--hudtra-panel-hi), var(--hudtra-panel-lo));
+    color: var(--hudtra-bronze-hi);
     font-size: var(--font-size-13, 13px);
-    box-shadow: 0 -0.15rem 0.5rem rgb(0 0 0 / 0.5);
+    box-shadow: 0 -0.2rem 0.6rem rgb(0 0 0 / 0.6);
   }
-  #hud-to-rule-them-all.collapsed .hudtra-reopen:hover { color: var(--hudtra-gold-bright); }
+  #hud-to-rule-them-all.collapsed .hudtra-reopen:hover { color: var(--hudtra-gold-hi); }
 
   /* The frame's own tab would otherwise sit at the screen edge next to this one. */
   #hud-to-rule-them-all.collapsed .hudtra-collapse { visibility: hidden; }
@@ -148,18 +226,23 @@
     bottom: 100%;
     left: 0;
     right: 0;
-    margin-bottom: 0.4em;
-    padding: 0.5em 0.6em 0.4em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.45em;
-    /* Floats over the canvas now, so it carries the frame's own opaque panel
-       treatment rather than a translucent inner tint. */
+    margin-bottom: 0.45em;
+    padding: 0.6em 0.7em 0.5em;
+    border: 1px solid var(--hudtra-bronze);
+    border-radius: 0.4em;
     background:
-      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.05), transparent 60%),
-      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+      radial-gradient(120% 140% at 50% 0%, rgb(255 255 255 / 0.05), transparent 55%),
+      linear-gradient(180deg, var(--hudtra-panel-hi), var(--hudtra-panel-lo));
     box-shadow:
-      inset 0 1px 0 rgb(236 209 147 / 0.2),
-      0 -0.2em 0.8em rgb(0 0 0 / 0.5);
+      inset 0 1px 0 rgb(246 233 198 / 0.14),
+      0 -0.3em 1.2em rgb(0 0 0 / 0.6);
+    transition: transform calc(var(--hudtra-anim) * 2.2) ease;
+  }
+  /* Collapsing slides the frame down by its own height - which is not enough to
+     clear the out-of-flow panel sitting above it, so the panel gets a matching
+     slide of its own height on top of that. */
+  #hud-to-rule-them-all.collapsed .hudtra-desc-panel {
+    transform: translateY(calc(100% + 0.45em));
   }
   #hud-to-rule-them-all .hudtra-desc-content {
     display: flex;
@@ -167,7 +250,7 @@
     max-height: 30vh;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--hudtra-gold-dark) transparent;
+    scrollbar-color: var(--hudtra-bronze) transparent;
   }
   /* dnd5e's card is built for a narrow hover tooltip and stretches to whatever it
      is given, so it gets an explicit reading width here instead of spanning the
@@ -188,23 +271,13 @@
   #hud-to-rule-them-all .hudtra-desc-content :is(a, a.content-link, .content-link) {
     color: var(--hudtra-text);
     background: rgb(255 255 255 / 0.07);
-    border-color: rgb(200 163 82 / 0.35);
+    border-color: rgb(168 135 74 / 0.35);
     text-decoration-color: var(--hudtra-gold);
   }
   #hud-to-rule-them-all .hudtra-desc-content :is(a, a.content-link, .content-link):hover {
-    color: var(--hudtra-gold-bright);
+    color: var(--hudtra-gold-hi);
   }
   #hud-to-rule-them-all .hudtra-desc-content :is(a, .content-link) i { color: var(--hudtra-gold); }
-
-  /* Collapsing slides the frame down by its own height - which is not enough to
-     clear the out-of-flow panel sitting above it, so the panel gets a matching
-     slide of its own height on top of that. */
-  #hud-to-rule-them-all .hudtra-desc-panel {
-    transition: transform calc(var(--hudtra-anim) * 2.2) ease;
-  }
-  #hud-to-rule-them-all.collapsed .hudtra-desc-panel {
-    transform: translateY(calc(100% + 0.4em));
-  }
 
   /* Neutralize Foundry's default button chrome inside the bar once, then style
      each control explicitly. */
@@ -223,7 +296,7 @@
     box-shadow: none;
   }
   #hud-to-rule-them-all button:focus-visible {
-    outline: 2px solid var(--hudtra-gold-bright);
+    outline: 2px solid var(--hudtra-gold-hi);
     outline-offset: 1px;
   }
 
@@ -233,25 +306,30 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.35em;
+    gap: 0.3em;
     flex: 0 0 auto;
+    padding-right: 0.2em;
   }
+  /* Bezel, not a border: black hairline, bronze ring, black hairline. Three cheap
+     shadows read as turned metal where one 2px border reads as a stroke. */
   #hud-to-rule-them-all .hudtra-portrait-ring {
     position: relative;
-    width: 5.2em;
-    height: 5.2em;
-    padding: 0.28em;
+    width: 5.3em;
+    height: 5.3em;
+    padding: 0.26em;
     border-radius: 50%;
-    /* The ring doubles as the HP gauge: gold rim outside, HP arc inside it. */
+    /* The ring doubles as the HP gauge: bezel outside, HP arc inside it. */
     --hudtra-hp-color: color-mix(in oklab,
       var(--hudtra-hp) calc(var(--hudtra-hp-pct, 100) * 1%),
       var(--hudtra-danger));
     background:
       conic-gradient(var(--hudtra-hp-color) calc(var(--hudtra-hp-pct, 100) * 1%),
-                     rgb(0 0 0 / 0.55) 0);
+                     rgb(0 0 0 / 0.7) 0);
     box-shadow:
-      0 0 0 2px var(--hudtra-gold-dark),
-      0 0 0.6em rgb(0 0 0 / 0.6);
+      0 0 0 1px var(--hudtra-void),
+      0 0 0 3px var(--hudtra-bronze),
+      0 0 0 4px var(--hudtra-void),
+      0 0.15em 0.7em rgb(0 0 0 / 0.7);
   }
   #hud-to-rule-them-all .hudtra-portrait-btn {
     position: relative;
@@ -268,8 +346,9 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border: 1px solid rgb(0 0 0 / 0.7);
+    border: 1px solid rgb(0 0 0 / 0.8);
     border-radius: 50%;
+    transition: filter var(--hudtra-anim);
   }
   /* 0 HP: skull overlay on the portrait; clicking it rolls a death save for PCs. */
   #hud-to-rule-them-all .hudtra-skull {
@@ -278,104 +357,127 @@
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: rgb(0 0 0 / 0.6);
+    background: rgb(0 0 0 / 0.65);
     color: var(--hudtra-text);
     font-size: 1.9em;
     text-shadow: 0 0 6px #000;
   }
   #hud-to-rule-them-all .hudtra-portrait-ring.dying {
     box-shadow:
-      0 0 0 2px var(--hudtra-danger),
-      0 0 0.8em color-mix(in oklab, var(--hudtra-danger) 70%, transparent);
+      0 0 0 1px var(--hudtra-void),
+      0 0 0 3px var(--hudtra-danger),
+      0 0 0 4px var(--hudtra-void),
+      0 0 1em color-mix(in oklab, var(--hudtra-danger) 65%, transparent);
   }
   #hud-to-rule-them-all .hudtra-portrait-ring.dying .hudtra-skull:hover {
     color: var(--hudtra-danger);
   }
   #hud-to-rule-them-all .hudtra-hp-label {
     position: absolute;
-    bottom: -0.5em;
+    bottom: -0.45em;
     left: 50%;
     transform: translateX(-50%);
-    padding: 0.1em 0.5em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.7em;
-    background: var(--hudtra-leather-lo);
-    font-size: 0.78em;
+    padding: 0.12em 0.6em;
+    border: 1px solid var(--hudtra-bronze);
+    border-radius: 0.8em;
+    background: var(--hudtra-panel-lo);
+    font-size: 0.72em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
     white-space: nowrap;
+    box-shadow: 0 0.1em 0.3em rgb(0 0 0 / 0.7);
   }
+  /* Gradient-filled display type. The drop-shadow does the job text-shadow can't
+     once the fill is a clipped background. */
   #hud-to-rule-them-all .hudtra-name {
     max-width: 9em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-top: 0.3em;
+    margin-top: 0.45em;
+    font-family: var(--hudtra-font-display);
+    font-size: 1.05em;
     font-weight: 600;
-    font-variant: small-caps;
-    letter-spacing: 0.04em;
-    color: var(--hudtra-gold-bright);
-    text-shadow: 0 1px 2px #000;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    background: linear-gradient(180deg, var(--hudtra-gold-hi), var(--hudtra-bronze-hi));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.9));
   }
   #hud-to-rule-them-all .hudtra-vitals {
     display: flex;
-    gap: 0.7em;
-    font-size: 0.82em;
+    align-items: center;
+    gap: 0.6em;
+    font-size: 0.72em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--hudtra-text-dim);
   }
-  #hud-to-rule-them-all .hudtra-vitals i { color: var(--hudtra-gold); }
+  #hud-to-rule-them-all .hudtra-vitals i { color: var(--hudtra-bronze-hi); }
 
-  /* ---- action economy pools ---- */
+  /* ---- action economy pools ----
+     Recessed well rather than a pair of divider lines: the economy is the one
+     readout on the bar that is not a button, and sinking it says so. */
   #hud-to-rule-them-all .hudtra-economy {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.45em;
+    gap: 0.5em;
     flex: 0 0 auto;
-    padding-inline: 0.6em;
-    border-inline: 1px solid rgb(200 163 82 / 0.25);
+    /* Hugs its rows instead of stretching to the bar's height: three short rows
+       centred in a full-height box read as an empty container. */
+    align-self: center;
+    padding: 0.5em 0.7em;
+    border: 1px solid rgb(0 0 0 / 0.6);
+    border-radius: 0.35em;
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.35), rgb(0 0 0 / 0.15));
+    box-shadow:
+      inset 0 1px 2px rgb(0 0 0 / 0.8),
+      0 1px 0 rgb(168 135 74 / 0.12);
   }
   #hud-to-rule-them-all .hudtra-pool {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 0.45em;
+    gap: 0.5em;
   }
   #hud-to-rule-them-all .hudtra-pool > i {
-    width: 1.2em;
+    width: 1.1em;
     text-align: center;
-    font-size: 0.9em;
-    color: var(--hudtra-gold);
+    font-size: 0.85em;
+    color: var(--hudtra-pool-c, var(--hudtra-bronze-hi));
+    filter: drop-shadow(0 1px 1px #000);
   }
-  #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.3em; }
+  #hud-to-rule-them-all .hudtra-pips { display: flex; gap: 0.32em; }
 
-  /* The GM's manual correction handle. Only a cursor and a faint lift - the economy
-     row is a readout first, and it must not start looking like a row of buttons. */
+  /* The GM's manual correction handle. Only a cursor and a faint wash - the
+     economy row is a readout first, and it must not start looking like a row of
+     buttons. */
   #hud-to-rule-them-all .hudtra-pool.adjustable {
     cursor: pointer;
-    border-radius: 0.25em;
-    padding: 0.05em 0.2em;
-    margin: -0.05em -0.2em;
+    border-radius: 0.2em;
+    padding: 0.05em 0.25em;
+    margin: -0.05em -0.25em;
     transition: background var(--hudtra-anim);
   }
   #hud-to-rule-them-all .hudtra-pool.adjustable:hover {
-    background: rgb(236 209 147 / 0.12);
+    background: rgb(246 233 198 / 0.09);
   }
 
   /* Slow: this pool shares one budget with another. Small, dim and after the pips -
      it is a caveat on the pool, not a second resource. */
   #hud-to-rule-them-all .hudtra-coupled {
-    font-size: 0.62em;
-    color: var(--hudtra-gold-dark);
-    opacity: 0.9;
+    font-size: 0.6em;
+    color: var(--hudtra-bronze);
   }
 
   /* Barred by a condition (Stunned and its kin) rather than merely used up. The pips
      are already drawn spent; this says it was not the creature that spent them. */
-  #hud-to-rule-them-all .hudtra-pool.blocked > i {
-    color: var(--hudtra-text-dim, #8a8078);
-  }
-  #hud-to-rule-them-all .hudtra-pool.blocked .hudtra-pips {
-    opacity: 0.5;
-  }
+  #hud-to-rule-them-all .hudtra-pool.blocked > i { color: var(--hudtra-text-dim); }
+  #hud-to-rule-them-all .hudtra-pool.blocked .hudtra-pips { opacity: 0.5; }
   #hud-to-rule-them-all .hudtra-pool.blocked::after {
     content: "";
     position: absolute;
@@ -383,97 +485,239 @@
     right: -0.1em;
     top: 50%;
     height: 1px;
-    background: var(--hudtra-gold-dark);
+    background: var(--hudtra-bronze-hi);
     transform: rotate(-6deg);
     pointer-events: none;
   }
 
-  /* BG3-style pool markers: one shape + colour per pool, so a glance at the bar
-     reads the economy without counting icons. */
+  /* One shape AND one colour per pool, so a glance reads the economy without
+     counting icons or reading a label. Available pips are lit from within; a
+     spent one is the same shape as a dead socket. */
   #hud-to-rule-them-all .hudtra-pip {
-    width: 0.95em;
-    height: 0.95em;
+    width: 0.9em;
+    height: 0.9em;
     background: var(--hudtra-pool-c, var(--hudtra-gold));
-    filter: drop-shadow(0 0 3px color-mix(in oklab, var(--hudtra-pool-c, var(--hudtra-gold)) 55%, transparent));
+    filter:
+      drop-shadow(0 0 0.25em color-mix(in oklab, var(--hudtra-pool-c, var(--hudtra-gold)) 60%, transparent))
+      drop-shadow(0 1px 1px rgb(0 0 0 / 0.8));
   }
-  #hud-to-rule-them-all .hudtra-pool[data-pool="action"] {
-    --hudtra-pool-c: var(--hudtra-pool-action);
-  }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="action"]    { --hudtra-pool-c: var(--hudtra-pool-action); }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="bonus"]     { --hudtra-pool-c: var(--hudtra-pool-bonus); }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="reaction"]  { --hudtra-pool-c: var(--hudtra-pool-reaction); }
+  #hud-to-rule-them-all .hudtra-pool[data-pool="legendary"] { --hudtra-pool-c: var(--hudtra-pool-legendary); }
   #hud-to-rule-them-all .hudtra-pool[data-pool="action"] .hudtra-pip { border-radius: 50%; }
-  #hud-to-rule-them-all .hudtra-pool[data-pool="bonus"] {
-    --hudtra-pool-c: var(--hudtra-pool-bonus);
-  }
   #hud-to-rule-them-all .hudtra-pool[data-pool="bonus"] .hudtra-pip {
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
-  #hud-to-rule-them-all .hudtra-pool[data-pool="reaction"] {
-    --hudtra-pool-c: var(--hudtra-pool-reaction);
-  }
   #hud-to-rule-them-all .hudtra-pool[data-pool="reaction"] .hudtra-pip {
-    transform: rotate(45deg) scale(0.85);
-    border-radius: 0.12em;
-  }
-  #hud-to-rule-them-all .hudtra-pool[data-pool="legendary"] {
-    --hudtra-pool-c: var(--hudtra-pool-legendary);
+    transform: rotate(45deg) scale(0.86);
+    border-radius: 0.1em;
   }
   #hud-to-rule-them-all .hudtra-pool[data-pool="legendary"] .hudtra-pip {
     clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
   }
   #hud-to-rule-them-all .hudtra-pip.spent {
     background: var(--hudtra-spent);
-    filter: none;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.05));
   }
 
-  /* ---- action groups: BG3 hotbar slots, two rows filling column-first ---- */
+  /* ================================================================
+     ACTION GROUPS
+     ================================================================
+     Two nested divisions, and they are told apart by axis and by colour rather
+     than by two sets of headings shouting at each other:
+       POOL    - what a thing costs. Named in display type, tinted with the pool's
+                 own marker colour, so the heading and the pips agree.
+       SECTION - what a thing is (Weapons, Cantrips, 1st Level, Items, Features).
+                 Named in small UI caps and divided by the crimson bar BG3 hangs
+                 between the segments of its hotbar. */
   #hud-to-rule-them-all .hudtra-groups {
     display: flex;
     align-items: stretch;
-    gap: 0.8em;
+    gap: 1em;
     flex: 1 1 auto;
     min-width: 0;
     overflow-x: auto;
     /* Room for the hover lift/glow so it isn't clipped by the scroll container. */
-    padding: 0.35em 0.2em 0.25em;
+    padding: 0.1em 0.15em 0.3em;
     scrollbar-width: thin;
-    scrollbar-color: var(--hudtra-gold-dark) transparent;
+    scrollbar-color: var(--hudtra-bronze) transparent;
   }
+  /* flex: 0 0 auto everywhere below. .hudtra-groups is a scroll container by
+     design, and a shrinkable child defeats that: instead of scrolling, a bar that
+     is one column too wide squeezes every section until the headings ellipsize. */
+  #hud-to-rule-them-all .hudtra-group {
+    --hudtra-accent: var(--hudtra-bronze-hi);
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+  }
+  #hud-to-rule-them-all .hudtra-group[data-group="action"]    { --hudtra-accent: var(--hudtra-pool-action); }
+  #hud-to-rule-them-all .hudtra-group[data-group="bonus"]     { --hudtra-accent: var(--hudtra-pool-bonus); }
+  #hud-to-rule-them-all .hudtra-group[data-group="reaction"]  { --hudtra-accent: var(--hudtra-pool-reaction); }
+  #hud-to-rule-them-all .hudtra-group[data-group="legendary"] { --hudtra-accent: var(--hudtra-pool-legendary); }
+
   #hud-to-rule-them-all .hudtra-group + .hudtra-group {
-    border-left: 1px solid rgb(200 163 82 / 0.25);
-    padding-left: 0.8em;
+    border-left: 1px solid rgb(168 135 74 / 0.18);
+    padding-left: 1em;
   }
   #hud-to-rule-them-all .hudtra-group h4 {
-    margin: 0 0 0.3em;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    margin: 0;
     border: none;
-    font-size: 0.72em;
+    font-family: var(--hudtra-font-display);
+    font-size: 0.88em;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.14em;
     white-space: nowrap;
-    color: var(--hudtra-gold);
+    color: var(--hudtra-text);
     text-shadow: 0 1px 2px #000;
   }
+  #hud-to-rule-them-all .hudtra-group h4 i {
+    font-size: 0.8em;
+    color: var(--hudtra-accent);
+    filter: drop-shadow(0 0 0.35em color-mix(in oklab, var(--hudtra-accent) 55%, transparent));
+  }
   #hud-to-rule-them-all .hudtra-group.exhausted h4 { color: var(--hudtra-text-dim); }
+  #hud-to-rule-them-all .hudtra-group.exhausted h4 i { filter: none; opacity: 0.5; }
   /* Exhausted pool: the whole group's slots go dark and colourless. Distinct from
      .locked below, which brands individual slots with a padlock. */
   #hud-to-rule-them-all .hudtra-group.exhausted .hudtra-entries {
-    filter: grayscale(0.75) brightness(0.55);
+    filter: grayscale(0.8) brightness(0.5);
   }
+
+  /* Every section carries a heading row - a real one or the blank spacer from
+     hud.hbs - so headings land on one line and slot grids land on another, across
+     every section of every pool. That is also what keeps a FOLDED section's
+     heading up on the same line as the others instead of dropping to the floor
+     where its missing grid used to be. */
+  #hud-to-rule-them-all .hudtra-sections {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65em;
+  }
+  #hud-to-rule-them-all .hudtra-section {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+  }
+  /* The BG3 divider: a crimson bar that fades out top and bottom. Purely the
+     separator - the control is the heading, which says what it does in words. */
+  #hud-to-rule-them-all .hudtra-section + .hudtra-section {
+    padding-left: 0.65em;
+  }
+  #hud-to-rule-them-all .hudtra-section + .hudtra-section::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.1em;
+    bottom: 0.1em;
+    width: 2px;
+    border-radius: 1px;
+    background: linear-gradient(180deg,
+      transparent, var(--hudtra-crimson) 18%, var(--hudtra-crimson-hi) 50%,
+      var(--hudtra-crimson) 82%, transparent);
+    box-shadow: 0 0 0.5em rgb(207 66 52 / 0.35);
+    pointer-events: none;
+  }
+
+  /* No width of its own: the heading stretches to whatever the slot grid below it
+     is, and where the label is the wider of the two it widens the section instead
+     of ellipsizing. The ellipsis on .hudtra-section-name is the safety net for a
+     homebrew label nobody expected, not the normal case. */
+  #hud-to-rule-them-all .hudtra-section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.25em 0.45em;
+    /* Explicitly, not inherited: the button reset above sets line-height on
+       buttons only, and the blank spacer is a div - without this the two heading
+       variants differ by a pixel or three and the slot grids stop lining up. */
+    line-height: 1;
+    border: 1px solid rgb(168 135 74 / 0.18);
+    border-radius: 0.2em;
+    background: linear-gradient(180deg, rgb(246 233 198 / 0.07), rgb(246 233 198 / 0.015));
+    color: var(--hudtra-text-dim);
+    font-size: 0.62em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+    transition: color var(--hudtra-anim), border-color var(--hudtra-anim);
+  }
+  #hud-to-rule-them-all .hudtra-section-head:hover {
+    color: var(--hudtra-gold-hi);
+    border-color: rgb(168 135 74 / 0.5);
+  }
+  /* The undivided pool's spacer (hud.hbs): holds the row open, shows nothing. */
+  #hud-to-rule-them-all .hudtra-section-head.is-blank {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #hud-to-rule-them-all .hudtra-section-chev {
+    font-size: 0.85em;
+    color: var(--hudtra-bronze-hi);
+    transition: transform calc(var(--hudtra-anim) * 1.6) ease;
+  }
+  #hud-to-rule-them-all .hudtra-section-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #hud-to-rule-them-all .hudtra-section-count {
+    margin-left: auto;
+    padding-left: 0.5em;
+    color: var(--hudtra-gold);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+  /* Folded: the slots go, the heading stays and turns into the handle that brings
+     them back. The chevron is the only thing that has to change to say so. */
+  #hud-to-rule-them-all .hudtra-section.collapsed .hudtra-entries { display: none; }
+  #hud-to-rule-them-all .hudtra-section.collapsed .hudtra-section-chev {
+    transform: rotate(-90deg);
+  }
+  #hud-to-rule-them-all .hudtra-section.collapsed .hudtra-section-head {
+    color: var(--hudtra-text);
+    border-color: rgb(168 135 74 / 0.35);
+    background: linear-gradient(180deg, rgb(140 35 26 / 0.35), rgb(140 35 26 / 0.12));
+  }
+
+  /* Row count is the per-user "slotRows" setting, handed down as a variable on the
+     frame. It is a trade rather than a preference: each row makes the bar one slot
+     taller and roughly a third narrower, and horizontal is what runs out first on
+     a caster. The fallback in var() is what the bar draws if the variable never
+     arrives - never let this resolve to nothing, an invalid repeat() takes the
+     whole declaration with it and the grid collapses into one column. */
   #hud-to-rule-them-all .hudtra-entries {
     display: grid;
     grid-auto-flow: column;
-    grid-template-rows: repeat(2, var(--hudtra-slot));
+    grid-template-rows: repeat(var(--hudtra-rows, 3), var(--hudtra-slot));
     gap: 0.3em;
   }
 
+  /* ---- the slot ----
+     A framed tile, not a bare picture: 2px of bed showing around the art is what
+     separates one icon from the next without a hard border between them, and it
+     is what BG3's hotbar does. */
   #hud-to-rule-them-all .hudtra-slot {
     position: relative;
+    display: grid;
+    place-items: center;
     width: var(--hudtra-slot);
     height: var(--hudtra-slot);
-    overflow: hidden;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.35em;
-    background: radial-gradient(circle at 30% 25%, #3a322b, #1b1613);
-    box-shadow: inset 0 0 0.5em rgb(0 0 0 / 0.8);
+    padding: 2px;
+    border: 1px solid #3a2f22;
+    border-radius: 0.2em;
+    background: linear-gradient(180deg, #2b2520, #111 90%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.07),
+      0 1px 2px rgb(0 0 0 / 0.7);
     transition:
       transform var(--hudtra-anim),
       border-color var(--hudtra-anim),
@@ -484,45 +728,49 @@
     height: 100%;
     object-fit: cover;
     border: none;
+    border-radius: 0.12em;
+    background: var(--hudtra-well);
+    transition: filter var(--hudtra-anim);
   }
   #hud-to-rule-them-all .hudtra-slot > i {
-    font-size: 1.35em;
+    font-size: 1.3em;
     color: var(--hudtra-text);
     text-shadow: 0 1px 2px #000;
   }
   #hud-to-rule-them-all .hudtra-slot:hover {
-    transform: translateY(-0.12em);
-    border-color: var(--hudtra-gold-bright);
+    transform: translateY(-0.15em);
+    border-color: var(--hudtra-gold);
     box-shadow:
-      0 0 0.6em rgb(236 209 147 / 0.45),
-      inset 0 0 0.5em rgb(0 0 0 / 0.8);
+      0 0 0.8em rgb(217 189 128 / 0.4),
+      0 0.25em 0.5em rgb(0 0 0 / 0.6),
+      inset 0 1px 0 rgb(255 255 255 / 0.12);
     z-index: 1;
   }
+  #hud-to-rule-them-all .hudtra-slot:hover img { filter: brightness(1.12) saturate(1.08); }
   /* Passive features are read-only reference cards, not buttons that "do"
      something - the dashed frame sets them apart from usable slots. */
   #hud-to-rule-them-all .hudtra-group[data-group="passive"] .hudtra-slot {
     border-style: dashed;
-    opacity: 0.85;
+    opacity: 0.8;
   }
 
   /* Locked mid-Extra-Attack: only attack activities stay live, everything else
      gets the padlock treatment. */
-  #hud-to-rule-them-all .hudtra-slot.locked {
-    filter: grayscale(0.9) brightness(0.6);
-  }
+  #hud-to-rule-them-all .hudtra-slot.locked { filter: grayscale(0.9) brightness(0.55); }
   #hud-to-rule-them-all .hudtra-slot.locked:hover {
     transform: none;
-    border-color: var(--hudtra-gold-dark);
-    box-shadow: inset 0 0 0.5em rgb(0 0 0 / 0.8);
+    border-color: #3a2f22;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07);
   }
   #hud-to-rule-them-all .hudtra-lock {
     position: absolute;
     inset: 0;
     display: grid;
     place-items: center;
-    background: rgb(0 0 0 / 0.35);
-    color: var(--hudtra-gold-bright);
-    font-size: 1em;
+    border-radius: 0.15em;
+    background: rgb(0 0 0 / 0.45);
+    color: var(--hudtra-gold-hi);
+    font-size: 0.95em;
     text-shadow: 0 1px 3px #000;
   }
   /* Split marker: top-right, the one corner neither the uses badge (bottom-right)
@@ -530,92 +778,136 @@
      button, it does not rank it. */
   #hud-to-rule-them-all .hudtra-split {
     position: absolute;
-    right: 0.15em;
-    top: 0.15em;
-    font-size: 0.6em;
-    color: var(--hudtra-gold-bright);
-    opacity: 0.75;
+    right: 0.2em;
+    top: 0.2em;
+    font-size: 0.55em;
+    color: var(--hudtra-gold-hi);
+    opacity: 0.8;
     text-shadow: 0 1px 3px #000, 0 0 0.4em #000;
   }
 
-  /* Charges/uses: gold, bottom-right. */
-  #hud-to-rule-them-all .hudtra-uses {
+  /* Badges share one plinth so they read as one family: black bed, hairline, tight
+     numerals. Colour is the only thing that differs, and it is what tells them
+     apart at a glance - gold for charges, pool-green for attacks. */
+  #hud-to-rule-them-all :is(.hudtra-uses, .hudtra-attacks) {
     position: absolute;
-    right: 0.1em;
-    bottom: 0.1em;
-    min-width: 1.3em;
-    padding: 0.1em 0.25em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.3em;
-    background: rgb(0 0 0 / 0.85);
-    font-size: 0.62em;
+    padding: 0.1em 0.3em;
+    border: 1px solid;
+    border-radius: 0.2em;
+    background: rgb(6 5 5 / 0.9);
+    font-size: 0.58em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
     text-align: center;
-    color: var(--hudtra-gold-bright);
   }
-  /* Attacks left inside this action: action-green with a fist, top-left - so it
-     can't be confused with the gold charge counter in the opposite corner. */
+  #hud-to-rule-them-all .hudtra-uses {
+    right: 0.12em;
+    bottom: 0.12em;
+    min-width: 1.4em;
+    border-color: var(--hudtra-bronze);
+    color: var(--hudtra-gold-hi);
+  }
   #hud-to-rule-them-all .hudtra-attacks {
-    position: absolute;
-    left: 0.1em;
-    top: 0.1em;
+    left: 0.12em;
+    top: 0.12em;
     display: inline-flex;
     align-items: center;
     gap: 0.2em;
-    padding: 0.1em 0.25em;
-    border: 1px solid color-mix(in oklab, var(--hudtra-pool-action) 60%, black);
-    border-radius: 0.3em;
-    background: rgb(0 0 0 / 0.85);
-    font-size: 0.62em;
-    color: color-mix(in oklab, var(--hudtra-pool-action) 55%, white);
+    border-color: color-mix(in oklab, var(--hudtra-pool-action) 55%, black);
+    color: color-mix(in oklab, var(--hudtra-pool-action) 45%, white);
   }
   #hud-to-rule-them-all .hudtra-attacks i { font-size: 0.85em; }
 
   /* ---- turn controls ---- */
   #hud-to-rule-them-all .hudtra-controls {
     display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    flex: 0 0 auto;
+  }
+  /* The small utilities stay stacked and quiet; the disc beside them is the only
+     control on the bar that gets to be big. */
+  #hud-to-rule-them-all .hudtra-controls-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4em;
+  }
+  #hud-to-rule-them-all :is(.hudtra-reset, .hudtra-config-btn) {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 2em;
+    height: 2em;
+    border: 1px solid var(--hudtra-bronze);
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(0 0 0 / 0.35));
+    color: var(--hudtra-bronze-hi);
+    font-size: 0.85em;
+    transition: color var(--hudtra-anim), border-color var(--hudtra-anim);
+  }
+  #hud-to-rule-them-all :is(.hudtra-reset, .hudtra-config-btn):hover {
+    border-color: var(--hudtra-gold);
+    color: var(--hudtra-gold-hi);
+  }
+
+  /* BG3 ends its bar with one large labelled disc, and that is the whole idea: on
+     your own turn there is exactly one control you are looking for. Struck metal,
+     not a flat circle - the ring is three shadows deep and the face is lit from
+     above. The icon stays under the word so it still reads at small
+     --hudtra-scale, where the word alone would not. */
+  #hud-to-rule-them-all .hudtra-end-turn {
+    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.45em;
-    flex: 0 0 auto;
-  }
-  #hud-to-rule-them-all .hudtra-end-turn {
-    width: 3.2em;
-    height: 3.2em;
-    border: 2px solid var(--hudtra-gold);
+    gap: 0.1em;
+    width: 4.9em;
+    height: 4.9em;
+    padding: 0.3em;
+    border: 1px solid var(--hudtra-gold);
     border-radius: 50%;
     background:
-      radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.18), transparent 55%),
-      linear-gradient(180deg, #8a6a24, #4c3812);
-    color: var(--hudtra-gold-bright);
-    font-size: 1.05em;
-    box-shadow: 0 0.15em 0.5em rgb(0 0 0 / 0.6);
-    transition: border-color var(--hudtra-anim), box-shadow var(--hudtra-anim);
+      radial-gradient(circle at 50% 22%, rgb(255 255 255 / 0.2), transparent 58%),
+      linear-gradient(180deg, #5c4620 0%, #2a1f10 78%, #1a130b 100%);
+    color: var(--hudtra-gold-hi);
+    box-shadow:
+      0 0 0 1px var(--hudtra-void),
+      0 0 0 3px var(--hudtra-bronze),
+      0 0 0 4px var(--hudtra-void),
+      inset 0 0 1.4em rgb(0 0 0 / 0.55),
+      0 0.2em 0.7em rgb(0 0 0 / 0.7);
+    transition:
+      border-color var(--hudtra-anim),
+      box-shadow var(--hudtra-anim),
+      transform var(--hudtra-anim);
   }
   #hud-to-rule-them-all .hudtra-end-turn:hover {
-    border-color: var(--hudtra-gold-bright);
-    box-shadow: 0 0 0.7em rgb(236 209 147 / 0.5);
+    transform: translateY(-0.1em);
+    box-shadow:
+      0 0 0 1px var(--hudtra-void),
+      0 0 0 3px var(--hudtra-gold),
+      0 0 0 4px var(--hudtra-void),
+      inset 0 0 1.4em rgb(0 0 0 / 0.45),
+      0 0 1.1em rgb(246 233 198 / 0.4);
   }
-  #hud-to-rule-them-all .hudtra-reset {
-    width: 2em;
-    height: 2em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 50%;
-    background: rgb(0 0 0 / 0.35);
+  #hud-to-rule-them-all .hudtra-end-turn-label {
+    font-family: var(--hudtra-font-display);
+    font-size: 0.78em;
+    font-weight: 600;
+    line-height: 1.05;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-shadow: 0 1px 2px #000;
+  }
+  #hud-to-rule-them-all .hudtra-end-turn > i {
     font-size: 0.85em;
+    opacity: 0.75;
+    text-shadow: 0 1px 2px #000;
   }
-  #hud-to-rule-them-all .hudtra-reset:hover { border-color: var(--hudtra-gold-bright); }
-
-  #hud-to-rule-them-all .hudtra-config-btn {
-    position: relative;
-    width: 2em;
-    height: 2em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 50%;
-    background: rgb(0 0 0 / 0.35);
-    font-size: 0.85em;
-  }
-  #hud-to-rule-them-all .hudtra-config-btn:hover { border-color: var(--hudtra-gold-bright); }
 
   /* New-suggestion mark: detection proposes a different attack count than the one
      configured (see config.mjs attackNotice). A badge rather than a plain dot, so it
@@ -623,22 +915,22 @@
      per suggested value, never by the module itself. */
   #hud-to-rule-them-all .hudtra-config-mark {
     position: absolute;
-    top: -0.35em;
-    right: -0.35em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    top: -0.3em;
+    right: -0.3em;
+    display: grid;
+    place-items: center;
     width: 1.15em;
     height: 1.15em;
     border-radius: 50%;
     background: var(--hudtra-pool-bonus);
-    color: #1a1206;
+    color: #150e04;
     font-size: 0.8em;
     font-weight: bold;
-    box-shadow: 0 0 0.4em rgb(224 134 43 / 0.8);
+    box-shadow: 0 0 0.4em rgb(217 128 38 / 0.8);
   }
   #hud-to-rule-them-all .hudtra-config-btn.has-notice {
     border-color: var(--hudtra-pool-bonus);
+    color: var(--hudtra-pool-bonus);
   }
   /* The pulse is the only thing asking for attention here, so it goes away entirely
      for anyone who asked for less motion - the badge itself still shows. */
@@ -656,56 +948,65 @@
     #hud-to-rule-them-all { --hudtra-anim: 0ms; }
   }
 
-  /* ---- BG3-style hover card (see hud.mjs tooltipFor) ---- */
+  /* ---- hover card (see hud.mjs tooltipFor) ----
+     Same panel as the bar so the two read as one object, one step darker so it
+     sits above rather than beside. */
   :is(#tooltip, .locked-tooltip).hudtra-tooltip {
+    font-family: var(--hudtra-font-ui);
     font-size: var(--font-size-13, 13px);
-    max-width: 24em;
-    padding: 0.6em 0.75em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.5em;
+    max-width: 25em;
+    padding: 0.7em 0.8em;
+    border: 1px solid var(--hudtra-bronze);
+    border-radius: 0.4em;
     background:
-      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.05), transparent 60%),
-      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
+      radial-gradient(120% 140% at 50% 0%, rgb(255 255 255 / 0.05), transparent 55%),
+      linear-gradient(180deg, var(--hudtra-panel-hi), var(--hudtra-panel-lo));
     color: var(--hudtra-text);
     text-align: left;
     box-shadow:
-      inset 0 1px 0 rgb(236 209 147 / 0.2),
-      0 0.3em 1em rgb(0 0 0 / 0.6);
+      inset 0 1px 0 rgb(246 233 198 / 0.14),
+      0 0.4em 1.4em rgb(0 0 0 / 0.7);
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt header {
     display: flex;
     align-items: center;
-    gap: 0.6em;
+    gap: 0.65em;
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt header img {
-    width: 3.4em;
-    height: 3.4em;
+    width: 3.2em;
+    height: 3.2em;
     flex: 0 0 auto;
     object-fit: cover;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.35em;
-    box-shadow: 0 0 0.4em rgb(0 0 0 / 0.6);
+    padding: 2px;
+    border: 1px solid #3a2f22;
+    border-radius: 0.2em;
+    background: linear-gradient(180deg, #2b2520, #111);
+    box-shadow: 0 0.1em 0.4em rgb(0 0 0 / 0.7);
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-name {
     display: block;
-    font-size: 1.1em;
+    font-family: var(--hudtra-font-display);
+    font-size: 1.2em;
     font-weight: 600;
-    font-variant: small-caps;
-    letter-spacing: 0.03em;
-    color: var(--hudtra-gold-bright);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--hudtra-gold-hi);
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-meta {
     display: block;
-    font-size: 0.8em;
+    margin-top: 0.1em;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--hudtra-text-dim);
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-rows {
     display: flex;
     flex-direction: column;
-    gap: 0.25em;
-    margin: 0.55em 0 0;
-    padding-top: 0.5em;
-    border-top: 1px solid rgb(200 163 82 / 0.25);
+    gap: 0.3em;
+    margin: 0.6em 0 0;
+    padding-top: 0.55em;
+    border-top: 1px solid rgb(168 135 74 / 0.25);
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-row {
     display: flex;
@@ -716,6 +1017,9 @@
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-row dt {
     color: var(--hudtra-text-dim);
     font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.92em;
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-row dd { margin: 0; }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-attacks {
@@ -725,9 +1029,9 @@
     font-style: italic;
   }
   :is(#tooltip, .locked-tooltip).hudtra-tooltip .hudtra-tt-hint {
-    margin: 0.55em 0 0;
-    padding-top: 0.5em;
-    border-top: 1px solid rgb(200 163 82 / 0.25);
+    margin: 0.6em 0 0;
+    padding-top: 0.55em;
+    border-top: 1px solid rgb(168 135 74 / 0.25);
     font-size: 0.75em;
     font-style: italic;
     color: var(--hudtra-text-dim);
@@ -744,7 +1048,7 @@
     width: 4em;
     height: 4em;
     object-fit: cover;
-    border-radius: 0.35em;
+    border-radius: 0.2em;
   }
   #hud-to-rule-them-all .hudtra-desc-text { min-width: 0; }
 

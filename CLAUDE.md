@@ -46,7 +46,7 @@ reading the code, say so rather than claiming it works.
 
 | File | Responsibility |
 | --- | --- |
-| `scripts/const.mjs` | Every runtime assumption: pool definitions, activation-type map |
+| `scripts/const.mjs` | Every runtime assumption: pool definitions, activation-type map, category table |
 | `scripts/economy.mjs` | State model. The **only** place that reads or writes the economy flag |
 | `scripts/config.mjs` | Per-actor configuration, storage only. The **only** place that reads or writes the config flag. Imports nothing but `const.mjs` — see below |
 | `scripts/config-app.mjs` | The dialog that edits that config, plus the suggestion/notice logic |
@@ -211,6 +211,27 @@ what keeps the economy row attached to the creature in the bar; using the active
 would show a player their character wearing the monster's pips. Everything turn-bound
 (`isMyTurn`, End Turn, reset) hangs off it too.
 
+- **A pool is divided again, by kind.** `actions.sectionsFor` splits one pool's entries
+  into Weapons / Spells / Items / Features (`ITEM_TYPE_CATEGORY`, keyed by `item.type`
+  because that is the only classification dnd5e itself maintains), and spells again by
+  level because on a caster "Spells" is not a section, it is the whole bar. It runs on
+  what `collectActions` already sorted and `Array#sort` is stable there, so the per-entry
+  `sort` rule and the A-Z setting still decide the order *within* a section — sections
+  only decide the blocks. Two cases return one unlabelled section and both matter: the
+  setting being off has to leave the old flat grid untouched, and a pool that produced
+  only one section gets no rail, so an NPC with four attacks keeps exactly the bar it had.
+- **Every section renders a heading row, including the undivided one** — there it is
+  `.hudtra-section-head.is-blank`, a hidden spacer. Two things depend on it: headings
+  land on one line and slot grids on another *across every pool*, and a folded section's
+  heading stays up on that line instead of dropping to where its grid used to be. It is
+  also what stops the bar changing height as you click from a goblin to a wizard. The
+  spacer needs `line-height: 1` declared on the class, not inherited — the button reset
+  only reaches the real heading, which is a `<button>`.
+- **The fold is per pool AND section**, stored as `pool/section` keys in the
+  `collapsedSections` client setting. An **array**, not a map of booleans: un-folding has
+  to remove a key, and an array cannot leave a stale `true` behind if `settings.set` ever
+  merged. The handler toggles the class without a re-render, the same two-part state the
+  bar's own collapse uses; the template reads the setting back on the next render.
 - Ending an encounter **collapses** it (`deleteCombat` → `collapse(true)`); starting one
   pulls it back up. Both are just the slide the handle does, so it can always be brought
   back by hand.
