@@ -177,7 +177,13 @@ Consequences to respect:
 - When you extend this, add a field to the dialog rather than a new heuristic.
 
 **4. Only creatures with a player owner have an economy.**
-`economy.isTracked(actor)` is `actor.hasPlayerOwner === true`, and it is the switch for
+`economy.isTracked(actor)` is `actor.hasPlayerOwner === true` — unless the world setting
+`trackEveryone` is on, which counts everything and is the pre-0.5.0 behaviour. Default
+**off**, so everything below is still what happens by default; it exists because "my
+GM-owned test character has no pips" is the first thing that happens to anyone testing,
+and because a table may simply want its monsters counted. World-scoped on purpose:
+whether a creature is counted decides what lands in its Combatant flag, so two clients
+must never disagree about it. `isTracked` is the switch for
 the *counting* half of the module only: booking (`dnd5e.postUseActivity`), the gate
 (`checkGate`), the turn resets, the pips, and the Extra Attack counter. The *list* half —
 which activities exist, which pool each one is in, the per-entry rules, the drag-and-drop

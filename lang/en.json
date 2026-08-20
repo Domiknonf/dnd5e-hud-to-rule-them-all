@@ -78,6 +78,8 @@
   "dnd5e-hud-to-rule-them-all.settings.enforceActions.block": "Block the usage",
   "dnd5e-hud-to-rule-them-all.settings.gmBypass.name": "GM bypasses enforcement",
   "dnd5e-hud-to-rule-them-all.settings.gmBypass.hint": "The GM is never blocked.",
+  "dnd5e-hud-to-rule-them-all.settings.trackEveryone.name": "Count creatures without a player owner",
+  "dnd5e-hud-to-rule-them-all.settings.trackEveryone.hint": "Off by default: only creatures somebody plays get pips, because the GM already knows a monster has one action. Turn this on to count every creature — useful for a GM-owned test character, or a table that wants monsters counted too.",
   "dnd5e-hud-to-rule-them-all.settings.hideUnequipped.name": "Hide unequipped items",
   "dnd5e-hud-to-rule-them-all.settings.hideUnequipped.hint": "Only show activities from equipped gear.",
   "dnd5e-hud-to-rule-them-all.settings.hideUnprepared.name": "Hide unprepared spells",

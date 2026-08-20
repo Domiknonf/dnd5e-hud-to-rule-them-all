@@ -108,6 +108,10 @@ drake and a sidekick are all `npc` actors that somebody plays, and those keep th
 economy. Hand a boss monster to a player and it starts counting; take it back and it
 stops.
 
+If that is not what your table wants — or you are testing on a GM-owned character and
+wondering where the pips went — *Count creatures without a player owner* turns counting
+back on for everything. Off by default.
+
 ### Per character — the gear on the bar
 
 Everything the module cannot know for certain is answered here rather than guessed at,

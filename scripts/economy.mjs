@@ -50,9 +50,20 @@ export function combatantFor(actor) {
  * summoned drake and a sidekick are all `npc` actors that a player is playing, and
  * those are exactly the ones that still need counting; an actor.type check would
  * have taken the bar away from them along with the goblins.
+ *
+ * THE ESCAPE HATCH: `trackEveryone` counts every creature regardless, which is what
+ * the module did before 0.5.0. Default off, so the reasoning above stays the default
+ * behaviour and nobody pays for monster bookkeeping they never read. It exists for
+ * two cases that are real: testing on a GM-owned character (where "why are there no
+ * pips" is the first thing that happens), and a table that simply wants the GM's
+ * monsters counted too. Being a WORLD setting is deliberate - whether a creature is
+ * counted decides what gets written to its Combatant flag, and two clients disagreeing
+ * about that would book the same attack differently.
  */
 export function isTracked(actor) {
-  return actor?.hasPlayerOwner === true;
+  if (!actor) return false;
+  if (game.settings.get(MODULE_ID, "trackEveryone") === true) return true;
+  return actor.hasPlayerOwner === true;
 }
 
 /**

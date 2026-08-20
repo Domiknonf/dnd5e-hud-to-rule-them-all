@@ -43,6 +43,10 @@ export function registerSettings() {
     }
   });
   reg("gmBypass",        { ...WORLD, type: Boolean, default: true });
+  // Counts creatures without a player owner as well - see economy.isTracked for why
+  // that is off by default, and why it has to be a world setting rather than a
+  // per-user one.
+  reg("trackEveryone",   { ...WORLD, type: Boolean, default: false });
 
   /* --- Content filters -------------------------------------- */
   reg("hideUnequipped",     { ...WORLD, type: Boolean, default: true });
