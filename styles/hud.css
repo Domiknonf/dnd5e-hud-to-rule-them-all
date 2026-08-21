@@ -754,31 +754,43 @@
      "green circle" means the same thing in both places. Only in the grid - in the
      grouped layout the column header already says it, and a marker on every slot
      would just be noise. */
+  /* BOTTOM-LEFT, on its own backing plate. Slot art is whatever the content shipped,
+     so a coloured pip sitting straight on it is a coin flip - a green circle on Fire
+     Bolt's green beam is invisible. The plate is a fixed dark square with a drop
+     shadow, which makes the marker read the same on every icon. */
   #hud-to-rule-them-all .hudtra-cost { display: none; }
   #hud-to-rule-them-all .hudtra-grid .hudtra-cost {
-    display: block;
+    display: grid;
+    place-items: center;
     position: absolute;
-    left: 0.18em;
-    top: 0.18em;
-    width: 0.62em;
-    height: 0.62em;
-    background: var(--hudtra-pool-c, var(--hudtra-gold));
-    box-shadow: 0 0 0.2em #000, 0 0 0.35em color-mix(in oklab, var(--hudtra-pool-c, var(--hudtra-gold)) 60%, transparent);
+    left: 0.12em;
+    bottom: 0.12em;
+    width: 1.05em;
+    height: 1.05em;
+    border-radius: 0.18em;
+    background: rgb(0 0 0 / 0.72);
+    box-shadow: 0 0.05em 0.25em rgb(0 0 0 / 0.9);
   }
-  #hud-to-rule-them-all .hudtra-cost[data-pool="action"] {
+  #hud-to-rule-them-all .hudtra-cost > i {
+    width: 0.58em;
+    height: 0.58em;
+    background: var(--hudtra-pool-c, var(--hudtra-gold));
+    filter: drop-shadow(0 0 0.2em color-mix(in oklab, var(--hudtra-pool-c, var(--hudtra-gold)) 60%, transparent));
+  }
+  #hud-to-rule-them-all .hudtra-cost[data-pool="action"] > i {
     --hudtra-pool-c: var(--hudtra-pool-action);
     border-radius: 50%;
   }
-  #hud-to-rule-them-all .hudtra-cost[data-pool="bonus"] {
+  #hud-to-rule-them-all .hudtra-cost[data-pool="bonus"] > i {
     --hudtra-pool-c: var(--hudtra-pool-bonus);
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
-  #hud-to-rule-them-all .hudtra-cost[data-pool="reaction"] {
+  #hud-to-rule-them-all .hudtra-cost[data-pool="reaction"] > i {
     --hudtra-pool-c: var(--hudtra-pool-reaction);
     transform: rotate(45deg) scale(0.85);
     border-radius: 0.1em;
   }
-  #hud-to-rule-them-all .hudtra-cost[data-pool="legendary"] {
+  #hud-to-rule-them-all .hudtra-cost[data-pool="legendary"] > i {
     --hudtra-pool-c: var(--hudtra-pool-legendary);
     clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
   }
@@ -869,14 +881,14 @@
     text-align: center;
     color: var(--hudtra-gold-bright);
   }
-  /* Attacks left inside this action. BOTTOM-LEFT, and the corner is the whole point:
-     top-left is the cost marker it used to sit underneath, and bottom-right is the
-     gold charge counter - which the same slot really can carry at the same time. A
-     square, because it holds one number. */
+  /* Attacks left inside this action. TOP-LEFT: the cost marker owns bottom-left and
+     the gold charge counter owns bottom-right - and one slot really can carry all
+     three at once, so none of them may share a corner. A square, because it holds one
+     number. */
   #hud-to-rule-them-all .hudtra-attacks {
     position: absolute;
     left: 0.12em;
-    bottom: 0.12em;
+    top: 0.12em;
     display: grid;
     place-items: center;
     width: 1.15em;

@@ -188,8 +188,13 @@
             {{!-- What this costs, as the shape its pool uses in the resource column.
                  In the grid it is the only thing left saying so - there is no column
                  header any more - and CSS hides it again in the grouped layout, where
-                 the header already says it. --}}
-            <i class="hudtra-cost" data-pool="{{pool}}"></i>
+                 the header already says it.
+
+                 Two elements, not one: the shape is cut out of the inner <i> with
+                 clip-path, and a clip-path would take the backing plate with it. The
+                 outer span is that plate - slot art is arbitrary, and a coloured pip
+                 straight on top of a bright icon is unreadable. --}}
+            <span class="hudtra-cost" data-pool="{{pool}}"><i></i></span>
             {{#if locked}}<i class="hudtra-lock fa-solid fa-lock"></i>{{/if}}
             {{!-- Same icon the config dialog marks a split entry with, meaning the
                  same thing: this item has buttons in more than one pool. --}}

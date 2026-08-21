@@ -368,9 +368,13 @@ the question, click, and undo the click; greying just tells you.
   order — `Array#sort` is stable, so the `sort` rule and the A-Z setting still decide
   within one level.
 - **Each badge on a slot owns one corner, and they collide if you forget which.** Cost
-  marker top-left, split marker top-right, charges bottom-right, attacks-left-in-this-
-  action bottom-left. A Breath Weapon really does carry charges *and* count as an
-  attack, so those two must never share a corner.
+  marker bottom-left, attacks-left-in-this-action top-left, split marker top-right,
+  charges bottom-right. A Breath Weapon really does carry charges *and* count as an
+  attack *and* cost an action, so no two of them may share a corner.
+- **The cost marker sits on a backing plate**, which is why it is two elements: the
+  shape is a `clip-path` on the inner `<i>`, and a clip-path would take the plate with
+  it. Slot art is whatever the content shipped — a green pip straight on Fire Bolt's
+  green beam is invisible, so the plate is what makes it read the same everywhere.
 
 ## Domain model
 
