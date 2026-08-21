@@ -81,21 +81,11 @@ function foldTooltip(label, count, folded) {
  * That is the trade: a spell dragged to the front of the Action zone leads the spells
  * rather than the whole group. Turning the setting off gives the flat order back.
  *
- * `filtering` says a spell level is currently picked out on the strip. It force-opens
- * the spell section for as long as that lasts: clicking "level 3" and watching nothing
- * happen because spells were folded away is not an answer anybody wants. It is a
- * transient override and never touches the stored fold - clearing the filter puts the
- * section back exactly as it was, which is why this is not done by rewriting the
- * setting.
  */
-function sectionsFor(poolKey, entries, folded, filtering = false) {
+function sectionsFor(poolKey, entries, folded) {
   const flat = { sectioned: false, sections: [{ key: "", collapsed: false, entries }] };
   if (!game.settings.get(MODULE_ID, "groupSections")) return flat;
-  // While a level is picked out, the size threshold is off. Filtering leaves a small
-  // group almost by definition, and going flat at exactly that moment is what put a
-  // sword, a breath weapon and two spells in one undivided row - the one moment the
-  // boundary between "spell" and "not a spell" matters most.
-  if (!filtering && entries.length < SECTION_MIN_ENTRIES) return flat;
+  if (entries.length < SECTION_MIN_ENTRIES) return flat;
 
   const byKey = new Map();
   for (const entry of entries) {
@@ -109,7 +99,7 @@ function sectionsFor(poolKey, entries, folded, filtering = false) {
     .map(([key, list]) => {
       const id = `${poolKey}:${key}`;
       const label = game.i18n.localize(`${MODULE_ID}.section.${key}`);
-      const collapsed = folded[id] === true && !(filtering && key === "spell");
+      const collapsed = folded[id] === true;
       // Spells read by level, the way every character sheet lists them: cantrips
       // first, then 1st upwards. Array#sort is stable, so the configured order (and
       // the A-Z setting) still decides within one level.
@@ -132,19 +122,37 @@ function sectionsFor(poolKey, entries, folded, filtering = false) {
 /* ---------------------------------------------- */
 
 /**
- * The strip above the bar: one chip per spell level this creature either has slots for
- * or has spells for, plus a Pact Magic readout. Each chip does two jobs at once -
- * it says how many slots are left, and it filters the bar down to that level.
+ * The highest spell level this creature can still pay for, or null when it has no slot
+ * pools at all and nothing can be concluded from them.
+ *
+ * A ceiling rather than a per-level check, because upcasting exists: a 4th-level slot
+ * casts a 1st-level spell, so what matters is whether ANY slot at or above the spell's
+ * own level is left. Pact slots count, at their own level.
+ *
+ * -1 means "there are pools and every one of them is empty" - that greys every leveled
+ * spell, which is right, and is a different answer from null, which greys nothing.
+ */
+function highestCastable(actor) {
+  const rows = spellSlots(actor);
+  if (!rows.length) return null;
+  return rows.reduce((best, row) => (row.value > 0 && row.level > best ? row.level : best), -1);
+}
+
+/**
+ * The spell slots in the resource cluster: one row per level this creature either has
+ * slots for or has spells for, plus a Pact Magic row.
+ *
+ * A READOUT, not a control. These rows used to filter the bar down to one level, and
+ * that was answering the wrong question: what you want to know mid-turn is "can I still
+ * cast this", so the bar now says so directly by greying out what no slot can pay for
+ * (see highestCastable). A filter made you ask the question, click, and then undo the
+ * click; the greying just tells you.
  *
  * Which levels appear is read off the BAR, not off the spell list: a spell hidden in
- * the gear dialog or filtered out by "hide unprepared" is not castable from here, so a
- * chip that filtered to it would filter to nothing. A level with slots but nothing on
- * the bar still shows - the slots are worth seeing - it just is not a button.
- *
- * Pact Magic is deliberately a readout and not a filter. A pact slot casts anything
- * you know at its level, so there is no set of spells "the pact chip" would mean.
+ * the gear dialog or dropped by "hide unprepared" cannot be cast from here anyway. A
+ * level with slots but nothing on the bar still shows - the slots are worth seeing.
  */
-function spellBarFor(actor, buckets, active) {
+function spellBarFor(actor, buckets) {
   const counts = new Map();
   for (const bucket of Object.values(buckets)) {
     for (const entry of bucket) {
@@ -159,12 +167,6 @@ function spellBarFor(actor, buckets, active) {
   const pact = rows.find(r => r.pact) ?? null;
   const keys = [...new Set([...counts.keys(), ...leveled.keys()])].sort((a, b) => a - b);
   if (!keys.length && !pact) return null;
-
-  // The lit chip is the only way to un-filter, so a filter can only survive while its
-  // chip is still there to be clicked. A level whose last spell just left the bar
-  // clears itself rather than leaving the bar narrowed with nothing to click.
-  const filterable = (level) => (counts.get(level) ?? 0) > 0;
-  const effective = active !== null && keys.includes(active) && filterable(active) ? active : null;
 
   /**
    * One pip per slot, filled while it is still there. A number answers "how many"
@@ -182,11 +184,6 @@ function spellBarFor(actor, buckets, active) {
     const row = leveled.get(level) ?? null;
     // dnd5e's own level names, localized by the system - "Cantrip", "1st Level", …
     const label = game.i18n.localize(CONFIG.DND5E?.spellLevels?.[level] ?? "") || String(level);
-    const canFilter = filterable(level);
-    const isActive = effective === level;
-    const hint = canFilter
-      ? game.i18n.localize(`${MODULE_ID}.spells.${isActive ? "filterOff" : "filterOn"}`)
-      : game.i18n.localize(`${MODULE_ID}.spells.nothingHere`);
     return {
       level,
       // Cantrips have no number to show, so they get a letter. Everything else is
@@ -200,11 +197,9 @@ function spellBarFor(actor, buckets, active) {
       // there, and a dash would invent a resource that does not exist.
       slotless: !row && level > 0,
       empty: !!row && row.value <= 0,
-      filterable: canFilter,
-      active: isActive,
-      tooltip: row ? `${label} · ${game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, row)}\n${hint}`
-        : level === 0 ? `${label}\n${hint}`
-        : `${label} · ${game.i18n.localize(`${MODULE_ID}.spells.noSlots`)}\n${hint}`
+      tooltip: row ? `${label} · ${game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, row)}`
+        : level === 0 ? label
+        : `${label} · ${game.i18n.localize(`${MODULE_ID}.spells.noSlots`)}`
     };
   });
 
@@ -216,8 +211,7 @@ function spellBarFor(actor, buckets, active) {
       empty: pact.value <= 0,
       tooltip: `${game.i18n.format(`${MODULE_ID}.spells.pactLabel`, pact)} · `
         + game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, pact)
-    },
-    active: effective
+    }
   };
 }
 
@@ -292,7 +286,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       describe: CombatHUD.#onShowDescription,
       collapse: CombatHUD.#onCollapse,
       toggleFold: CombatHUD.#onToggleFold,
-      toggleLevel: CombatHUD.#onToggleLevel,
       toggleCategory: CombatHUD.#onToggleCategory,
       rows: CombatHUD.#onRows,
       portrait: CombatHUD.#onPortrait,
@@ -319,18 +312,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   #descriptionUuid = null;
 
   /**
-   * Spell level the strip is currently filtered to, or null for all of them.
-   *
-   * Deliberately NOT persisted, unlike a fold: a fold says "I never want to look at
-   * this", a filter says "right now I am casting a level 3 spell". Coming back to the
-   * bar next session with your cantrips still hidden would be a bug, not a memory.
-   */
-  #spellLevel = null;
-
-  /**
    * Category tab the played-creature grid is narrowed to (a SECTIONS key, or
-   * "passive"), or null for "everything that is an action". Instance state for the
-   * same reason #spellLevel is: it answers "what am I looking for right now".
+   * "passive"), or null for "everything that is an action".
+   *
+   * Instance state, deliberately NOT persisted: a fold says "I never want to look at
+   * this", a tab says "right now I am looking for a weapon". Coming back next session
+   * with half your bar hidden would be a bug, not a memory.
    */
   #category = null;
 
@@ -495,7 +482,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       // Same reasoning: a level picked out on one creature's strip means nothing on
       // the next one, and silently hiding half of a wizard's bar because a warlock
       // was selected earlier is the worst kind of stale state.
-      this.#spellLevel = null;
       this.#category = null;
     }
     const combatant = this.subjectCombatant;
@@ -563,15 +549,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(econCombatant);
     const folded = foldedIds();
-    // Built from the UNFILTERED buckets, so the chips keep listing every level while
-    // one of them is picked out - otherwise choosing a level would take away the only
-    // control that undoes it.
-    const spellBar = spellBarFor(actor, buckets, this.#spellLevel);
-    // Written back, not just read: the strip decides whether the filter is still valid
-    // (its chip has to exist to be un-clicked), and this is what keeps the field, the
-    // lit chip and the entries below from disagreeing.
-    this.#spellLevel = spellBar?.active ?? null;
-    const spellLevel = this.#spellLevel;
+    const spellBar = spellBarFor(actor, buckets);
+    // The ceiling every leveled spell on the bar is measured against, resolved once
+    // per render rather than per slot.
+    const castable = highestCastable(actor);
     const poolGroups = Object.entries(RESOURCES)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([key, def]) => {
@@ -593,11 +574,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // grey out: it rides along on each slot instead.
         const exhausted = tracked && (blocked.has(key) || coupledOut(econCombatant, key)
           || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0));
-        // The level filter narrows the SPELLS and nothing else: a filter that also
-        // took your weapons off the bar would be useless in the one moment it is
-        // used, which is mid-turn while deciding what to cast.
         const entries = (buckets[key] ?? [])
-          .filter(e => spellLevel === null || e.itemType !== "spell" || Number(e.level ?? 0) === spellLevel)
           .map(entry => {
             // Resolved in collectActions, so a per-entry override is already folded in.
             const isAttackEntry = key === "action" && entry.countsAsAttack;
@@ -624,11 +601,19 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
             // stack: the slot markup now sits one loop deeper (group -> section -> entry).
             enriched.pool = key;
             enriched.exhausted = exhausted;
+            // Out of slots to pay for it. Greyed, never hidden: what you cannot cast
+            // this round you can still read, and it comes back on its own after a
+            // rest. Cantrips and at-will/innate casting never grey out - they cost no
+            // slot - and a creature with no slot pools at all greys nothing, because
+            // there is nothing to conclude from an absent resource.
+            enriched.unavailable = entry.itemType === "spell" && !entry.atWill
+              && castable !== null && Number(entry.level ?? 0) > 0
+              && Number(entry.level ?? 0) > castable;
             enriched.tooltipHtml = tooltipFor(enriched, label);
             return enriched;
           });
         const collapsed = folded[key] === true;
-        const { sectioned, sections } = sectionsFor(key, entries, folded, spellLevel !== null);
+        const { sectioned, sections } = sectionsFor(key, entries, folded);
         return {
           key,
           icon: def.icon,
@@ -796,19 +781,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // No onChange on this setting: a click re-renders right here rather than through
     // the debounce, so the fold answers immediately.
     await game.settings.set(MODULE_ID, "folded", folded);
-    return this.render();
-  }
-
-  /**
-   * Pick a spell level out on the strip; clicking the lit chip puts every level back.
-   * That is the whole control - the chip that narrowed the bar is the chip that widens
-   * it again, so there is no separate "show all" button to find. Session state only,
-   * on the instance: see #spellLevel for why this one is not remembered.
-   */
-  static async #onToggleLevel(event, target) {
-    const level = Number(target.dataset.level);
-    if (!Number.isFinite(level)) return;
-    this.#spellLevel = this.#spellLevel === level ? null : level;
     return this.render();
   }
 

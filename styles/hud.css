@@ -626,30 +626,13 @@
     font-variant-numeric: tabular-nums;
     color: var(--hudtra-text);
   }
-  /* Only the ones that are actually buttons: a level with nothing to filter to carries
-     no data-action, so it must not light up under the pointer either. */
-  #hud-to-rule-them-all button.hudtra-level:not(.quiet):hover {
-    border-color: var(--hudtra-gold);
-    background: rgb(236 209 147 / 0.1);
-  }
-  /* The picked level. Loud on purpose: while this is lit, part of the bar is not
-     being shown, and that must never be something you have to go looking for. */
-  #hud-to-rule-them-all .hudtra-level.active {
-    border-color: var(--hudtra-gold-bright);
-    background: rgb(236 209 147 / 0.22);
-    box-shadow: 0 0 0.5em rgb(236 209 147 / 0.35);
-  }
-  /* No slots left at this level. Still readable - "0/3" is the answer to the question
-     being asked - just clearly spent. */
+  /* No slots left at this level. Still readable - "0 of 3" is the answer to the
+     question being asked - just clearly spent. */
   #hud-to-rule-them-all .hudtra-level.empty { opacity: 0.55; }
   #hud-to-rule-them-all .hudtra-level.empty .hudtra-level-slots { text-decoration: line-through; }
-  /* Slots at a level with nothing on the bar to cast: a readout, so it must not look
-     like the buttons around it. */
-  #hud-to-rule-them-all .hudtra-level.quiet,
-  #hud-to-rule-them-all .hudtra-level.pact {
-    border-style: dashed;
-    cursor: default;
-  }
+  /* Pact Magic: its own pool, refilled on a short rest, so it is set apart from the
+     leveled slots above it rather than reading as one of them. */
+  #hud-to-rule-them-all .hudtra-level.pact { border-style: dashed; }
   /* One pip per slot, same language as the economy row's pips: a resource you can
      count without reading. Smaller than those, because a spell level is a readout on
      a chip and the pools are the bar's headline number. */
@@ -810,6 +793,16 @@
   #hud-to-rule-them-all .hudtra-grid .hudtra-slot.spent {
     filter: grayscale(0.75) brightness(0.55);
   }
+  /* No slot left that could pay for this spell. Greyed in BOTH layouts, because it is
+     a fact about the spell and not about the column it happens to sit in - and greyed
+     rather than hidden: what you cannot cast this round you can still read, and it
+     comes back by itself after a rest. */
+  #hud-to-rule-them-all .hudtra-slot.unavailable {
+    filter: grayscale(0.85) brightness(0.5);
+  }
+  #hud-to-rule-them-all .hudtra-slot.unavailable:hover {
+    filter: grayscale(0.5) brightness(0.75);
+  }
 
   /* Rows control, BG3's +/- beside End Turn. */
   #hud-to-rule-them-all .hudtra-rows {
@@ -878,23 +871,25 @@
     text-align: center;
     color: var(--hudtra-gold-bright);
   }
-  /* Attacks left inside this action: action-green with a fist, top-left - so it
-     can't be confused with the gold charge counter in the opposite corner. */
+  /* Attacks left inside this action. BOTTOM-LEFT, and the corner is the whole point:
+     top-left is the cost marker it used to sit underneath, and bottom-right is the
+     gold charge counter - which the same slot really can carry at the same time. A
+     square, because it holds one number. */
   #hud-to-rule-them-all .hudtra-attacks {
     position: absolute;
-    left: 0.1em;
-    top: 0.1em;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2em;
-    padding: 0.1em 0.25em;
+    left: 0.12em;
+    bottom: 0.12em;
+    display: grid;
+    place-items: center;
+    width: 1.15em;
+    height: 1.15em;
     border: 1px solid color-mix(in oklab, var(--hudtra-pool-action) 60%, black);
-    border-radius: 0.3em;
+    border-radius: 0.15em;
     background: rgb(0 0 0 / 0.85);
-    font-size: 0.62em;
+    font-size: 0.68em;
+    font-variant-numeric: tabular-nums;
     color: color-mix(in oklab, var(--hudtra-pool-action) 55%, white);
   }
-  #hud-to-rule-them-all .hudtra-attacks i { font-size: 0.85em; }
 
   /* ---- turn controls ---- */
   #hud-to-rule-them-all .hudtra-controls {

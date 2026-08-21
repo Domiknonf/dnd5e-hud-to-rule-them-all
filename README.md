@@ -48,10 +48,11 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   Features, Consumables and Gear. Click a group's name to fold the whole thing, or one of
   the chips beside it to fold a single section — a folded chip names what it is holding
   and how much of it. Remembered per user. Passives start folded.
-- **Spell strip.** A row above the bar with one chip per spell level: a pip per slot so
-  you can see what is left without reading a number, and a click to narrow the bar to
-  that level (click the lit chip again to widen it). Pact Magic gets its own readout.
-  Spells sort by level, cantrips first.
+- **Spell slots, next to the pips.** One row per spell level with a pip per slot, so you
+  see what is left without reading a number. Pact Magic gets its own row. Spells you have
+  no slot left for grey themselves out — upcasting counted, cantrips and at-will casting
+  never — so "can I still cast this" is answered before you ask. Spells sort by level,
+  cantrips first.
 - **Nothing moves.** The bar has a fixed width, so folding a section, filtering by level
   or switching creatures never slides the buttons out from under your pointer.
 - **Descriptions in place.** Middle-click any slot to expand dnd5e's own item card above

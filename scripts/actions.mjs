@@ -49,6 +49,13 @@ export function isDescriptiveOnly(activity) {
  * zero extra robustness. Homebrew or translated content needs the manual
  * config.attacksPerAction override instead.
  */
+/**
+ * Spell "preparation methods" that consume no slot. A creature out of slots can still
+ * cast these, so the bar must not grey them out. VERIFY AT RUNTIME against
+ * `CONFIG.DND5E.spellPreparationModes` if innate casters ever go grey.
+ */
+const ATWILL_METHODS = new Set(["atwill", "innate"]);
+
 const PC_EXTRA_ATTACK_NAMES = {
   "extra attack": 2,
   "two extra attacks": 3,
@@ -523,6 +530,11 @@ export function collectActions(actor) {
       // whether it is worth drawing (see SECTION_MIN_ENTRIES).
       section: sectionFor(item),
       level: item.type === "spell" ? item.system.level : null,
+      // Costs no slot, so running out of slots must not grey it out. dnd5e 5.x keys
+      // this as system.method; older schemas used preparation.mode.
+      atWill: item.type === "spell" && ATWILL_METHODS.has(
+        item.system?.method ?? item.system?.preparation?.mode ?? ""
+      ),
       uses: usesFor(single, item),
       details: single ? detailsFor(single) : null,
       description: plainDescription(item),

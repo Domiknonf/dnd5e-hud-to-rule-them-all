@@ -331,44 +331,44 @@ under it away (`hud.mjs -> sectionsFor`, `#onToggleFold`).
   the section, so it grows the name and the count and keeps full contrast. Never dim the
   only remaining evidence of something.
 
-### The spell strip
+### Spell slots
 
-Its own row at the top of the frame (`hud.mjs -> spellBarFor`), between the description
-panel and the bar. One chip per spell level, doing two jobs at once: how many slots are
-left there, and a filter narrowing the bar to that level.
+In the resource cluster beside the portrait (`hud.mjs -> spellBarFor`), with the pips
+they belong with. One row per spell level: how many slots are left there.
+
+**A readout, not a control.** These rows used to filter the bar down to one level, which
+answered the wrong question — mid-turn you want to know *can I still cast this*, so the
+bar says so directly: `highestCastable` resolves the ceiling once per render and every
+leveled spell above it is greyed out (`.hudtra-slot.unavailable`). A filter made you ask
+the question, click, and undo the click; greying just tells you.
+
+- **A ceiling, not a per-level check, because upcasting exists.** A 4th-level slot casts
+  a 1st-level spell, so what matters is whether *any* slot at or above the spell's level
+  is left. Pact slots count, at their own level.
+- **Three things never grey**: cantrips, at-will/innate casting (`ATWILL_METHODS` in
+  `actions.mjs` — they cost no slot), and every spell on a creature with no slot pools at
+  all. That last one is the difference between `highestCastable` returning `-1` ("pools
+  exist, all empty" — grey everything) and `null` ("nothing to conclude" — grey nothing).
+- **Greyed, never hidden.** What you cannot cast this round you can still read, and it
+  comes back on its own after a rest.
 
 - **Which levels appear is read off the BAR, not off the spell list.** A spell hidden in
-  the gear dialog or dropped by "hide unprepared" cannot be cast from here, so a chip
-  filtering to it would filter to nothing. A level with slots but nothing on the bar
-  still shows — the slots are worth seeing — but carries no `data-action`, the same way
-  the economy row only gives the GM one.
-- **The filter narrows spells and nothing else.** It is used mid-turn while deciding what
-  to cast; taking the weapons off the bar at that moment would make it useless. What it
-  *does* do is switch `SECTION_MIN_ENTRIES` off, so the group keeps its sections while
-  filtered — otherwise the filtered group drops under the threshold, goes flat, and puts
-  a sword, a breath weapon and two spells in one undivided row at exactly the moment the
-  boundary matters most.
-- **The lit chip is the whole control.** Clicking it again clears the filter, so there is
-  no separate "show all" button. That only holds while the chip is still on the strip, so
-  the filter clears itself when its level leaves the bar — `spellBarFor` returns the
-  effective level and `_prepareContext` writes it back to `#spellLevel`.
+  the gear dialog or dropped by "hide unprepared" cannot be cast from here anyway. A
+  level with slots but nothing on the bar still shows — the slots are worth seeing.
 - **Slots are pips, not a number** (`SPELL_PIP_LIMIT` guards the homebrew case). Four
   dots answer "how many are left" without being read, which is the question the row
   exists for. Cantrips get no pips *and no "none" dash*: they are at-will, so an empty
   slot area is the complete answer and a dash would invent a resource.
-- **It is instance state (`#spellLevel`), not a setting.** A fold means "I never want to
-  look at this", a filter means "right now I am casting a 3rd-level spell" — coming back
-  next session with your cantrips still hidden would be a bug. Cleared whenever the bar
-  changes creature, like the description panel.
-- While a filter is active it **force-opens folded spell sections**, as a transient
-  override that never rewrites the stored fold. Clicking a level and watching nothing
-  happen is not an answer; silently un-configuring what somebody folded is not one either.
-- **Pact Magic is a readout, not a filter.** A pact slot casts anything you know at its
-  level, so there is no set of spells the chip would mean. It is a separate row rather
-  than folded into its level because it refills on a short rest and is spent separately.
+- **Pact Magic is a row of its own**, not folded into its level: it refills on a short
+  rest and is spent separately, so one "3/4" covering both would be a lie in both
+  directions.
 - Spells inside a section sort by **level** first (cantrips up), then by the configured
   order — `Array#sort` is stable, so the `sort` rule and the A-Z setting still decide
   within one level.
+- **Each badge on a slot owns one corner, and they collide if you forget which.** Cost
+  marker top-left, split marker top-right, charges bottom-right, attacks-left-in-this-
+  action bottom-left. A Breath Weapon really does carry charges *and* count as an
+  attack, so those two must never share a corner.
 
 ## Domain model
 

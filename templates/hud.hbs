@@ -97,11 +97,10 @@
     {{#if spellBar}}
     <div class="hudtra-spellslots">
       {{#each spellBar.levels}}
-      {{!-- data-action only where there is something to filter TO: a level with slots
-           but nothing on the bar is a readout, and must not promise a click. --}}
-      <button type="button" class="hudtra-level {{#if active}}active{{/if}} {{#if empty}}empty{{/if}} {{#unless filterable}}quiet{{/unless}}"
-              {{#if filterable}}data-action="toggleLevel"{{/if}} data-level="{{level}}"
-              data-tooltip-text="{{tooltip}}">
+      {{!-- A readout, not a control: what you can still cast is said by the bar itself,
+           which greys out what no slot can pay for. A <span>, so it never looks like a
+           button that does nothing. --}}
+      <span class="hudtra-level {{#if empty}}empty{{/if}}" data-tooltip-text="{{tooltip}}">
         <span class="hudtra-level-badge">{{short}}</span>
         {{!-- One pip per slot, filled while it is still there: "how many do I have
              left" without reading anything. Past SPELL_PIP_LIMIT it is a number. --}}
@@ -115,7 +114,7 @@
              spells, or a creature that has none. A dash says "looked, there are none"
              where a blank would just look unfinished. --}}
         {{#if slotless}}<span class="hudtra-level-slots hudtra-level-none">–</span>{{/if}}
-      </button>
+      </span>
       {{/each}}
       {{!-- Pact Magic is a readout, not a filter: a pact slot casts anything you know
            at its level, so there is no set of spells it would narrow to. --}}
@@ -185,7 +184,7 @@
         {{#unless collapsed}}
         <div class="hudtra-entries" data-section="{{key}}">
           {{#each entries}}
-          <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}} {{#if exhausted}}spent{{/if}}" data-action="{{action}}"
+          <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}} {{#if exhausted}}spent{{/if}} {{#if unavailable}}unavailable{{/if}}" data-action="{{action}}"
                   data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{pool}}"
                   data-name="{{name}}"
                   data-tooltip-html="{{tooltipHtml}}">
@@ -200,7 +199,12 @@
                  same thing: this item has buttons in more than one pool. --}}
             {{#if split}}<i class="hudtra-split fa-solid fa-link-slash"></i>{{/if}}
             {{#if uses}}<span class="hudtra-uses">{{uses.value}}/{{uses.max}}</span>{{/if}}
-            {{#if attacksBadge}}<span class="hudtra-attacks"><i class="fa-solid fa-hand-fist"></i>{{attacksBadge.available}}/{{attacksBadge.max}}</span>{{/if}}
+            {{!-- Attacks left inside this action. Bottom-LEFT: top-left is the cost
+                 marker it used to sit under, and bottom-right is the charge counter,
+                 which the same slot really can carry at once (a Breath Weapon has
+                 uses AND stands in for an attack). Just the number - the total is one
+                 hover away, and a square wants one glyph. --}}
+            {{#if attacksBadge}}<span class="hudtra-attacks">{{attacksBadge.available}}</span>{{/if}}
           </button>
           {{/each}}
         </div>
