@@ -657,8 +657,6 @@
     border-color: var(--hudtra-gold-dark);
     box-shadow: none;
   }
-  /* Spells at this level, but no slots to cast them from. */
-  #hud-to-rule-them-all .hudtra-level-none { color: var(--hudtra-text-dim); }
 
   #hud-to-rule-them-all .hudtra-sections {
     display: flex;

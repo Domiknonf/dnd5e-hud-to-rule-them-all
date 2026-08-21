@@ -110,10 +110,6 @@
         </span>
         {{/if}}
         {{#if slots}}<span class="hudtra-level-slots">{{slots}}</span>{{/if}}
-        {{!-- Spells at this level but no slot pool for them - a warlock's leveled
-             spells, or a creature that has none. A dash says "looked, there are none"
-             where a blank would just look unfinished. --}}
-        {{#if slotless}}<span class="hudtra-level-slots hudtra-level-none">–</span>{{/if}}
       </span>
       {{/each}}
       {{!-- Pact Magic is a readout, not a filter: a pact slot casts anything you know

@@ -352,13 +352,15 @@ the question, click, and undo the click; greying just tells you.
 - **Greyed, never hidden.** What you cannot cast this round you can still read, and it
   comes back on its own after a rest.
 
-- **Which levels appear is read off the BAR, not off the spell list.** A spell hidden in
-  the gear dialog or dropped by "hide unprepared" cannot be cast from here anyway. A
-  level with slots but nothing on the bar still shows — the slots are worth seeing.
+- **One row per slot pool, and nothing else.** Levels the creature knows spells at but
+  has no pool for used to get a row marked "no slots at this level" — noise at best and
+  a lie at worst, since a warlock has no `spell3` pool and casts 3rd-level spells all
+  day out of the Pact Magic row below it. Cantrips go the same way: at-will, no pool, no
+  row. Nothing is lost, because "can I cast this" is answered on the spell now. A pool
+  with slots but no spell on the bar still shows — a scroll may spend it.
 - **Slots are pips, not a number** (`SPELL_PIP_LIMIT` guards the homebrew case). Four
   dots answer "how many are left" without being read, which is the question the row
-  exists for. Cantrips get no pips *and no "none" dash*: they are at-will, so an empty
-  slot area is the complete answer and a dash would invent a resource.
+  exists for.
 - **Pact Magic is a row of its own**, not folded into its level: it refills on a short
   rest and is spent separately, so one "3/4" covering both would be a lie in both
   directions.

@@ -148,25 +148,21 @@ function highestCastable(actor) {
  * (see highestCastable). A filter made you ask the question, click, and then undo the
  * click; the greying just tells you.
  *
- * Which levels appear is read off the BAR, not off the spell list: a spell hidden in
- * the gear dialog or dropped by "hide unprepared" cannot be cast from here anyway. A
- * level with slots but nothing on the bar still shows - the slots are worth seeing.
+ * ONE ROW PER SLOT POOL, and nothing else. Levels the creature knows spells at but has
+ * no slots for used to get a row too, marked "no slots at this level" - which was noise
+ * at best and a lie at worst: a warlock has no `spell3` pool and can absolutely cast a
+ * 3rd-level spell, out of the Pact Magic row sitting right below it. Nothing is lost by
+ * dropping those rows, because whether a spell is castable is answered on the spell
+ * itself now, by the greying. Cantrips go the same way: at-will, no pool, no row.
+ *
+ * A pool with slots but no spell on the bar still shows - the slots are worth seeing,
+ * and a scroll or a hidden entry may well spend them.
  */
-function spellBarFor(actor, buckets) {
-  const counts = new Map();
-  for (const bucket of Object.values(buckets)) {
-    for (const entry of bucket) {
-      if (entry.itemType !== "spell") continue;
-      const level = Number(entry.level ?? 0);
-      counts.set(level, (counts.get(level) ?? 0) + 1);
-    }
-  }
-
+function spellBarFor(actor) {
   const rows = spellSlots(actor);
-  const leveled = new Map(rows.filter(r => !r.pact).map(r => [r.level, r]));
+  if (!rows.length) return null;
+  const leveled = rows.filter(r => !r.pact).sort((a, b) => a.level - b.level);
   const pact = rows.find(r => r.pact) ?? null;
-  const keys = [...new Set([...counts.keys(), ...leveled.keys()])].sort((a, b) => a - b);
-  if (!keys.length && !pact) return null;
 
   /**
    * One pip per slot, filled while it is still there. A number answers "how many"
@@ -174,32 +170,20 @@ function spellBarFor(actor, buckets) {
    * question this row exists for. Past SPELL_PIP_LIMIT it goes back to being a
    * number, because a row of pips that has to be counted is just a worse number.
    */
-  const slotsOf = (row) => {
-    if (!row) return { pips: null, slots: "" };
-    if (row.max > SPELL_PIP_LIMIT) return { pips: null, slots: `${row.value}/${row.max}` };
-    return { pips: Array.fromRange(row.max).map(i => ({ spent: i >= row.value })), slots: "" };
-  };
+  const slotsOf = (row) => row.max > SPELL_PIP_LIMIT
+    ? { pips: null, slots: `${row.value}/${row.max}` }
+    : { pips: Array.fromRange(row.max).map(i => ({ spent: i >= row.value })), slots: "" };
 
-  const levels = keys.map(level => {
-    const row = leveled.get(level) ?? null;
-    // dnd5e's own level names, localized by the system - "Cantrip", "1st Level", …
-    const label = game.i18n.localize(CONFIG.DND5E?.spellLevels?.[level] ?? "") || String(level);
+  const levels = leveled.map(row => {
+    // dnd5e's own level names, localized by the system - "1st Level", "2nd Level", …
+    const label = game.i18n.localize(CONFIG.DND5E?.spellLevels?.[row.level] ?? "") || String(row.level);
     return {
-      level,
-      // Cantrips have no number to show, so they get a letter. Everything else is
-      // its own numeral - short enough to stay legible at the bar's smallest scale.
-      short: level === 0 ? game.i18n.localize(`${MODULE_ID}.spells.cantripShort`) : String(level),
+      level: row.level,
+      // Its own numeral - short enough to stay legible at the bar's smallest scale.
+      short: String(row.level),
       ...slotsOf(row),
-      // A level with spells but no slot pool of its own - a warlock's leveled spells,
-      // or a creature that simply has none. Said outright rather than left blank, so
-      // "where are my slots" has an answer on the chip itself. NOT for cantrips:
-      // those are at-will, so an empty slot area is the correct and complete answer
-      // there, and a dash would invent a resource that does not exist.
-      slotless: !row && level > 0,
-      empty: !!row && row.value <= 0,
-      tooltip: row ? `${label} · ${game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, row)}`
-        : level === 0 ? label
-        : `${label} · ${game.i18n.localize(`${MODULE_ID}.spells.noSlots`)}`
+      empty: row.value <= 0,
+      tooltip: `${label} · ${game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, row)}`
     };
   });
 
@@ -549,7 +533,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(econCombatant);
     const folded = foldedIds();
-    const spellBar = spellBarFor(actor, buckets);
+    const spellBar = spellBarFor(actor);
     // The ceiling every leveled spell on the bar is measured against, resolved once
     // per render rather than per slot.
     const castable = highestCastable(actor);
