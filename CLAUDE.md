@@ -93,6 +93,14 @@ Consequences to respect:
   Keeping storage free of the detection is what stops that from being an import cycle;
   the dialog lives in `config-app.mjs` for the same reason. `tools/verify.mjs` checks for
   cycles — run it after moving imports around.
+- **The hot paths read the rules table once, not per activity.** `entryRules(actor)`
+  returns the whole `config.entries` map and `ruleFor(rules, item, activity)` resolves
+  against it; `entryConfig(actor, item, activity)` is the same answer for callers with
+  one activity in hand (the booking path). `collectActions` on a 60-item sheet went
+  from ~250 `getFlag` calls per render to one — `Document#getFlag` validates the scope
+  against every active module before it reads anything. **The resolved rule may be the
+  stored object itself, so never mutate what `ruleFor`/`entryConfig` hands back**; the
+  dialog copies before writing, which is what keeps that safe.
 - **Per-entry rules live under `config.entries`, keyed by document ID, never by uuid.** A
   synthetic token actor's uuid carries its scene and token, so a uuid key written for one
   goblin would never match the base Actor the config is stored on. `entryKey()` builds
@@ -126,6 +134,11 @@ Consequences to respect:
   is a capacity change and belongs in `getMaxima`, NOT in `ACTION_GRANT_NAMES`: it is
   an effect on a target, so booking it on use would hand the extra action to the
   caster. Slow is neither — it couples two pools into one budget (`coupledOut`).
+- **`getEconomy` merges by hand, field by field**, rather than through
+  `foundry.utils.mergeObject`, which deep-clones both sides on every call. The shape is
+  fixed: `used` and `granted` are the only nested maps, and both are full maps from
+  `freshEconomy` with the stored partial laid over them. **A new field on the economy
+  has to be added to that merge**, or it will not survive a read.
 - **`getEconomy` recomputes the maxima and the fresh ones win.** Letting the stored
   ones override froze `max` at whatever it was when the flag was last written, so a
   Haste landing mid-turn did nothing until the next turn reset. Nothing writes a max
@@ -233,6 +246,19 @@ token always wins, for everyone. The fallback differs:
 what keeps the economy row attached to the creature in the bar; using the active one
 would show a player their character wearing the monster's pips. Everything turn-bound
 (`isMyTurn`, End Turn, reset) hangs off it too.
+
+**Because the bar shows exactly one creature, most document hooks must not redraw it.**
+`refreshHUDFor(actor, changed)` (in `hud.mjs`, beside `subjectActor` so the two cannot
+drift) drops updates that cannot reach the bar; the actor, item, effect, token and
+combatant hooks in `module.mjs` all route through it. Twelve monsters trading blows
+used to mean a full rebuild per update on every client, producing identical markup.
+Two rules keep it honest:
+
+- **When in doubt, redraw.** An update with no actor behind it still refreshes.
+- **Anything that decides WHO is shown redraws unconditionally** and therefore does
+  *not* go through the filter: combat, adding and removing combatants, `controlToken`,
+  `updateUser`, and any change touching `ownership`. Add a hook to the filtered list
+  only after checking it against that list.
 
 - Ending an encounter **collapses** it (`deleteCombat` → `collapse(true)`); starting one
   pulls it back up. Both are just the slide the handle does, so it can always be brought

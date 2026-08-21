@@ -53,11 +53,16 @@ export function attackSuggestion(actor) {
  * level-up - which is the whole thing this is meant to catch.
  */
 export function attackNotice(actor) {
-  const suggestion = attackSuggestion(actor);
-  if (!suggestion) return null;
+  // Reason (1) first, because it is both the commonest answer and the only one that
+  // costs nothing: with nothing configured, detection is already in force and there
+  // is no disagreement to report. Asking it first is what keeps the HUD - which calls
+  // this on every render - from walking the whole sheet looking for a feature whose
+  // answer it would then throw away.
   const config = getActorConfig(actor);
   const configured = Number(config.attacksPerAction);
   if (!Number.isFinite(configured) || configured <= 0) return null;
+  const suggestion = attackSuggestion(actor);
+  if (!suggestion) return null;
   if (configured === suggestion.count) return null;
   if (Number(config.seenAttackSuggestion) === suggestion.count) return null;
   return { ...suggestion, configured };

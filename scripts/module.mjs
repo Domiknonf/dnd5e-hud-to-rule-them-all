@@ -1,7 +1,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerSocket } from "./socket.mjs";
-import { getHUD, refreshHUD } from "./hud.mjs";
+import { getHUD, refreshHUD, refreshHUDFor } from "./hud.mjs";
 import {
   spend, spendAttack, refund, resetTurn, checkGate, getEconomy, combatantFor, poolForNow, grant,
   diagnose, isTracked
@@ -130,7 +130,12 @@ Hooks.on("combatStart", async (combat) => {
   // Only the tracked ones carry an economy to refill. On a twelve-goblin encounter
   // this is the difference between one flag write per player and thirteen.
   if (game.user.isActiveGM) {
-    for (const c of combat.combatants) if (isTracked(c.actor)) await resetTurn(c);
+    // In parallel: these are independent Combatant documents, and awaiting them one
+    // by one made the start of an encounter a chain of round trips as long as the
+    // party. Order does not matter - each write only touches its own combatant.
+    await Promise.all(combat.combatants
+      .filter(c => isTracked(c.actor))
+      .map(c => resetTurn(c)));
   }
   // Symmetric to deleteCombat below: an encounter starting pulls the bar back up
   // even if it was manually slid away out of combat.
@@ -149,7 +154,15 @@ Hooks.on("updateCombat", refreshHUD);
 // The bar survives the encounter as a plain ability hotbar. Ending combat slides it
 // away rather than destroying it, so it can be pulled back up from the corner tab.
 Hooks.on("deleteCombat", () => { getHUD().collapse(true); refreshHUD(); });
-Hooks.on("updateCombatant", refreshHUD);
+// The economy flag lives here, so this fires on every booked action in the party and
+// lands on every client, while a bar only ever shows one of those creatures. A change
+// to WHICH creature a combatant stands for is never filtered - it can move the subject.
+Hooks.on("updateCombatant", (doc, changed) => {
+  if (changed.actorId !== undefined || changed.tokenId !== undefined) return refreshHUD();
+  refreshHUDFor(doc.actor);
+});
+// Who is in the fight decides who a player without a selected token falls back to,
+// so these two always redraw.
 Hooks.on("createCombatant", refreshHUD);
 Hooks.on("deleteCombatant", refreshHUD);
 
@@ -162,15 +175,27 @@ Hooks.on("deleteCombatant", refreshHUD);
 Hooks.on("controlToken", refreshHUD);
 Hooks.on("updateUser", refreshHUD);
 
-Hooks.on("updateActor", refreshHUD);
-Hooks.on("createItem", refreshHUD);
-Hooks.on("updateItem", refreshHUD);
-Hooks.on("deleteItem", refreshHUD);
-Hooks.on("createActiveEffect", refreshHUD);
-Hooks.on("deleteActiveEffect", refreshHUD);
+/** An effect hangs off the actor directly, or off one of its items. */
+const effectActor = (effect) =>
+  (effect?.parent?.documentName === "Actor" ? effect.parent : effect?.parent?.actor) ?? null;
+
+// Everything below fires for every creature in the world, while the bar shows exactly
+// one - so these route through refreshHUDFor, which drops the updates that cannot
+// reach it. Anything that decides WHO is shown (above) redraws unconditionally.
+Hooks.on("updateActor", (doc, changed) => refreshHUDFor(doc, changed));
+Hooks.on("createItem", (doc) => refreshHUDFor(doc.actor));
+Hooks.on("updateItem", (doc) => refreshHUDFor(doc.actor));
+Hooks.on("deleteItem", (doc) => refreshHUDFor(doc.actor));
+Hooks.on("createActiveEffect", (doc) => refreshHUDFor(effectActor(doc)));
+Hooks.on("deleteActiveEffect", (doc) => refreshHUDFor(effectActor(doc)));
 // Enabling or disabling an existing effect fires UPDATE, not create - and that is how
 // DAE commonly applies one. Without this, Haste landing on a creature that already
 // carried the (disabled) effect changed the economy and never redrew the bar.
-Hooks.on("updateActiveEffect", refreshHUD);
+Hooks.on("updateActiveEffect", (doc) => refreshHUDFor(effectActor(doc)));
 // A condition applied through the token HUD's status icons rather than as an effect.
-Hooks.on("updateToken", refreshHUD);
+Hooks.on("updateToken", (doc, changed) => {
+  // A token that changed which actor it stands for may well have been showing the
+  // previous one, and `doc.actor` now answers for the new one - so do not filter.
+  if (changed.actorId !== undefined || changed.actorLink !== undefined) return refreshHUD();
+  refreshHUDFor(doc.actor, changed);
+});

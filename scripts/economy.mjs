@@ -212,17 +212,33 @@ export function coupledPools(combatant) {
 }
 
 /**
+ * Every pool barred right now because a pool it shares a budget with has already
+ * been spent (Slow: an action or a Bonus Action, not both).
+ *
+ * Answers for ALL pools in one pass. The bar asks this per pool, twice over - once
+ * for the pips and once for the group that greys out - and doing it one pool at a
+ * time re-matched the effect tables and re-read the economy for each of them.
+ * Takes an economy if the caller already has one, which the HUD does.
+ */
+export function coupledOutPools(combatant, econ = null) {
+  const out = new Set();
+  const rules = matchedEffectRules(combatant?.actor, EFFECT_EXCLUSIVE_POOLS);
+  if (!rules.length) return out;
+  const used = (econ ?? getEconomy(combatant)).used ?? {};
+  for (const rule of rules) {
+    for (const pool of rule.pools) {
+      if (rule.pools.some(other => other !== pool && (used[other] ?? 0) > 0)) out.add(pool);
+    }
+  }
+  return out;
+}
+
+/**
  * Whether `type` is barred because a pool it shares a budget with has already been
  * spent (Slow: an action or a Bonus Action, not both).
  */
 export function coupledOut(combatant, type) {
-  const rules = matchedEffectRules(combatant?.actor, EFFECT_EXCLUSIVE_POOLS)
-    .filter(rule => rule.pools.includes(type));
-  if (!rules.length) return false;
-  const econ = getEconomy(combatant);
-  return rules.some(rule =>
-    rule.pools.some(pool => pool !== type && (econ.used[pool] ?? 0) > 0)
-  );
+  return coupledOutPools(combatant).has(type);
 }
 
 /**
@@ -274,7 +290,20 @@ export function getEconomy(combatant) {
   // when the flag was last written, so a Haste landing mid-turn - or a level-up, or
   // a changed world setting - did not show until the next turn reset. Nothing ever
   // writes a max that getMaxima() cannot recompute, so there is nothing to preserve.
-  return foundry.utils.mergeObject(fresh, { ...stored, max: fresh.max }, { inplace: false });
+  //
+  // Spelled out field by field rather than through foundry.utils.mergeObject, which
+  // deep-clones both sides on every call. The shape is fixed and two levels deep, so
+  // the recursion bought nothing: `used` and `granted` are the only nested maps, and
+  // both are full ones seeded by freshEconomy with a stored partial laid over them -
+  // which is precisely what the merge did.
+  return {
+    key: stored.key ?? fresh.key,
+    used: { ...fresh.used, ...stored.used },
+    granted: { ...fresh.granted, ...stored.granted },
+    max: fresh.max,
+    attacksLeft: stored.attacksLeft ?? fresh.attacksLeft,
+    log: stored.log ?? fresh.log
+  };
 }
 
 /**
@@ -286,9 +315,18 @@ export function poolMax(econ, type) {
   return (econ?.max?.[type] ?? 0) + (econ?.granted?.[type] ?? 0);
 }
 
+/**
+ * What is left in a pool, from an economy already in hand. The HUD resolves the
+ * economy once per render and then asks this about every pool and every attack
+ * entry; going back through remaining() for each of those re-read the Combatant flag
+ * and recomputed the maxima every time.
+ */
+export function remainingOf(econ, type) {
+  return poolMax(econ, type) - (econ?.used?.[type] ?? 0);
+}
+
 export function remaining(combatant, type) {
-  const econ = getEconomy(combatant);
-  return poolMax(econ, type) - (econ.used[type] ?? 0);
+  return remainingOf(getEconomy(combatant), type);
 }
 
 export function canAfford(combatant, type, amount = 1) {
@@ -495,9 +533,7 @@ export function diagnose(actor = null) {
     // Which pools share a budget, and which of them that has actually closed yet -
     // a coupling looks like nothing at all until one of the pair is spent.
     coupledPools: probe ? [...coupledPools(probe)] : [],
-    coupledOutNow: combatant
-      ? Object.keys(RESOURCES).filter(pool => coupledOut(combatant, pool))
-      : [],
+    coupledOutNow: combatant ? [...coupledOutPools(combatant)] : [],
     used: econ?.used ?? null,
     grantedThisTurn: econ?.granted ?? null,
     attacksLeft: econ?.attacksLeft ?? null

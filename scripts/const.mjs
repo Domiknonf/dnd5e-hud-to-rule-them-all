@@ -25,6 +25,15 @@ export const RESOURCES = {
 };
 
 /**
+ * The pool keys in display order, resolved once at load.
+ *
+ * Every render walked RESOURCES and sorted it by `order` two or three times over -
+ * for the pips, for the groups and again for the grid. The table is a module
+ * constant, so the answer is too.
+ */
+export const POOL_ORDER = Object.keys(RESOURCES).sort((a, b) => RESOURCES[a].order - RESOURCES[b].order);
+
+/**
  * SECTIONS: the second level of grouping, INSIDE one pool. A caster's Action group is
  * twenty-odd buttons, and "which of these is a spell" is a question the player answers
  * by eye every single turn - so the bar answers it instead, and each section can be

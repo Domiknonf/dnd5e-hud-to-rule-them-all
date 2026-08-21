@@ -78,17 +78,46 @@ export function entryKey(item, activity = null) {
 }
 
 /**
- * What was configured for an entry, resolved most-specific-first: a rule set on one
- * activity beats the one set on its item, which is what lets "the whole item is a
- * bonus action" coexist with "except this one activity".
+ * The empty rule, shared. Handed back for every entry nobody has configured, which
+ * on a fresh actor is all of them - a new `{}` per lookup was one throwaway object
+ * per activity per render. Frozen so a caller cannot make it stop being empty.
  */
-export function entryConfig(actor, item, activity = null) {
-  const entries = getActorConfig(actor).entries ?? {};
-  const base = entries[entryKey(item)] ?? {};
+const NO_RULE = Object.freeze({});
+
+/**
+ * The whole rules table for an actor, read ONCE. `entryKey` lookups against it are
+ * plain property reads, while every call to getActorConfig() below costs a
+ * configTarget() resolution plus a Document#getFlag - and getFlag validates the flag
+ * scope against every active module before it reads anything.
+ *
+ * That is why the hot enumeration in actions.mjs takes the table once and resolves
+ * against it (see ruleFor) instead of asking per activity: the same answer, one flag
+ * read instead of several hundred.
+ */
+export function entryRules(actor) {
+  return getActorConfig(actor).entries ?? NO_RULE;
+}
+
+/**
+ * What was configured for an entry, resolved most-specific-first out of an already
+ * read rules table: a rule set on one activity beats the one set on its item, which
+ * is what lets "the whole item is a bonus action" coexist with "except this one
+ * activity".
+ */
+export function ruleFor(rules, item, activity = null) {
+  const base = rules[entryKey(item)] ?? NO_RULE;
   if (!activity) return base;
+  const own = rules[entryKey(item, activity)];
   // Merge FIELD BY FIELD, not object by object. Reordering writes a `sort` onto
   // every activity, so an activity rule almost always exists - and returning it
   // whole meant an item-level `pool` was never read again once anything had been
   // dragged. The activity still wins per field, which is the point.
-  return { ...base, ...(entries[entryKey(item, activity)] ?? {}) };
+  // Nothing to merge -> hand back the item rule itself rather than a copy of it.
+  if (!own) return base;
+  return base === NO_RULE ? own : { ...base, ...own };
+}
+
+/** The same answer for a single entry, for callers that have no table in hand. */
+export function entryConfig(actor, item, activity = null) {
+  return ruleFor(entryRules(actor), item, activity);
 }

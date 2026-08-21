@@ -1,16 +1,35 @@
 import {
-  MODULE_ID, RESOURCES, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
+  MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
   GRID_ROWS, GRID_TABS, DEBOUNCE_MS
 } from "./const.mjs";
 import {
-  getEconomy, resetTurn, remaining, getAttacksPerAction, combatantFor, spend, refund, poolMax,
-  blockedPools, blockingConditions, coupledOut, coupledPools, isTracked, isPlayed
+  getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
+  refund, poolMax, blockedPools, blockingConditions, coupledOutPools, coupledPools,
+  isTracked, isPlayed
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
+import { configTarget } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * The hover card's fixed wording, localized once instead of per row per entry per
+ * render - a caster's bar is sixty-odd tooltips with up to five rows each, and every
+ * one of those labels is the same six strings. Built lazily because i18n is not ready
+ * at import time, and never rebuilt: Foundry requires a reload to change language.
+ */
+let ttLabels = null;
+function tooltipLabels() {
+  if (ttLabels) return ttLabels;
+  const esc = Handlebars.escapeExpression;
+  const of = (key) => esc(game.i18n.localize(`${MODULE_ID}.tooltip.${key}`));
+  return (ttLabels = {
+    range: of("range"), target: of("target"), damage: of("damage"),
+    uses: of("uses"), alsoIn: of("alsoIn"), middleClick: of("middleClick")
+  });
+}
 
 /**
  * BG3-style hover card, injected via data-tooltip-html (core cleans the HTML with
@@ -20,6 +39,7 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
  */
 function tooltipFor(entry, poolLabel) {
   const esc = Handlebars.escapeExpression;
+  const labels = tooltipLabels();
   const img = entry.img ? `<img src="${esc(entry.img)}" alt="">` : "";
   const spellLevel = entry.itemType === "spell" && entry.level != null
     ? game.i18n.localize(CONFIG.DND5E?.spellLevels?.[entry.level] ?? "") : "";
@@ -29,7 +49,7 @@ function tooltipFor(entry, poolLabel) {
   const meta = [entry.subtitle, poolLabel, spellLevel].filter(Boolean).map(esc).join(" &middot; ");
   const rows = [];
   const row = (key, value) => rows.push(
-    `<div class="hudtra-tt-row"><dt>${esc(game.i18n.localize(`${MODULE_ID}.tooltip.${key}`))}</dt><dd>${esc(value)}</dd></div>`
+    `<div class="hudtra-tt-row"><dt>${labels[key]}</dt><dd>${esc(value)}</dd></div>`
   );
   if (entry.details?.range) row("range", entry.details.range);
   if (entry.details?.target) row("target", entry.details.target);
@@ -42,7 +62,7 @@ function tooltipFor(entry, poolLabel) {
     + `<header>${img}<div><span class="hudtra-tt-name">${esc(entry.name)}</span>`
     + (meta ? `<span class="hudtra-tt-meta">${meta}</span>` : "") + `</div></header>`
     + (rows.length ? `<dl class="hudtra-tt-rows">${rows.join("")}</dl>` : "")
-    + (entry.description ? `<p class="hudtra-tt-hint">${esc(game.i18n.localize(`${MODULE_ID}.tooltip.middleClick`))}</p>` : "")
+    + (entry.description ? `<p class="hudtra-tt-hint">${labels.middleClick}</p>` : "")
     + `</div>`;
 }
 
@@ -81,10 +101,13 @@ function foldTooltip(label, count, folded) {
  * That is the trade: a spell dragged to the front of the Action zone leads the spells
  * rather than the whole group. Turning the setting off gives the flat order back.
  *
+ * `grouping` is the setting, handed in rather than read here: this runs once per pool
+ * group, and a client-scoped setting is fetched and parsed out of browser storage on
+ * every read.
  */
-function sectionsFor(poolKey, entries, folded) {
+function sectionsFor(poolKey, entries, folded, grouping) {
   const flat = { sectioned: false, sections: [{ key: "", collapsed: false, entries }] };
-  if (!game.settings.get(MODULE_ID, "groupSections")) return flat;
+  if (!grouping) return flat;
   if (entries.length < SECTION_MIN_ENTRIES) return flat;
 
   const byKey = new Map();
@@ -132,8 +155,7 @@ function sectionsFor(poolKey, entries, folded) {
  * -1 means "there are pools and every one of them is empty" - that greys every leveled
  * spell, which is right, and is a different answer from null, which greys nothing.
  */
-function highestCastable(actor) {
-  const rows = spellSlots(actor);
+function highestCastable(rows) {
   if (!rows.length) return null;
   return rows.reduce((best, row) => (row.value > 0 && row.level > best ? row.level : best), -1);
 }
@@ -157,9 +179,11 @@ function highestCastable(actor) {
  *
  * A pool with slots but no spell on the bar still shows - the slots are worth seeing,
  * and a scroll or a hidden entry may well spend them.
+ *
+ * Takes the rows rather than the actor, so one spellSlots() read serves both this and
+ * highestCastable above instead of each walking system.spells for itself.
  */
-function spellBarFor(actor) {
-  const rows = spellSlots(actor);
+function spellBarFor(rows) {
   if (!rows.length) return null;
   const leveled = rows.filter(r => !r.pact).sort((a, b) => a.level - b.level);
   const pact = rows.find(r => r.pact) ?? null;
@@ -221,7 +245,7 @@ function spellBarFor(actor) {
 function gridFor(buckets, category) {
   const showing = category ?? null;
   const entries = [];
-  for (const key of Object.keys(RESOURCES).sort((a, b) => RESOURCES[a].order - RESOURCES[b].order)) {
+  for (const key of POOL_ORDER) {
     // Passives only ever appear on their own tab, never mixed into the action grid.
     if (key === "passive" ? showing !== "passive" : showing === "passive") continue;
     for (const entry of buckets[key] ?? []) {
@@ -359,8 +383,17 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * character wearing the active monster's pips.
    */
   get subjectCombatant() {
+    return this.#combatantOf(this.subjectActor);
+  }
+
+  /**
+   * The same answer for an actor the caller has already resolved. subjectActor is a
+   * search (controlled tokens, then the fallback chain), and _prepareContext needs
+   * both halves - going through the getter again ran that search twice per render.
+   */
+  #combatantOf(actor) {
     if (!game.combat?.started) return null;
-    return combatantFor(this.subjectActor);
+    return combatantFor(actor);
   }
 
   get hasSubject() {
@@ -468,7 +501,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       // was selected earlier is the worst kind of stale state.
       this.#category = null;
     }
-    const combatant = this.subjectCombatant;
+    const combatant = this.#combatantOf(actor);
     const inCombat = !!combatant;
     const isMyTurn = !!combatant && game.combat?.combatant?.id === combatant.id;
     const isMine = actor?.isOwner === true;
@@ -491,21 +524,25 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // broken bar; one with four crossed-out pips reads as Stunned.
     const blocked = blockedPools(econCombatant);
     const coupled = coupledPools(econCombatant);
+    // Which pools a coupling has already closed, for every pool at once. Asked per
+    // pool this re-matched the effect tables and re-read the economy each time, in
+    // both loops below.
+    const coupledOutNow = coupledOutPools(econCombatant, econ);
     const conditions = blockingConditions(econCombatant)
       .map(s => game.i18n.localize(CONFIG.DND5E?.conditionTypes?.[s]?.label ?? s));
     const blockedHint = conditions.length
       ? game.i18n.format(`${MODULE_ID}.blockedBy`, { conditions: conditions.join(", ") })
       : "";
 
-    const pools = !showEconomy ? [] : Object.entries(RESOURCES)
-      .filter(([key]) => key !== "other")
-      .sort((a, b) => a[1].order - b[1].order)
-      .map(([key, def]) => {
+    const pools = !showEconomy ? [] : POOL_ORDER
+      .filter(key => key !== "other")
+      .map(key => {
+        const def = RESOURCES[key];
         // poolMax, not econ.max: an Action Surge raises the pool for this turn, and
         // the pips are where that has to become visible.
         const max = poolMax(econ, key);
         const used = econ.used[key] ?? 0;
-        const spentByCoupling = coupledOut(econCombatant, key);
+        const spentByCoupling = coupledOutNow.has(key);
         const out = blocked.has(key) || spentByCoupling;
         // Shown while the coupling is merely PENDING - once it has bitten, the pool
         // is drawn as barred and saying "one of these two" as well would be noise.
@@ -532,20 +569,27 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(econCombatant);
-    const folded = foldedIds();
-    const spellBar = spellBarFor(actor);
+    // TWO LAYOUTS, ONE SWITCH (see economy.isPlayed). Resolved BEFORE the groups are
+    // built, because in the grid layout the sectioning, the fold state and their
+    // tooltips are all discarded again - the grid is one headerless field - and the
+    // cheapest way to compute them is not to.
+    const played = isPlayed(actor);
+    const folded = played ? {} : foldedIds();
+    const grouping = !played && game.settings.get(MODULE_ID, "groupSections");
+    const slotRows = spellSlots(actor);
+    const spellBar = spellBarFor(slotRows);
     // The ceiling every leveled spell on the bar is measured against, resolved once
     // per render rather than per slot.
-    const castable = highestCastable(actor);
-    const poolGroups = Object.entries(RESOURCES)
-      .sort((a, b) => a[1].order - b[1].order)
-      .map(([key, def]) => {
+    const castable = highestCastable(slotRows);
+    const poolGroups = POOL_ORDER
+      .map(key => {
+        const def = RESOURCES[key];
         // A queued Extra Attack (econ.attacksLeft) keeps the action group usable
         // even once the action pip itself reads as spent - but the action was
         // already committed to attacking, so only attack activities (and attack
         // substitutes like the Dragonborn's Breath Weapon) stay live.
         const hasFreeAttack = key === "action" && (econ.attacksLeft ?? 0) > 0;
-        const midAttackSequence = hasFreeAttack && remaining(econCombatant, key) <= 0;
+        const midAttackSequence = hasFreeAttack && remainingOf(econ, key) <= 0;
         const label = game.i18n.localize(`${MODULE_ID}.pool.${key}`);
         // Only per-turn pools can exhaust; "other" and "passive" have no budget.
         // A barring condition beats the queued-attack shortcut: being Stunned
@@ -556,8 +600,8 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         // grey itself out on every monster that has one.
         // Computed BEFORE the entries, because in the grid there is no group left to
         // grey out: it rides along on each slot instead.
-        const exhausted = tracked && (blocked.has(key) || coupledOut(econCombatant, key)
-          || (def.perTurn && !hasFreeAttack && remaining(econCombatant, key) <= 0));
+        const exhausted = tracked && (blocked.has(key) || coupledOutNow.has(key)
+          || (def.perTurn && !hasFreeAttack && remainingOf(econ, key) <= 0));
         const entries = (buckets[key] ?? [])
           .map(entry => {
             // Resolved in collectActions, so a per-entry override is already folded in.
@@ -572,7 +616,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
               // promise THAT number rather than the actor's.
               const total = entry.attacks ?? attacksPerAction;
               if (total > 1) {
-                const available = remaining(econCombatant, "action") > 0 ? total : (econ.attacksLeft ?? 0);
+                const available = remainingOf(econ, "action") > 0 ? total : (econ.attacksLeft ?? 0);
                 attacksBadge = {
                   available, max: total,
                   hint: game.i18n.format(`${MODULE_ID}.attacksAvailable`, { available, max: total })
@@ -596,8 +640,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
             enriched.tooltipHtml = tooltipFor(enriched, label);
             return enriched;
           });
+        // In the grid layout this object is nothing but a carrier for its entries:
+        // the grid is rebuilt from them below and drawn headerless, so the sections,
+        // the chips, the fold state and their tooltips would all be discarded again.
+        if (played) return { key, entries };
+
         const collapsed = folded[key] === true;
-        const { sectioned, sections } = sectionsFor(key, entries, folded);
+        const { sectioned, sections } = sectionsFor(key, entries, folded, grouping);
         return {
           key,
           icon: def.icon,
@@ -618,11 +667,11 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       })
       .filter(g => g.entries.length);
 
-    // TWO LAYOUTS, ONE SWITCH (see economy.isPlayed). A creature somebody plays gets
-    // BG3's single grid - the pool moves onto each slot as a marker, the categories
-    // move into tabs above it. A GM-only creature keeps the auto-grouped columns:
-    // nobody curates twelve goblins, and the headers are how that bar is read.
-    const played = isPlayed(actor);
+    // A creature somebody plays gets BG3's single grid - the pool moves onto each slot
+    // as a marker, the categories move into tabs above it. A GM-only creature keeps
+    // the auto-grouped columns: nobody curates twelve goblins, and the headers are how
+    // that bar is read. (`played` itself is resolved further up, where it also decides
+    // how much of each group above is worth building.)
     const enriched = Object.fromEntries(poolGroups.map(g => [g.key, g.entries]));
     const tabs = played ? tabsFor(enriched, this.#category) : [];
     // Same self-clearing rule the spell filter follows: a tab that is no longer there
@@ -885,4 +934,37 @@ export function getHUD() {
 
 export function refreshHUD() {
   refresh();
+}
+
+/**
+ * WHOSE CHANGES THE BAR HAS TO REDRAW FOR.
+ *
+ * The document hooks in module.mjs fire for every creature in the world, and a
+ * re-render rebuilds the whole bar: every item on the sheet is enumerated, bucketed
+ * and given a hover card. In an encounter of a dozen monsters trading blows - or
+ * under any module that ticks effects each turn - that was a full rebuild per update,
+ * on every client, nearly all of it producing byte-identical markup, because the bar
+ * shows exactly ONE creature.
+ *
+ * Lives here rather than in module.mjs because it is the same question subjectActor
+ * answers, and the two have to agree.
+ *
+ * The rule is "when in doubt, redraw": a change that cannot be attributed to an actor
+ * still refreshes, and so does every hook that does NOT come through here - combat,
+ * adding and removing combatants, token selection, the user's assigned character -
+ * which is where WHICH creature the bar shows is actually decided.
+ */
+export function refreshHUDFor(actor, changed = {}) {
+  // Ownership decides who the bar falls back to when no token is selected, so it
+  // redraws whichever creature it landed on (see CombatHUD#subjectActor).
+  if (changed.ownership !== undefined) return refresh();
+  if (!actor) return refresh();
+  const subject = instance?.subjectActor;
+  // Nothing on the bar yet: let the debounced refresh decide, exactly as before.
+  if (!subject) return refresh();
+  if (actor === subject || actor.uuid === subject.uuid) return refresh();
+  // Per-actor config lives on the BASE actor (see config.configTarget), which an
+  // unlinked token's synthetic actor shadows - so a rule written there does reach a
+  // bar showing one of its tokens.
+  if (configTarget(subject)?.uuid === actor.uuid) return refresh();
 }

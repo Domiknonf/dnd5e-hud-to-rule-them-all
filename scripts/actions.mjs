@@ -3,7 +3,7 @@ import {
   GENERIC_ACTIVITY_ICON, GENERIC_ACTIVITY_NAMES, ATTACK_SUBSTITUTE_NAMES, ACTION_GRANT_NAMES,
   ITEM_TYPE_SECTIONS, DEFAULT_SECTION
 } from "./const.mjs";
-import { entryConfig, entryKey } from "./config.mjs";
+import { entryConfig, entryRules, ruleFor, entryKey } from "./config.mjs";
 
 /**
  * In dnd5e 4.x+ the unit of "a thing you do" is an Activity, not an Item.
@@ -109,11 +109,18 @@ export function isAttackSubstituteItem(item) {
 /**
  * Does using this consume one attack within the Attack action (rather than a fresh
  * action of its own)? Configuration wins; detection is the fallback.
+ *
+ * Split from the lookup so the enumeration below can answer it from a rules table it
+ * has already read (see config.entryRules) instead of re-reading the actor flag for
+ * every activity on the sheet.
  */
-export function countsAsAttack(activity) {
-  const override = entryConfig(activity?.actor, activity?.item, activity).attack;
-  if (typeof override === "boolean") return override;
+function attackOf(activity, rule) {
+  if (typeof rule.attack === "boolean") return rule.attack;
   return activity?.type === "attack" || isAttackSubstituteItem(activity?.item);
+}
+
+export function countsAsAttack(activity) {
+  return attackOf(activity, entryConfig(activity?.actor, activity?.item, activity));
 }
 
 /**
@@ -206,23 +213,50 @@ function activationFor(activity) {
   return ownActivation(activity.item) ?? raw;
 }
 
-/** Which pool an activity draws from. Configuration wins over ACTIVATION_MAP. */
-export function poolFor(activity) {
-  const override = entryConfig(activity?.actor, activity?.item, activity).pool;
+/**
+ * Which pool an activity draws from. Configuration wins over ACTIVATION_MAP.
+ *
+ * Same split as attackOf above: the resolver takes an already-resolved rule, the
+ * exported wrapper looks one up for callers outside the enumeration (the booking
+ * path in module.mjs asks about exactly one activity).
+ */
+function poolOf(activity, rule) {
+  const override = rule.pool;
   if (override && RESOURCES[override]) return override;
   return bucketFor(activationFor(activity));
 }
 
+export function poolFor(activity) {
+  return poolOf(activity, entryConfig(activity?.actor, activity?.item, activity));
+}
+
+/**
+ * The two world settings isUsable() consults, read ONCE per enumeration.
+ *
+ * game.settings.get is not a property read: a world-scoped setting is looked up by
+ * scanning the world's whole settings collection, so asking per item meant two linear
+ * scans over every setting every module in the world has registered, times the number
+ * of items on the sheet. The answers cannot change halfway through one enumeration.
+ */
+function usabilityFilters() {
+  return {
+    hideUnequipped: game.settings.get(MODULE_ID, "hideUnequipped"),
+    hideUnprepared: game.settings.get(MODULE_ID, "hideUnprepared")
+  };
+}
+
 /** Cheap availability filter. Extend this — it is where most house rules land. */
-function isUsable(item) {
+function isUsable(item, filters) {
   // dnd5e caches a real spell Item on the actor for every "cast" activity on a
   // feature (NPC Spellcasting, Innate Spellcasting). Both would surface, so the
   // cached copy is dropped and the activity on the parent feature wins.
-  if (item.getFlag?.("dnd5e", "cachedFor")) return false;
+  // Read straight off `flags` rather than through getFlag(): identical result, minus
+  // getFlag's validation of the scope against every active module in the world.
+  if (item.flags?.dnd5e?.cachedFor) return false;
 
-  if (item.system?.equipped === false && game.settings.get(MODULE_ID, "hideUnequipped")) return false;
+  if (item.system?.equipped === false && filters.hideUnequipped) return false;
 
-  if (item.type === "spell" && game.settings.get(MODULE_ID, "hideUnprepared")) {
+  if (item.type === "spell" && filters.hideUnprepared) {
     const sys = item.system ?? {};
     // NPC statblocks list what the creature can cast; preparation does not apply.
     if (item.actor?.type === "character") {
@@ -294,10 +328,22 @@ function damageLabel(activity) {
  * (@UUID links, [[/roll]] inline rolls) is deliberately NOT run - it is async and
  * would have to fire on every render for every entry. Instead the enricher's label
  * is kept (or the enricher dropped) and the text clamped at a word boundary.
+ *
+ * MEMOISED on the raw description string, because the bar re-renders on every hook
+ * that touches an actor and this otherwise ran five passes over the full description
+ * HTML of every item on the sheet, every time. The result is a pure function of that
+ * string, so a cached answer can only be stale if the string changed - which is
+ * exactly what the stored `raw` is compared against. The cache is keyed weakly on the
+ * item, so nothing is held alive by it.
  */
+const descriptionCache = new WeakMap();
+
 function plainDescription(item) {
-  let text = item.system?.description?.value ?? "";
-  text = text
+  const raw = item.system?.description?.value ?? "";
+  const cached = descriptionCache.get(item);
+  if (cached && cached.raw === raw) return cached.text;
+
+  let text = raw
     .replace(/<[^>]+>/g, " ")
     .replace(/(@\w+\[[^\]]*\]|\[\[[^\]]*\]\])\{([^}]*)\}/g, "$2")
     .replace(/@\w+\[[^\]]*\]|\[\[[^\]]*\]\]/g, "")
@@ -305,6 +351,7 @@ function plainDescription(item) {
     .replace(/\s+/g, " ")
     .trim();
   if (text.length > 300) text = `${text.slice(0, 300).replace(/\s+\S*$/, "")}…`;
+  descriptionCache.set(item, { raw, text });
   return text;
 }
 
@@ -346,10 +393,15 @@ export function enumerateEntries(actor) {
   const entries = [];
   if (!actor) return entries;
   const produced = new Set();
+  // Read ONCE, for the whole enumeration. Both of these used to be asked per item or
+  // per activity: the rules table costs a flag read (config.entryRules), the filters
+  // two world-setting lookups, and neither answer can change while this loop runs.
+  const rules = entryRules(actor);
+  const filters = usabilityFilters();
 
   const make = (item, activities, pool, passive = false, allActivities = activities) => {
     const first = activities[0] ?? null;
-    const rule = entryConfig(actor, item, first);
+    const rule = ruleFor(rules, item, first);
     produced.add(item.id);
     return {
       key: activities.length ? entryKey(item, first) : entryKey(item),
@@ -369,7 +421,7 @@ export function enumerateEntries(actor) {
         pool: passive ? "passive" : (first ? bucketFor(activationFor(first)) : null),
         attack: activities.some(a => a.type === "attack") || isAttackSubstituteItem(item)
       },
-      attack: activities.some(countsAsAttack),
+      attack: activities.some(a => attackOf(a, ruleFor(rules, item, a))),
       attackOverridden: typeof rule.attack === "boolean",
       // How many attacks ONE Attack action grants when this entry starts it. Null
       // means "use the actor's number" (config.attacksPerAction / detection).
@@ -382,14 +434,14 @@ export function enumerateEntries(actor) {
     if (!item.system?.activities?.size) continue;
     // Same filter the bar uses - this is where the cached NPC-spellcasting copies
     // get dropped, and skipping it here is what put them in the dialog.
-    if (!isUsable(item)) continue;
+    if (!isUsable(item, filters)) continue;
     const activities = [...item.system.activities].filter(a => !isDescriptiveOnly(a));
     if (!activities.length) continue;
 
     const byPool = new Map();
     const unpooled = [];
     for (const activity of activities) {
-      const pool = poolFor(activity);
+      const pool = poolOf(activity, ruleFor(rules, item, activity));
       if (!pool) { unpooled.push(activity); continue; }
       if (!byPool.has(pool)) byPool.set(pool, []);
       byPool.get(pool).push(activity);
