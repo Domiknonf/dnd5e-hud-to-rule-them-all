@@ -6,10 +6,12 @@
      convention: the BG3-style bar commits to one fixed dark leather-and-gold look,
      so the palette below is hardcoded instead of derived from Foundry's theme
      variables. Structural values (font size, z-index) still come from core.
-     The palette is shared with :is(#tooltip, .locked-tooltip).hudtra-tooltip - core's tooltip element
-     lives outside our application root, so it can't inherit these. */
+     The palette is shared with our own tooltips (the hover card, and the fallback
+     description card) - core's tooltip element lives outside our application root,
+     so it can't inherit these. Pinned dnd5e cards are deliberately NOT in this list:
+     those keep dnd5e's own look, which is the point of pinning dnd5e's own card. */
   #hud-to-rule-them-all,
-  :is(#tooltip, .locked-tooltip).hudtra-tooltip {
+  :is(#tooltip, .locked-tooltip):is(.hudtra-tooltip, .hudtra-desc-plain) {
     --hudtra-gold: #c8a352;
     --hudtra-gold-bright: #ecd193;
     --hudtra-gold-dark: #6e5626;
@@ -95,9 +97,7 @@
     gap: 0.7em;
   }
 
-  /* ---- collapse tab, peeking above the top edge of its parent ----
-     Parent is the description panel when one is open, the frame otherwise (see
-     hud.hbs) - both are containing blocks, so one rule covers both cases. ---- */
+  /* ---- collapse tab, peeking above the frame's top edge ---- */
   #hud-to-rule-them-all .hudtra-collapse {
     position: absolute;
     top: -1.3em;
@@ -154,72 +154,21 @@
   /* The frame's own tab would otherwise sit at the screen edge next to this one. */
   #hud-to-rule-them-all.collapsed .hudtra-collapse { visibility: hidden; }
 
-  /* ---- description panel above the bar (middle click / passive features) ----
-     Absolutely positioned ON PURPOSE: as a normal column child its content would
-     feed into the frame's intrinsic width and opening a description would resize
-     the whole bar. Out of flow, the bar's width stays driven solely by
-     .hudtra-main (i.e. by the action columns). */
-  #hud-to-rule-them-all .hudtra-desc-panel {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    right: 0;
-    margin-bottom: 0.4em;
-    padding: 0.5em 0.6em 0.4em;
-    border: 1px solid var(--hudtra-gold-dark);
-    border-radius: 0.45em;
-    /* Floats over the canvas now, so it carries the frame's own opaque panel
-       treatment rather than a translucent inner tint. */
-    background:
-      radial-gradient(ellipse at 50% -30%, rgb(255 255 255 / 0.05), transparent 60%),
-      linear-gradient(180deg, var(--hudtra-leather-hi), var(--hudtra-leather-lo));
-    box-shadow:
-      inset 0 1px 0 rgb(236 209 147 / 0.2),
-      0 -0.2em 0.8em rgb(0 0 0 / 0.5);
-  }
-  #hud-to-rule-them-all .hudtra-desc-content {
-    display: flex;
-    justify-content: center;
-    max-height: 30vh;
+  /* ---- pinned description cards ----
+     NOT a panel of ours any more: a middle click pins dnd5e's own item card through
+     core's TooltipManager, exactly as the character sheet does (see hud.mjs
+     #pinDescription). The element therefore lives in core's tooltip layer, OUTSIDE
+     this application's root, which is why these selectors do not start at
+     #hud-to-rule-them-all - and why the card floats above the bar and above any
+     sheet instead of being clipped by either.
+
+     dnd5e's own styling does the looks; all we add is what keeps a very long
+     feature on screen, plus the clicks our dismissal needs. */
+  :is(#tooltip, .locked-tooltip).hudtra-desc-pin {
+    max-height: 60vh;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--hudtra-gold-dark) transparent;
-  }
-  /* dnd5e's card is built for a narrow hover tooltip and stretches to whatever it
-     is given, so it gets an explicit reading width here instead of spanning the
-     full bar. Its own huge header art is capped alongside it. */
-  #hud-to-rule-them-all .hudtra-desc-content > * {
-    width: 100%;
-    max-width: 42em;
-  }
-  #hud-to-rule-them-all .hudtra-desc-content img {
-    max-width: 7em;
-    max-height: 7em;
-    object-fit: cover;
-  }
-  /* dnd5e's own "middle-click to lock" footer: meaningless in a pinned panel. */
-  #hud-to-rule-them-all .hudtra-desc-content .hint { display: none; }
-  /* Enriched content links default to a dark ink colour meant for parchment
-     sheets - unreadable on the dark panel, so they follow our text colour. */
-  #hud-to-rule-them-all .hudtra-desc-content :is(a, a.content-link, .content-link) {
-    color: var(--hudtra-text);
-    background: rgb(255 255 255 / 0.07);
-    border-color: rgb(200 163 82 / 0.35);
-    text-decoration-color: var(--hudtra-gold);
-  }
-  #hud-to-rule-them-all .hudtra-desc-content :is(a, a.content-link, .content-link):hover {
-    color: var(--hudtra-gold-bright);
-  }
-  #hud-to-rule-them-all .hudtra-desc-content :is(a, .content-link) i { color: var(--hudtra-gold); }
-
-  /* Collapsing slides the frame down by its own height - which is not enough to
-     clear the out-of-flow panel sitting above it, so the panel gets a matching
-     slide of its own height on top of that. */
-  #hud-to-rule-them-all .hudtra-desc-panel {
-    transition: transform calc(var(--hudtra-anim) * 2.2) ease;
-  }
-  #hud-to-rule-them-all.collapsed .hudtra-desc-panel {
-    transform: translateY(calc(100% + 0.4em));
+    pointer-events: all;
   }
 
   /* Neutralize Foundry's default button chrome inside the bar once, then style
@@ -1088,20 +1037,37 @@
     color: var(--hudtra-text-dim);
   }
 
-  /* Fallback body when dnd5e's rich card API is unavailable (see hud.mjs). */
-  #hud-to-rule-them-all .hudtra-desc-body {
+  /* Fallback card, for anything whose data model has no richTooltip() (see hud.mjs).
+     dnd5e's classes are absent on this one, so it gets our own palette and a reading
+     width rather than inheriting a bare core tooltip. */
+  :is(#tooltip, .locked-tooltip).hudtra-desc-plain {
+    max-width: 30em;
+    text-align: left;
+    color: var(--hudtra-text);
+  }
+  .hudtra-desc-body {
     display: flex;
     gap: 0.75em;
     align-items: flex-start;
   }
-  #hud-to-rule-them-all .hudtra-desc-body img {
+  .hudtra-desc-body img {
     flex: 0 0 auto;
     width: 4em;
     height: 4em;
     object-fit: cover;
     border-radius: 0.35em;
+    border: none;
   }
-  #hud-to-rule-them-all .hudtra-desc-text { min-width: 0; }
+  .hudtra-desc-text { min-width: 0; }
+  /* Enriched links default to a dark ink colour meant for parchment sheets, which is
+     unreadable on this dark card. dnd5e's own card needs none of this - it brings its
+     own link styling. */
+  .hudtra-desc-plain :is(a, a.content-link, .content-link) {
+    color: var(--hudtra-text);
+    background: rgb(255 255 255 / 0.07);
+    border-color: rgb(200 163 82 / 0.35);
+  }
+  .hudtra-desc-plain :is(a, .content-link) i { color: var(--hudtra-gold); }
 
   /* Foundry's own macro hotbar (#hotbar in v13) is redundant while the combat bar
      is up and would sit right on top of it. The bar no longer closes when combat

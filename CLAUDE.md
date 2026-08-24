@@ -290,6 +290,21 @@ Two rules keep it honest:
   about to click walk out from under the pointer. The groups are left-aligned inside the
   fixed frame and `.hudtra-groups` scrolls when there is more than fits, so the cost is
   empty leather on a creature with few abilities, and nothing else.
+- **A description is a pinned tooltip, not a panel.** Middle-clicking a slot (or
+  left-clicking a passive) hands dnd5e's own item card to core's `TooltipManager` and
+  pins it with `lockTooltip()` — the same mechanism, and therefore the same card, as a
+  middle click on the character sheet. It is deliberately not ours: the element lives
+  in core's tooltip layer, outside this application's root, so it is never clipped by
+  the bar, never covered by a sheet, and costs the bar no height. The fixed panel above
+  the frame that used to do this is gone, and with it the collapse handle's two-stage
+  behaviour.
+  - **Strip `hudtra-tooltip` off the pinned element.** The slots sit under a
+    `data-tooltip-class`, so the card would otherwise inherit the bar's leather palette
+    over dnd5e's own — and would land in the set the *next* middle click dismisses
+    (that dismissal is what stops the bar's stat card from being pinned twice).
+  - Pins are dismissed by clicking them, by middle-clicking the same slot again, and by
+    anything that changes what the slots mean: a different creature in the bar, or the
+    bar collapsing.
 - **Two collapse handles exist on purpose.** The one inside `.hudtra-frame` rides the
   frame's collapse transform; a transformed element becomes the containing block for its
   positioned descendants, so it cannot be pinned to the viewport. `.hudtra-reopen` is a
@@ -471,7 +486,7 @@ Opportunity Attack does not open an Attack action or queue Extra Attacks.
 - **Declarative click handling.** `data-action="name"` in the template, static handler in
   `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery. Three documented
   exceptions, all because ApplicationV2 only binds `click`/`contextmenu`: the
-  middle-click description popup needs a delegated `auxclick` listener in
+  middle-click description pin needs a delegated `auxclick` listener in
   `hud.mjs -> _onFirstRender`, the config dialog's drop zones need the four HTML5 drag
   events in `config-app.mjs -> _onFirstRender`, and arranging the bar needs four more
   in `hud.mjs -> _onFirstRender`. All are delegated from the persistent root and bound

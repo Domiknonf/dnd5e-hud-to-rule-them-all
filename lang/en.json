@@ -39,7 +39,6 @@
   "dnd5e-hud-to-rule-them-all.tooltip.middleClick": "Middle-click for the full description",
   "dnd5e-hud-to-rule-them-all.close": "Close",
   "dnd5e-hud-to-rule-them-all.toggleBar": "Collapse or expand the bar",
-  "dnd5e-hud-to-rule-them-all.closeDescription": "Close the description",
   "dnd5e-hud-to-rule-them-all.notify.exhausted": "No {pool} left this turn.",
   "dnd5e-hud-to-rule-them-all.notify.noGM": "A GM must be online for this.",
   "dnd5e-hud-to-rule-them-all.config.title": "HUD configuration",

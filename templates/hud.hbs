@@ -11,23 +11,14 @@
      presentation-only context fields. --}}
 <div class="hudtra-frame" style="--hudtra-scale: {{scale}}">
 
-  {{!-- One collapse handle, rendered at the top edge of whatever is currently the
-       topmost element: the description panel if open, the bar itself otherwise.
-       Clicking it collapses the description first, the bar only once it's gone. --}}
-  {{#if description}}
-  <div class="hudtra-desc-panel">
-    <button type="button" class="hudtra-collapse" data-action="collapse"
-            data-tooltip-text="{{collapseTooltip}}">
-      <i class="fa-solid fa-chevron-down"></i>
-    </button>
-    <div class="hudtra-desc-content">{{{description.content}}}</div>
-  </div>
-  {{else}}
+  {{!-- The collapse handle, at the bar's top edge. Descriptions are no longer a panel
+       up here: they are pinned as core tooltips beside the slot they came from (see
+       hud.mjs #pinDescription), which is what the character sheet's middle click
+       does, so nothing above the bar has to make room for them any more. --}}
   <button type="button" class="hudtra-collapse" data-action="collapse"
-          data-tooltip-text="{{collapseTooltip}}">
+          data-tooltip="dnd5e-hud-to-rule-them-all.toggleBar">
     <i class="fa-solid fa-chevron-down"></i>
   </button>
-  {{/if}}
 
   {{!-- Category tabs, BG3's row above the hotbar. Only for a creature somebody plays:
        a GM-run statblock keeps its pool columns, which are already the categories it

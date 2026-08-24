@@ -66,6 +66,45 @@ function tooltipFor(entry, poolLabel) {
     + `</div>`;
 }
 
+/**
+ * dnd5e's own item card - the one the character sheet shows on hover and pins on a
+ * middle click, complete with its property pills. Returned as raw content plus the
+ * classes it wants on the tooltip element, because that is what the pin needs.
+ *
+ * The fallback is a plainly enriched description, for anything whose data model has
+ * no richTooltip(); it carries its own class so our CSS can make it presentable
+ * without touching dnd5e's card.
+ */
+async function descriptionCard(uuid) {
+  const doc = await fromUuid(uuid).catch(() => null);
+  const item = doc?.item ?? doc;   // an Activity uuid resolves to its parent item
+  if (!item) return null;
+
+  if (typeof item.system?.richTooltip === "function") {
+    try {
+      const card = await item.system.richTooltip();
+      return {
+        html: card.content,
+        classes: card.classes?.length ? card.classes : ["dnd5e2", "dnd5e-tooltip", "item-tooltip"]
+      };
+    } catch (err) {
+      console.warn(`${MODULE_ID} | richTooltip failed, falling back to raw description`, err);
+    }
+  }
+
+  const esc = Handlebars.escapeExpression;
+  const TE = foundry.applications.ux?.TextEditor?.implementation ?? TextEditor;
+  const enriched = await TE.enrichHTML(item.system?.description?.value ?? "", {
+    relativeTo: item,
+    rollData: item.getRollData?.() ?? {}
+  });
+  return {
+    html: `<div class="hudtra-desc-body"><img src="${esc(item.img)}" alt="">`
+      + `<div class="hudtra-desc-text">${enriched}</div></div>`,
+    classes: ["hudtra-desc-plain"]
+  };
+}
+
 /* ---------------------------------------------- */
 /*  Folding                                        */
 /* ---------------------------------------------- */
@@ -361,8 +400,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Which combatant the HUD is showing. Defaults to the active combatant. */
   #combatantId = null;
 
-  /** Item/activity uuid whose description panel is currently expanded, if any. */
-  #descriptionUuid = null;
+  /**
+   * The description cards currently pinned, by the uuid they were opened from. Core
+   * owns the elements (they live in its tooltip layer, outside this application's
+   * root and outside its re-renders); this is only what is needed to toggle one off
+   * again and to clear them all when the bar changes creature.
+   */
+  #pinned = new Map();
 
   /**
    * Category tab the played-creature grid is narrowed to (a SECTIONS key, or
@@ -468,7 +512,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * transition. Safe before the first render - `element` is null until then.
    */
   collapse(state = true) {
-    if (state) this.#descriptionUuid = null;
+    if (state) this.#unpinAll();
     this.#collapsed = state;
     this.element?.classList.toggle("collapsed", state);
   }
@@ -491,9 +535,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       event.preventDefault();
       // Core's own middle-click behaviour is "pin the active tooltip as a clone"
       // (TooltipManager#_onLockTooltip, on pointerup - which has already fired by
-      // the time auxclick arrives). A pinned copy of the hover card on top of the
-      // description dialog is just noise: dismiss any freshly pinned hover card
-      // before opening the dialog.
+      // the time auxclick arrives). That pins the BAR'S hover card, which is the
+      // stat line, not the description: dismiss it and pin the real card instead.
+      // Same mechanism either way, so what ends up on screen is what the character
+      // sheet's middle click produces.
       for (const el of document.querySelectorAll(".locked-tooltip.hudtra-tooltip")) {
         game.tooltip?.dismissLockedTooltip?.(el);
       }
@@ -630,36 +675,81 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     this.element.classList.toggle("collapsed", this.#collapsed);
   }
 
-  /**
-   * Builds the content for the description panel above the bar. Preferred content
-   * is dnd5e's own rich item card (ItemDataModel#richTooltip - the same card the
-   * inventory shows on hover, complete with property pills), falling back to a
-   * plain enriched description if that API is unavailable.
-   */
-  async #prepareDescription() {
-    if (!this.#descriptionUuid) return null;
-    const doc = await fromUuid(this.#descriptionUuid).catch(() => null);
-    const item = doc?.item ?? doc;   // an Activity uuid resolves to its parent item
-    if (!item) { this.#descriptionUuid = null; return null; }
+  /* -------------------------------------------- */
+  /*  Pinned descriptions                          */
+  /* -------------------------------------------- */
 
-    if (typeof item.system?.richTooltip === "function") {
-      try {
-        const card = await item.system.richTooltip();
-        const classes = card.classes?.length ? card.classes : ["dnd5e2", "dnd5e-tooltip", "item-tooltip"];
-        return { name: item.name, content: `<div class="${classes.join(" ")}">${card.content}</div>` };
-      } catch (err) {
-        console.warn(`${MODULE_ID} | richTooltip failed, falling back to raw description`, err);
-      }
-    }
-    const esc = Handlebars.escapeExpression;
-    const TE = foundry.applications.ux?.TextEditor?.implementation ?? TextEditor;
-    const enriched = await TE.enrichHTML(item.system?.description?.value ?? "", {
-      relativeTo: item,
-      rollData: item.getRollData?.() ?? {}
+  /**
+   * Pin the description card beside a slot, or take it away again if that slot's card
+   * is already pinned.
+   *
+   * THIS IS CORE'S OWN PIN, not a panel of ours: `TooltipManager#lockTooltip` clones
+   * the live tooltip into a `.locked-tooltip` that outlives the hover, which is exactly
+   * what a middle click on the character sheet does. Two things follow, and both are
+   * the point of doing it this way: the card is dnd5e's own (same markup, same classes,
+   * same CSS as the sheet's), and it floats in core's tooltip layer, so it is never
+   * clipped by the bar and never covered by a sheet.
+   *
+   * The bar's own hover card is pinned by core too - the middle click that gets here
+   * already pinned it on pointerup - which is why the caller dismisses that first.
+   */
+  async #pinDescription(slot) {
+    const uuid = slot?.dataset.uuid;
+    const tips = game.tooltip;
+    if (!uuid || !tips) return;
+    // A second middle click on the same slot takes the card away: the gesture that
+    // opened it is the first way back, clicking the card itself is the second.
+    if (this.#pinned.get(uuid)?.isConnected) return this.#unpin(uuid);
+
+    const card = await descriptionCard(uuid);
+    if (!card) return;
+    // Anchored to the slot, opening upwards: the bar sits at the bottom edge, and
+    // core clamps the card into the viewport from there.
+    tips.deactivate();
+    tips.activate(slot, { html: card.html, direction: "UP" });
+    // The classes go on the tooltip element itself rather than on a wrapper inside
+    // it, because that is where dnd5e's own card CSS expects them - a wrapper gets
+    // the colours and none of the layout. `hudtra-tooltip` comes OFF for the same
+    // reason: the slot sits under a data-tooltip-class, and inheriting it would
+    // repaint dnd5e's card in the bar's leather - and would put the card in the set
+    // the next middle click dismisses.
+    this.#dressCard(tips.tooltip, card);
+    const locked = tips.lockTooltip?.();
+    // No pinning API (a core version that dropped it): the card still showed, it just
+    // fades with the pointer. Degraded, not broken, and nothing to clean up.
+    if (!locked) return;
+    this.#dressCard(locked, card);
+    this.#pinned.set(uuid, locked);
+    // Click to dismiss, the way core's own pinned tooltips behave. Bound on the
+    // element we just created (and gone with it), and skipped on links so a @UUID
+    // reference inside the card stays clickable.
+    locked.addEventListener("click", event => {
+      if (event.target?.closest?.("a")) return;
+      this.#unpin(uuid);
     });
-    const content = `<div class="hudtra-desc-body"><img src="${esc(item.img)}" alt="">`
-      + `<div class="hudtra-desc-text">${enriched}</div></div>`;
-    return { name: item.name, content };
+  }
+
+  /** dnd5e's classes on, the bar's hover-card class off. Both elements, see above. */
+  #dressCard(el, card) {
+    if (!el) return;
+    el.classList.remove("hudtra-tooltip");
+    el.classList.add(...card.classes, "hudtra-desc-pin");
+  }
+
+  /** Take one pinned card away. Safe to call for one that is already gone. */
+  #unpin(uuid) {
+    const el = this.#pinned.get(uuid);
+    this.#pinned.delete(uuid);
+    if (el?.isConnected) game.tooltip?.dismissLockedTooltip?.(el);
+  }
+
+  /**
+   * Take them all away. The cards are anchored to slots, so they have to go whenever
+   * those slots stop meaning what they meant: a different creature in the bar, or the
+   * bar sliding away entirely.
+   */
+  #unpinAll() {
+    for (const uuid of [...this.#pinned.keys()]) this.#unpin(uuid);
   }
 
   /* -------------------------------------------- */
@@ -670,12 +760,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // for someone watching a creature that isn't in the fight - it stays null, which
     // is exactly what keeps every economy call below inert.
     const actor = this.subjectActor;
-    // An open description belongs to the creature it was opened on. Turn changes and
+    // A pinned description belongs to the creature it was opened on. Turn changes and
     // token clicks swap the whole bar underneath it, so drop it rather than leave a
-    // goblin's feature pinned above a player's abilities.
+    // goblin's feature floating over a player's abilities.
     if (this.#shownActorUuid !== (actor?.uuid ?? null)) {
       this.#shownActorUuid = actor?.uuid ?? null;
-      this.#descriptionUuid = null;
+      this.#unpinAll();
       // Same reasoning: a level picked out on one creature's strip means nothing on
       // the next one, and silently hiding half of a wizard's bar because a warlock
       // was selected earlier is the worst kind of stale state.
@@ -875,7 +965,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const hp = actor?.system?.attributes?.hp ?? null;
     const isDying = !!hp && hp.value <= 0;
     const rollsDeathSave = isDying && actor?.type === "character";
-    const description = await this.#prepareDescription();
 
     // A level-up can change what the detection would suggest without changing
     // anything visible in the bar (Extra Attack adds no new entry), so a new
@@ -920,9 +1009,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       addRowTooltip: game.i18n.localize(`${MODULE_ID}.grid.addRow`),
       removeRowTooltip: game.i18n.localize(`${MODULE_ID}.grid.removeRow`),
       groups,
-      description,
-      // The handle's first stage depends on what is currently open.
-      collapseTooltip: game.i18n.localize(`${MODULE_ID}.${description ? "closeDescription" : "toggleBar"}`),
       configNotice: !!notice,
       configTooltip: notice
         ? game.i18n.format(`${MODULE_ID}.config.notice.gear`, notice)
@@ -949,30 +1035,21 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Middle click on a slot (or left click on a passive feature): expand the
-   * description panel above the bar for that item, replace its content if a
-   * different item is picked, collapse it again when the same item is clicked
-   * twice. The X in the panel corner routes to #onCloseDescription.
+   * Middle click on a slot, or left click on a passive feature: pin dnd5e's own
+   * description card beside it (see #pinDescription).
    */
   static async #onShowDescription(event, target) {
-    const uuid = target.dataset.uuid;
-    if (!uuid) return;
-    this.#descriptionUuid = this.#descriptionUuid === uuid ? null : uuid;
-    return this.render();
+    return this.#pinDescription(target);
   }
 
   /**
-   * The single collapse handle works in stages: an open description panel closes
-   * first, and only a second click slides the bar itself away. Closing the
-   * description needs a re-render (the panel is template-driven), while the bar's
-   * slide only toggles a class on the persistent root so the transition animates.
+   * Slide the bar away and back. Deliberately NOT a re-render: toggling the class on
+   * the persistent root is what makes the transition animate. Pinned description
+   * cards go with it - they are anchored to slots that are on their way off screen.
    */
   static #onCollapse() {
-    if (this.#descriptionUuid) {
-      this.#descriptionUuid = null;
-      return this.render();
-    }
     this.#collapsed = !this.#collapsed;
+    if (this.#collapsed) this.#unpinAll();
     this.element.classList.toggle("collapsed", this.#collapsed);
   }
 
