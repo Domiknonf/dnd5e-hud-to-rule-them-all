@@ -1,6 +1,6 @@
 import {
   MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
-  GRID_ROWS, GRID_TABS, DEBOUNCE_MS
+  GRID_ROWS, GRID_TABS, ALL_TAB, DEBOUNCE_MS
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
@@ -279,7 +279,15 @@ function arrangedButtons(actor) {
   return arranged(all);
 }
 
-/** The tab strip: every category this creature actually has something in. */
+/**
+ * The tab strip: every category this creature actually has something in, led by "All".
+ *
+ * That first tab is the filter's off switch made visible. Clearing the filter was
+ * always possible - clicking the lit tab again does it - but nothing on the strip said
+ * so, and a bar narrowed to Weapons looks exactly like a bar that only has weapons.
+ * It carries no state of its own: "everything" IS the null category, so it lights up
+ * by itself whenever a tab is clicked off.
+ */
 function tabsFor(buckets, category) {
   const counts = new Map();
   for (const [key, bucket] of Object.entries(buckets)) {
@@ -288,7 +296,7 @@ function tabsFor(buckets, category) {
       counts.set(tab, (counts.get(tab) ?? 0) + 1);
     }
   }
-  return GRID_TABS
+  const tabs = GRID_TABS
     .filter(key => counts.has(key))
     .map(key => {
       const label = game.i18n.localize(
@@ -303,6 +311,20 @@ function tabsFor(buckets, category) {
         tooltip: game.i18n.format(`${MODULE_ID}.tab.${active ? "off" : "on"}`, { label })
       };
     });
+  if (!tabs.length) return tabs;
+
+  // Counts what All actually shows, which is everything EXCEPT the passives - they
+  // are not actions and stay on their own tab (see gridFor).
+  const total = tabs.reduce((n, tab) => tab.key === "passive" ? n : n + tab.count, 0);
+  tabs.unshift({
+    key: ALL_TAB,
+    label: game.i18n.localize(`${MODULE_ID}.tab.all`),
+    count: total,
+    active: !category,
+    icon: "fa-solid fa-border-all",
+    tooltip: game.i18n.localize(`${MODULE_ID}.tab.allHint`)
+  });
+  return tabs;
 }
 
 export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -985,7 +1007,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onToggleCategory(event, target) {
     const key = target.dataset.category;
     if (!key) return;
-    this.#category = this.#category === key ? null : key;
+    // "All" only ever clears: it is the filter's off switch, not a filter of its own.
+    const next = key === ALL_TAB || this.#category === key ? null : key;
+    // Clicking the lit "All" is the one click that changes nothing - and a full
+    // rebuild of the bar to draw the identical thing is worth not doing.
+    if (next === this.#category) return;
+    this.#category = next;
     return this.render();
   }
 

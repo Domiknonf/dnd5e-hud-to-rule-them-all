@@ -124,11 +124,17 @@
      centred macro bar. Sized from a core variable rather than the bar's own em
      scale, which lives on the frame and is out of reach from here. */
   #hud-to-rule-them-all .hudtra-reopen { display: none; }
+  /* Clear of the sidebar, not in the screen's corner: the bar is fixed across the
+     WHOLE viewport width, so a handle at `right: 0` lands on top of whatever the chat
+     column keeps down there - a dice tray, in this table's case. `--sidebar-width` is
+     core's own variable; the fallback is v13's default width, so a renamed variable
+     shifts the handle by a few pixels instead of putting it back under the tray. With
+     the sidebar collapsed there is nothing to clear and it takes the corner back. */
   #hud-to-rule-them-all.collapsed .hudtra-reopen {
     display: block;
     pointer-events: all;
     position: absolute;
-    right: 0.8rem;
+    right: calc(var(--sidebar-width, 300px) + 0.8rem);
     bottom: 0;
     height: 1.5rem;
     padding: 0 0.9rem;
@@ -141,6 +147,9 @@
     box-shadow: 0 -0.15rem 0.5rem rgb(0 0 0 / 0.5);
   }
   #hud-to-rule-them-all.collapsed .hudtra-reopen:hover { color: var(--hudtra-gold-bright); }
+  body:has(#sidebar.collapsed) #hud-to-rule-them-all.collapsed .hudtra-reopen {
+    right: 0.8rem;
+  }
 
   /* The frame's own tab would otherwise sit at the screen edge next to this one. */
   #hud-to-rule-them-all.collapsed .hudtra-collapse { visibility: hidden; }

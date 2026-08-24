@@ -293,8 +293,12 @@ Two rules keep it honest:
 - **Two collapse handles exist on purpose.** The one inside `.hudtra-frame` rides the
   frame's collapse transform; a transformed element becomes the containing block for its
   positioned descendants, so it cannot be pinned to the viewport. `.hudtra-reopen` is a
-  sibling of the frame for exactly that reason, and sits in the bottom-right corner to
-  stay clear of Foundry's centred macro bar.
+  sibling of the frame for exactly that reason, and sits at the bottom right to stay
+  clear of Foundry's centred macro bar — but **inside** the sidebar, not in the screen's
+  corner: the bar is fixed across the whole viewport width, so a handle at `right: 0`
+  lands on top of whatever the chat column keeps down there (a dice tray). It is offset
+  by core's `--sidebar-width` (fallback: v13's default) and takes the corner back while
+  the sidebar is collapsed.
 - The macro bar (`#hotbar`) is hidden only while the bar is **expanded**
   (`:not(.collapsed)`), so collapsing gives it back. The class is toggled without a
   re-render and `:has()` tracks that live.
@@ -308,12 +312,15 @@ drawn, not just whether it counts:
 | --- | --- | --- |
 | Layout | one BG3 grid, headerless | pool columns with headers |
 | Pool shown as | a marker on each slot (`.hudtra-cost`) | the column header |
-| Categories | tabs above the grid | fold chips in each header |
+| Categories | tabs above the grid, led by "All" | fold chips in each header |
 | Rows | `+` / `-`, client setting `gridRows` | two, fixed |
 
 The reasoning is decision 4's: a person arranges their own character once and lives
 with it; nobody arranges twelve goblins, so those keep a bar that fills itself.
 
+- **The "All" tab carries no state.** "Everything" is the null category, so that tab
+  only ever clears the filter and lights up on its own the moment another tab is
+  clicked off. It is not a `SECTIONS` key and is never stored as one (`ALL_TAB`).
 - **It reads `isPlayed`, never `isTracked`.** `isTracked` carries the `trackEveryone`
   escape hatch for counting, and a GM turning counting on for testing must not be
   handed a layout that expects to be curated.

@@ -110,6 +110,14 @@ export const GRID_ROWS = { min: 1, max: 4, default: 2 };
 export const GRID_TABS = ["weapon", "spell", "feature", "consumable", "gear", "passive"];
 
 /**
+ * The tab that leads the strip and stands for "no filter at all". Not a SECTIONS key
+ * and never stored as one: the unfiltered grid IS the null category, so this tab only
+ * ever clears - which is also what makes it light up on its own the moment another
+ * tab is clicked off.
+ */
+export const ALL_TAB = "all";
+
+/**
  * dnd5e activation type -> our bucket.
  * VERIFY AT RUNTIME: `Object.keys(CONFIG.DND5E.activityActivationTypes)` in the console.
  * Anything not listed here and not purely time-based lands in "other" (see actions.mjs).
