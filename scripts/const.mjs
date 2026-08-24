@@ -94,6 +94,16 @@ export const SECTION_MIN_ENTRIES = 8;
 export const SPELL_PIP_LIMIT = 6;
 
 /**
+ * How far right the played creature's grid may run, in cells. Positions are absolute
+ * cell numbers (see hud.mjs gridCells), and every cell up to the last occupied one is
+ * a real element - so a nonsense number in a hand-edited flag would ask the browser
+ * for that many. Nothing arranged by hand comes near this: at two rows it is fifty
+ * columns, far past anything a bar can show at once. A button past the limit is
+ * treated as unplaced and lands at the end.
+ */
+export const GRID_CELL_LIMIT = 100;
+
+/**
  * How many slot rows the played-creature grid may have, and what it starts with. BG3
  * puts `+` and `-` next to End Turn for exactly this; two rows is what fits under a
  * portrait without the bar growing taller than it already is.

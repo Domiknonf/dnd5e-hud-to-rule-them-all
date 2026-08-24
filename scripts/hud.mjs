@@ -1,6 +1,6 @@
 import {
   MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
-  GRID_ROWS, GRID_TABS, ALL_TAB, DEBOUNCE_MS
+  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
@@ -307,15 +307,74 @@ function arranged(entries) {
 }
 
 /**
- * Every button on this creature's bar, in the order it is drawn - the list a swap
- * renumbers. Built from collectActions rather than from the DOM: a category tab shows
- * a subset, and renumbering a subset would scramble everything it hides.
+ * Every button on this creature's bar in the order it is drawn, packed. This is what
+ * the GM's pool columns use: there is no field to leave a gap in there, so a position
+ * is a rank and nothing else.
  */
-function arrangedButtons(actor) {
-  const buckets = collectActions(actor);
+function barButtons(buckets) {
   const all = [];
   for (const key of POOL_ORDER) for (const entry of buckets[key] ?? []) all.push(entry);
   return arranged(all);
+}
+
+/** The grid's height in rows, clamped - the setting is a number a user could edit. */
+function gridRowCount() {
+  return Math.clamp(
+    Number(game.settings.get(MODULE_ID, "gridRows")) || GRID_ROWS.default,
+    GRID_ROWS.min, GRID_ROWS.max
+  );
+}
+
+/**
+ * THE GRID AS CELLS, which is what makes an empty slot a place you can drop on.
+ *
+ * `sort` is read here as an absolute cell number rather than as a rank: cell 7 is
+ * cell 7 whether or not cells 4 to 6 hold anything. That is the whole difference
+ * between "the icons keep an order" and "the icons keep a place" - a gap you left as
+ * a separator survives, and dropping something two columns to the right leaves it
+ * two columns to the right instead of pulling it back against the others.
+ *
+ * Consequences that fall out of it, and are all wanted:
+ * - Hiding a button leaves its cell empty. Nothing slides up, because nothing in an
+ *   arranged grid should move on its own.
+ * - A button with no cell yet (a new item, or a fresh character) goes after the last
+ *   occupied one, never into a gap somebody made on purpose.
+ * - Two buttons claiming the same cell cannot both have it: the second one is treated
+ *   as having none. That is only reachable from a stale config, and it resolves
+ *   itself the moment anything is dragged.
+ *
+ * The empty cells ARE rendered here, unlike the painted field behind them (see the
+ * CSS): only up to the end of the arrangement plus one spare column, so there is
+ * always somewhere new to drop without putting the whole rectangle in the DOM.
+ */
+function gridCells(entries, rows) {
+  // How far right this grid may run. GRID_CELL_LIMIT is the guard against a nonsense
+  // number in a hand-edited flag asking for a hundred thousand elements; it never
+  // costs a button, because a creature with more entries than that raises its own
+  // ceiling - losing an icon would be a far worse answer than a wide grid.
+  const limit = Math.max(GRID_CELL_LIMIT, entries.length + rows);
+  const placed = new Map();
+  const floating = [];
+  for (const entry of entries) {
+    const cell = Number.isFinite(entry.sort) ? entry.sort : -1;
+    if (cell < 0 || cell >= limit || placed.has(cell)) floating.push(entry);
+    else placed.set(cell, entry);
+  }
+
+  // After the last occupied cell, never into a gap somebody left on purpose - unless
+  // the end is full up, where the first free cell beats not being drawn at all.
+  let next = placed.size ? Math.max(...placed.keys()) + 1 : 0;
+  for (const entry of floating) {
+    while (placed.has(next)) next++;
+    if (next >= limit) { next = 0; while (placed.has(next)) next++; }
+    placed.set(next++, entry);
+  }
+
+  const last = placed.size ? Math.max(...placed.keys()) : -1;
+  const total = Math.min(Math.ceil((last + 1) / rows) * rows + rows, limit);
+  const cells = [];
+  for (let i = 0; i < total; i++) cells.push(placed.get(i) ?? { empty: true, cell: i });
+  return cells;
 }
 
 /**
@@ -594,8 +653,11 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   #onSlotDragOver(event) {
     if (!this.#dragKey) return;
-    const slot = event.target?.closest?.(".hudtra-slot[data-key]");
-    const takes = !!slot && slot.dataset.key !== this.#dragKey
+    const slot = event.target?.closest?.(".hudtra-slot");
+    // An occupied slot takes the drop unless it is the one being dragged; an empty
+    // cell always does. Both only within the group the drag started in.
+    const takes = !!slot
+      && (slot.dataset.key ? slot.dataset.key !== this.#dragKey : slot.dataset.cell !== undefined)
       && (slot.closest(".hudtra-group")?.dataset.group ?? null) === this.#dragGroup;
     this.#markDropSlot(takes ? slot : null);
     if (!this.#dropSlot) return;
@@ -603,30 +665,67 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     event.dataTransfer.dropEffect = "move";
   }
 
-  /** Icon onto icon: the two trade places, wherever on the bar they sit. */
+  /**
+   * Icon onto icon: the two trade places, wherever on the bar they sit. Icon onto an
+   * empty cell of the grid: it moves there and leaves its own cell empty, which is
+   * what lets a player put space between two groups of icons.
+   */
   async #onSlotDrop(event) {
     const from = this.#dragKey;
     if (!from) return;
     // Ours from here on, whatever it landed on inside the bar: the browser must not
     // also do whatever it does with a dropped payload.
     event.preventDefault();
-    const to = event.target?.closest?.(".hudtra-slot[data-key]")?.dataset.key;
+    const slot = event.target?.closest?.(".hudtra-slot");
+    const to = slot?.dataset.key ?? null;
+    const cell = slot?.dataset.cell !== undefined ? Number(slot.dataset.cell) : null;
     // Cleared BEFORE the await: this drag is handled either way, and dragend (which
     // fires while the write is still in flight) must not offer to hide it as well.
     this.#dragKey = null;
     this.#dragGroup = null;
     this.#markDropSlot(null);
-    if (!to || to === from) return;
     const actor = this.subjectActor;
-    if (!actor) return;
-    const buttons = arrangedButtons(actor);
-    const dragged = buttons.findIndex(entry => entry.key === from);
-    const target = buttons.findIndex(entry => entry.key === to);
-    if (dragged < 0 || target < 0) return;
-    [buttons[dragged], buttons[target]] = [buttons[target], buttons[dragged]];
-    // Every button is renumbered, not just the two: positions are one global run, so
-    // handing out two fresh indices without the rest to compare against says nothing.
-    return setEntryOrder(actor, buttons);
+    if (!actor || to === from) return;
+
+    const places = this.#placement(actor, from);
+    const dragged = places.findIndex(entry => entry?.key === from);
+    if (dragged < 0) return;
+
+    if (to !== null) {
+      const target = places.findIndex(entry => entry?.key === to);
+      if (target < 0) return;
+      [places[dragged], places[target]] = [places[target], places[dragged]];
+    } else if (Number.isInteger(cell) && cell >= 0 && cell < places.length) {
+      // The cell is empty by construction - only empty ones carry data-cell.
+      places[cell] = places[dragged];
+      places[dragged] = null;
+    } else return;
+
+    // Everything in that run is written, not just what moved: a position only means
+    // something next to the others, and this is the one place they are all in hand.
+    return setEntryOrder(actor, places);
+  }
+
+  /**
+   * The run of positions one drag may rearrange, as an array whose INDEX is the
+   * position. Which run it is depends on what was picked up, and the three cases are
+   * the three things a position can mean on this bar:
+   *
+   * - the played grid: absolute cells, gaps and all (see gridCells)
+   * - the passives of that grid: their tab is a packed list, so a plain rank
+   * - the GM's pool columns: the whole bar, packed, a plain rank
+   *
+   * Always built unfiltered: a category tab shows a subset, and renumbering a subset
+   * would scramble everything it hides.
+   */
+  #placement(actor, key) {
+    const buckets = collectActions(actor);
+    if (!isPlayed(actor)) return barButtons(buckets);
+    // Passives are never IN the grid (gridFor keeps them on their own tab), so they
+    // keep a run of their own - and stay out of the grid's cell numbering, where they
+    // would show up as holes nobody can fill.
+    if ((buckets.passive ?? []).some(entry => entry.key === key)) return arranged([...buckets.passive]);
+    return gridCells(gridFor(buckets, null), gridRowCount());
   }
 
   /**
@@ -652,7 +751,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     if (inside) return;
 
     const actor = this.subjectActor;
-    const button = actor ? arrangedButtons(actor).find(b => b.key === key) : null;
+    const button = actor ? barButtons(collectActions(actor)).find(b => b.key === key) : null;
     if (!button) return;
     // On a split button the activity's own name is the only thing telling it from the
     // item's other half, so the question has to carry it - and only this half is hidden.
@@ -949,19 +1048,20 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // Same self-clearing rule the spell filter follows: a tab that is no longer there
     // cannot be un-picked, so the filter drops rather than emptying the grid.
     if (played && this.#category && !tabs.some(t => t.key === this.#category)) this.#category = null;
+    const rows = gridRowCount();
     const gridEntries = played ? gridFor(enriched, this.#category) : [];
+    // The unfiltered grid is drawn as CELLS, so the gaps a player left are gaps and
+    // the empty ones can be dropped on. A category tab is a lens, not an arrangement:
+    // it packs, because a filtered grid full of holes where the other categories sit
+    // would say nothing about anything.
+    const cells = played && !this.#category ? gridCells(gridEntries, rows) : gridEntries;
     const groups = played
       ? (gridEntries.length
-        ? [{ key: "grid", header: false, exhausted: false, entries: gridEntries,
+        ? [{ key: "grid", header: false, exhausted: false, entries: cells,
              collapsed: false, chips: null,
-             sections: [{ key: "", collapsed: false, entries: gridEntries }] }]
+             sections: [{ key: "", collapsed: false, entries: cells }] }]
         : [])
       : poolGroups;
-
-    const rows = Math.clamp(
-      Number(game.settings.get(MODULE_ID, "gridRows")) || GRID_ROWS.default,
-      GRID_ROWS.min, GRID_ROWS.max
-    );
     const hp = actor?.system?.attributes?.hp ?? null;
     const isDying = !!hp && hp.value <= 0;
     const rollsDeathSave = isDying && actor?.type === "character";

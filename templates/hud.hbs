@@ -171,6 +171,13 @@
         {{#unless collapsed}}
         <div class="hudtra-entries" data-section="{{key}}">
           {{#each entries}}
+          {{#if empty}}
+          {{!-- An empty cell of the played grid. Rendered, unlike the painted field
+               behind it, for one reason: something has to be there to drop an icon
+               on. Only up to the end of the arrangement plus a spare column, so the
+               DOM stays small (see hud.mjs gridCells). --}}
+          <div class="hudtra-slot hudtra-empty" data-cell="{{cell}}"></div>
+          {{else}}
           {{!-- draggable for everyone, gated in the handler: whether this user may
                arrange the bar is one answer for the whole bar (hud.mjs #editable),
                and asking it per slot in here would only put it in the markup 60
@@ -205,6 +212,7 @@
                  hover away, and a square wants one glyph. --}}
             {{#if attacksBadge}}<span class="hudtra-attacks">{{attacksBadge.available}}</span>{{/if}}
           </button>
+          {{/if}}
           {{/each}}
         </div>
         {{/unless}}

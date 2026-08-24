@@ -136,20 +136,27 @@ function editableEntries(config) {
 }
 
 /**
- * Write a display position onto every button, in the order given. `buttons` is a list
- * of entries as actions.mjs produces them - the position goes on every config key a
- * button covers, or a grouped button would come apart the moment it moved.
+ * Write a display position onto every button, taken from WHERE IT SITS IN THE LIST.
+ * `buttons` is a list of entries as actions.mjs produces them - the position goes on
+ * every config key a button covers, or a grouped button would come apart the moment
+ * it moved.
  *
- * `sort` is a GLOBAL index across all pools, not a position within one: the played
- * creature's bar is a single grid, so an icon dragged onto an icon in another pool has
- * to be able to trade places with it. A pool column simply renders its own entries in
- * ascending order and gets the same answer it always did.
+ * Two things the index carries, and both callers rely on it:
+ *
+ * - `sort` is GLOBAL across the pools, not a position within one. The played
+ *   creature's bar is a single grid, so an icon dragged onto an icon from another
+ *   pool has to be able to trade places with it. A pool column just renders its own
+ *   entries in ascending order and gets the answer it always did.
+ * - HOLES IN THE LIST ARE THE POINT. An empty place stays empty - it is a cell of
+ *   the grid nobody is standing on - which is what lets a player put space between
+ *   two groups of icons. Callers with nothing to leave empty simply pass a packed
+ *   list and get the dense numbering they always got.
  */
 export async function setEntryOrder(actor, buttons) {
   const config = getActorConfig(actor);
   const entries = editableEntries(config);
   buttons.forEach((button, i) => {
-    for (const key of button.keys ?? []) entries[key] = { ...(entries[key] ?? {}), sort: i };
+    for (const key of button?.keys ?? []) entries[key] = { ...(entries[key] ?? {}), sort: i };
   });
   return setActorConfig(actor, { ...config, entries });
 }

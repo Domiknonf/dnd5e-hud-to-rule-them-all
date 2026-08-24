@@ -683,6 +683,23 @@
       border-color var(--hudtra-anim),
       box-shadow var(--hudtra-anim);
   }
+  /* An empty cell of the grid. It is there to be dropped on, not to be seen: the
+     painted field behind it already draws the frame, so this one contributes nothing
+     but its own area - and none of the slot chrome above, which would double the
+     frame and light up under the pointer like a button. */
+  #hud-to-rule-them-all .hudtra-slot.hudtra-empty {
+    border-color: transparent;
+    background: none;
+    box-shadow: none;
+  }
+  /* :not(.drop-target) so the empty cell still lights up as a drop target - the
+     pointer is over it while a drag hovers it, and a plain :hover rule would outrank
+     the highlight and swallow it. */
+  #hud-to-rule-them-all .hudtra-slot.hudtra-empty:hover:not(.drop-target) {
+    transform: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
   #hud-to-rule-them-all .hudtra-slot img {
     width: 100%;
     height: 100%;

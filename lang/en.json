@@ -89,7 +89,7 @@
   "dnd5e-hud-to-rule-them-all.settings.groupSections.hint": "Sort a crowded group into Weapons, Spells, Features, Consumables and Gear, each one foldable from the bar's header. Small groups are left alone. Your own order from the gear dialog then applies within a section.",
   "dnd5e-hud-to-rule-them-all.settings.scale.name": "HUD scale",
   "dnd5e-hud-to-rule-them-all.settings.scale.hint": "Size of the HUD on your screen.",
-  "dnd5e-hud-to-rule-them-all.config.zones.hint": "Drag entries between zones to change which pool they use, or drag an item straight from the character sheet. Dragging a tile also sets the order the bar shows - the same order icons dragged onto each other on the bar itself produce.",
+  "dnd5e-hud-to-rule-them-all.config.zones.hint": "Drag entries between zones to change which pool they use, or drag an item straight from the character sheet. Dragging a tile also sets the order the bar shows - note that it packs the bar, so any gaps left between icons on the bar itself are closed.",
   "dnd5e-hud-to-rule-them-all.config.zones.hidden": "Not on the bar",
   "dnd5e-hud-to-rule-them-all.config.zones.hiddenHint": "Nothing here. Drop something to keep it off the bar.",
   "dnd5e-hud-to-rule-them-all.config.zones.empty": "Nothing here. Drop an entry to add it.",

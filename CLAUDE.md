@@ -171,6 +171,23 @@ Consequences to respect:
   the bar's own swap (`config.setEntryOrder`). Numbering one zone from zero again would
   interleave the pools in that grid. A pool column just renders its own entries in
   ascending order and gets the answer it always did.
+- **In the played grid that position is an absolute CELL, not a rank** (`gridCells` in
+  `hud.mjs`). Cell 7 is cell 7 whether or not 4 to 6 hold anything, which is what lets
+  a player leave a gap between two groups of icons and keep it. Everything else follows
+  from that and is wanted: hiding a button leaves its cell empty (nothing on an arranged
+  grid moves by itself), a button with no cell yet goes *after* the last occupied one
+  rather than into a gap somebody made on purpose, and two buttons claiming one cell
+  means the second is treated as having none. `setEntryOrder` therefore takes a list
+  whose **holes are meaningful** — index is position, an empty place stays empty. The
+  packed runs (pool columns, the passive tab) pass a list without holes and get the
+  dense numbering they always got.
+- **Passives are numbered in a run of their own.** They are never in the grid — their
+  tab is a packed list — so putting them in its cell space would show up as holes
+  nobody can fill. `#placement` picks the run from what was picked up: grid cells,
+  passives, or the whole bar for a GM creature.
+- **The dialog's zone drag packs the bar**, because it renumbers densely across the
+  zones. That is stated in its hint: gaps are a bar-side arrangement, and a bulk
+  reorder in the dialog is the coarser tool of the two.
 - Reordering therefore writes a `sort` onto every entry. `sort` does **not** count
   towards an entry's "overridden" mark, or a single reorder would light up every tile.
 - **The bar itself is the second arranging surface** (`hud.mjs`, `#onSlotDragStart` and
@@ -178,6 +195,8 @@ Consequences to respect:
   played grid is a single group, so there the swap is free across pools, while in the
   GM layout the groups are the pool columns and a swap across two of them would move
   nothing visible (that bar orders by pool first). The target simply does not light up.
+  An icon dropped on an EMPTY cell of the grid moves there and leaves its own cell
+  empty — that is the whole reason those cells are rendered at all.
   Letting go outside `.hudtra-frame` offers to hide the button that was dragged — only that button, even on a split item, since the
   question names the activity. `#dragKey` doubles as "still unhandled": the drop clears
   it, which is what lets `dragend` tell a swap from a release outside the bar. An
@@ -342,7 +361,10 @@ with it; nobody arranges twelve goblins, so those keep a bar that fills itself.
 - **The empty slots are painted, not rendered** — a tiled SVG frame behind the grid, one
   tile per slot pitch. That is what makes the field a full rectangle at any width and
   any `--hudtra-scale` without measuring how many columns fit, and it costs no DOM on a
-  bar that already builds a tooltip per slot. Every wrapper between the flex row and the
+  bar that already builds a tooltip per slot. The **arranged** part of the field is the
+  exception: cells up to the end of the arrangement, plus one spare column, are real
+  elements, because a drop needs something to land on. Everything past that stays
+  painted, so the DOM grows with what somebody arranged and not with the screen. Every wrapper between the flex row and the
   grid has to pass the width through, or the field stops where the filled slots do.
 - **One template, one loop.** The grid is a single group with `header: false` and one
   nameless section, so `hud.hbs` did not grow a second copy of the slot markup — the
