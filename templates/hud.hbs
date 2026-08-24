@@ -180,11 +180,18 @@
         {{#unless collapsed}}
         <div class="hudtra-entries" data-section="{{key}}">
           {{#each entries}}
+          {{!-- draggable for everyone, gated in the handler: whether this user may
+               arrange the bar is one answer for the whole bar (hud.mjs #editable),
+               and asking it per slot in here would only put it in the markup 60
+               times. Dropped on another slot the two trade places; dropped off the
+               bar it offers to take the button off it. --}}
           <button type="button" class="hudtra-slot {{#if locked}}locked{{/if}} {{#if exhausted}}spent{{/if}} {{#if unavailable}}unavailable{{/if}}" data-action="{{action}}"
                   data-kind="{{kind}}" data-uuid="{{uuid}}" data-type="{{pool}}"
-                  data-name="{{name}}"
+                  data-name="{{name}}" data-key="{{key}}" draggable="true"
                   data-tooltip-html="{{tooltipHtml}}">
-            {{#if img}}<img src="{{img}}" alt="">{{else}}<i class="{{icon}}"></i>{{/if}}
+            {{!-- draggable="false": an <img> is a drag source of its own, and without
+                 this the browser drags the bare artwork instead of the slot. --}}
+            {{#if img}}<img src="{{img}}" alt="" draggable="false">{{else}}<i class="{{icon}}"></i>{{/if}}
             {{!-- What this costs, as the shape its pool uses in the resource column.
                  In the grid it is the only thing left saying so - there is no column
                  header any more - and CSS hides it again in the grouped layout, where

@@ -121,3 +121,67 @@ export function ruleFor(rules, item, activity = null) {
 export function entryConfig(actor, item, activity = null) {
   return ruleFor(entryRules(actor), item, activity);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Arranging                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Copy the rules table for editing. Shallow on purpose: the map is copied, each rule
+ * is replaced rather than mutated, so nothing a caller of ruleFor() still holds can
+ * change under it (see the "never mutate what ruleFor hands back" rule).
+ */
+function editableEntries(config) {
+  return { ...(config.entries ?? {}) };
+}
+
+/**
+ * Write a display position onto every button, in the order given. `buttons` is a list
+ * of entries as actions.mjs produces them - the position goes on every config key a
+ * button covers, or a grouped button would come apart the moment it moved.
+ *
+ * `sort` is a GLOBAL index across all pools, not a position within one: the played
+ * creature's bar is a single grid, so an icon dragged onto an icon in another pool has
+ * to be able to trade places with it. A pool column simply renders its own entries in
+ * ascending order and gets the same answer it always did.
+ */
+export async function setEntryOrder(actor, buttons) {
+  const config = getActorConfig(actor);
+  const entries = editableEntries(config);
+  buttons.forEach((button, i) => {
+    for (const key of button.keys ?? []) entries[key] = { ...(entries[key] ?? {}), sort: i };
+  });
+  return setActorConfig(actor, { ...config, entries });
+}
+
+/** Take one button off the bar, or put it back. */
+export async function setEntryHidden(actor, keys, hidden) {
+  const config = getActorConfig(actor);
+  const entries = editableEntries(config);
+  for (const key of keys ?? []) {
+    const rule = { ...(entries[key] ?? {}) };
+    if (hidden) rule.hidden = true;
+    else delete rule.hidden;
+    if (Object.keys(rule).length) entries[key] = rule;
+    else delete entries[key];
+  }
+  return setActorConfig(actor, { ...config, entries });
+}
+
+/**
+ * Drop every stored position, back to the automatic order. Only `sort` goes: what
+ * pool something belongs to, whether it counts as an attack and what is hidden are
+ * answers to different questions and are reset per entry in the dialog.
+ */
+export async function clearEntryOrder(actor) {
+  const config = getActorConfig(actor);
+  const entries = {};
+  for (const [key, rule] of Object.entries(config.entries ?? {})) {
+    const { sort, ...rest } = rule;
+    if (Object.keys(rest).length) entries[key] = rest;
+  }
+  const next = { ...config };
+  if (Object.keys(entries).length) next.entries = entries;
+  else delete next.entries;
+  return setActorConfig(actor, next);
+}

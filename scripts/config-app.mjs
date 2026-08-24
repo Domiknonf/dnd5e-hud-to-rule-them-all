@@ -5,7 +5,7 @@ import {
 import { guessAttacksPerAction, collectConfigurable } from "./actions.mjs";
 import { isTracked } from "./economy.mjs";
 import {
-  configTarget, getActorConfig, setActorConfig, entryKey as entryKeyOf
+  configTarget, getActorConfig, setActorConfig, clearEntryOrder, entryKey as entryKeyOf
 } from "./config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -119,6 +119,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       toggleAttack: HudConfig.#onToggleAttack,
       toggleHidden: HudConfig.#onToggleHidden,
       resetEntry: HudConfig.#onResetEntry,
+      resetOrder: HudConfig.#onResetOrder,
       clear: HudConfig.#onClear
     }
   };
@@ -395,10 +396,11 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       for (const k of row.keys) entries[k] = this.#poolRule(entries[k], zone, auto, hiding);
     }
 
-    // Renumber the target zone so the entry sits where it was let go. Computed from
-    // the CURRENT layout: the entry either was already in this zone (a reorder) or
-    // was not (an insert), and both fall out of the same two lines.
-    const tiles = this.#zonesFor(actor).find(z => z.key === zone)?.tiles ?? [];
+    // Renumber so the entry sits where it was let go. Computed from the CURRENT
+    // layout: the entry either was already in this zone (a reorder) or was not (an
+    // insert), and both fall out of the same two lines.
+    const zones = this.#zonesFor(actor);
+    const tiles = zones.find(z => z.key === zone)?.tiles ?? [];
     const from = tiles.findIndex(t => t.key === key);
     const ordered = tiles.map(t => t.key).filter(k => k !== key);
     // The index came from the rendered grid, which still counted the dragged tile,
@@ -406,12 +408,18 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const at = from >= 0 && from < index ? index - 1 : index;
     ordered.splice(Math.clamp(at, 0, ordered.length), 0, key);
 
+    // `sort` is a GLOBAL position, not one within the zone: a played creature's bar
+    // is a single grid across all pools (see config.setEntryOrder), so numbering each
+    // zone from zero would interleave the pools there. Every zone is therefore
+    // renumbered in bar order, with the dragged key taken out of the zone it left.
     const byKey = new Map(rows.map(r => [r.key, r]));
-    ordered.forEach((k, i) => {
-      for (const member of byKey.get(k)?.keys ?? [k]) {
-        entries[member] = { ...(entries[member] ?? {}), sort: i };
-      }
-    });
+    zones
+      .flatMap(z => z.key === zone ? ordered : z.tiles.map(t => t.key).filter(k => k !== key))
+      .forEach((k, i) => {
+        for (const member of byKey.get(k)?.keys ?? [k]) {
+          entries[member] = { ...(entries[member] ?? {}), sort: i };
+        }
+      });
 
     await this.#write(actor, { ...config, entries });
   }
@@ -595,6 +603,28 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onResetEntry(event, target) {
     const key = target.closest(".hudtra-tile")?.dataset.key;
     return this.#mutateEntry(key, () => ({}));
+  }
+
+  /**
+   * Throw the arrangement away: every stored position goes, both the ones dragged in
+   * here and the ones dragged on the bar itself, and the automatic order (pool first,
+   * then the sheet or A-Z) comes back. Nothing else about an entry is touched - where
+   * it belongs and what is hidden are different questions with their own controls.
+   */
+  static async #onResetOrder() {
+    const actor = this.actor;
+    if (!actor) return;
+    const ok = await DialogV2.confirm({
+      window: { title: game.i18n.localize(`${MODULE_ID}.config.zones.resetOrderTitle`) },
+      content: `<p>${game.i18n.format(`${MODULE_ID}.config.zones.resetOrderBody`, {
+        name: Handlebars.escapeExpression(actor.name)
+      })}</p>`,
+      modal: true,
+      rejectClose: false
+    }).catch(() => false);
+    if (!ok) return;
+    await clearEntryOrder(actor);
+    return this.render();
   }
 
   /** Take the suggestion: the configured count becomes the suggested one. */

@@ -83,10 +83,20 @@
     {{/if}}
 
     {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item
-         straight off the character sheet, to overrule where it belongs; drag within
-         a zone to set the order the bar shows. --}}
+         straight off the character sheet, to overrule where it belongs; dragging a
+         tile also writes its position on the bar, which is one global run across the
+         zones (see config.setEntryOrder) and is what the bar's own drag writes too. --}}
     <div class="hudtra-config-zones">
-      <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.zones.hint"}}</p>
+      <div class="hudtra-config-zones-head">
+        <p class="hint">{{localize "dnd5e-hud-to-rule-them-all.config.zones.hint"}}</p>
+        {{!-- The way back from any arrangement, here and on the bar: both write the
+             same position, so one control undoes both. --}}
+        <button type="button" data-action="resetOrder"
+                data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.resetOrderHint">
+          <i class="fa-solid fa-arrow-down-short-wide"></i>
+          {{localize "dnd5e-hud-to-rule-them-all.config.zones.resetOrder"}}
+        </button>
+      </div>
       {{#each zones}}
       <section class="hudtra-zone" data-zone="{{key}}">
         <h4><i class="{{icon}}"></i> {{label}}</h4>
