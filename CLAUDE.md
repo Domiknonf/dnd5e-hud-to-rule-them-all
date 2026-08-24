@@ -119,7 +119,7 @@ Consequences to respect:
   the `activity.type === "attack"` / `ATTACK_SUBSTITUTE_NAMES` guess), `attacks` (how
   many attacks this entry grants when it *opens* the Attack action), `grants` (what
   using it *adds* to the pools this turn — Action Surge; `false` overrides
-  `ACTION_GRANT_NAMES` to "nothing"), `hidden`, and `sort` (position within its pool).
+  `ACTION_GRANT_NAMES` to "nothing"), `hidden`, and `sort` (position on the bar).
   All but `sort` are resolved in `actions.mjs` (`poolFor`, `countsAsAttack`,
   `attacksForActivity`, `grantsForActivity`), so the HUD, the gate and the booking
   path all see the same answer — including usages from the sheet or a macro.
@@ -164,9 +164,26 @@ Consequences to respect:
   is what gives the mismatch confirmation something to compare against. Dropping an
   entry back where detection wanted it *removes* the rule rather than pinning the same
   value — otherwise "auto" could never be restored by dragging.
-- Reordering writes a `sort` onto every tile in the touched zone. `sort` therefore does
-  **not** count towards an entry's "overridden" mark, or a single reorder would light up
-  the whole zone.
+- **`sort` is a GLOBAL position, not one within a pool.** A played creature's bar is one
+  grid across all pools, so an icon dropped on an icon from another pool has to be able
+  to trade places with it — which per-pool numbering cannot express. Both writers
+  therefore renumber *everything* in bar order: the dialog's zone drag (`#assign`) and
+  the bar's own swap (`config.setEntryOrder`). Numbering one zone from zero again would
+  interleave the pools in that grid. A pool column just renders its own entries in
+  ascending order and gets the answer it always did.
+- Reordering therefore writes a `sort` onto every entry. `sort` does **not** count
+  towards an entry's "overridden" mark, or a single reorder would light up every tile.
+- **The bar itself is the second arranging surface** (`hud.mjs`, `#onSlotDragStart` and
+  friends). Icon onto icon swaps the two, but only **within one rendered group**: the
+  played grid is a single group, so there the swap is free across pools, while in the
+  GM layout the groups are the pool columns and a swap across two of them would move
+  nothing visible (that bar orders by pool first). The target simply does not light up.
+  Letting go outside `.hudtra-frame` offers to hide the button that was dragged — only that button, even on a split item, since the
+  question names the activity. `#dragKey` doubles as "still unhandled": the drop clears
+  it, which is what lets `dragend` tell a swap from a release outside the bar. An
+  Escape-cancelled drag reports no coordinates at all and asks nothing.
+- **One reset undoes both surfaces**, because both write the same field: the dialog's
+  "Reset order" button (`clearEntryOrder`) strips every `sort` and nothing else.
 - `hidden` removes an entry from the bar. It does **not** make it free: `costOfActivity`
   deliberately ignores the flag.
 - Config is stored on the **base** Actor (`configTarget`), so five unlinked goblins from
@@ -445,12 +462,13 @@ Opportunity Attack does not open an Attack action or queue Extra Attacks.
   bare global, and likewise for other v13-namespaced helpers. If you are unsure whether a
   global is deprecated, check the console for deprecation warnings rather than guessing.
 - **Declarative click handling.** `data-action="name"` in the template, static handler in
-  `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery. Two documented
-  exceptions, both because ApplicationV2 only binds `click`/`contextmenu`: the
+  `DEFAULT_OPTIONS.actions`. No manual `addEventListener`, no jQuery. Three documented
+  exceptions, all because ApplicationV2 only binds `click`/`contextmenu`: the
   middle-click description popup needs a delegated `auxclick` listener in
-  `hud.mjs -> _onFirstRender`, and the config dialog's drop zones need the four HTML5
-  drag events in `config-app.mjs -> _onFirstRender`. Both are delegated from the
-  persistent root and bound once. Do not add further listeners.
+  `hud.mjs -> _onFirstRender`, the config dialog's drop zones need the four HTML5 drag
+  events in `config-app.mjs -> _onFirstRender`, and arranging the bar needs four more
+  in `hud.mjs -> _onFirstRender`. All are delegated from the persistent root and bound
+  once. Do not add further listeners.
 - **No browser storage.** No `localStorage` or `sessionStorage`. State goes in document
   flags or `game.settings`.
 - **CSS lives in `@layer modules`** and uses Foundry's CSS variables so light and dark

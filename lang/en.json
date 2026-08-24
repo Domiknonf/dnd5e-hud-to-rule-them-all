@@ -88,7 +88,7 @@
   "dnd5e-hud-to-rule-them-all.settings.groupSections.hint": "Sort a crowded group into Weapons, Spells, Features, Consumables and Gear, each one foldable from the bar's header. Small groups are left alone. Your own order from the gear dialog then applies within a section.",
   "dnd5e-hud-to-rule-them-all.settings.scale.name": "HUD scale",
   "dnd5e-hud-to-rule-them-all.settings.scale.hint": "Size of the HUD on your screen.",
-  "dnd5e-hud-to-rule-them-all.config.zones.hint": "Drag entries between zones to change which pool they use, or drag an item straight from the character sheet. Drag within a zone to set the order the bar shows.",
+  "dnd5e-hud-to-rule-them-all.config.zones.hint": "Drag entries between zones to change which pool they use, or drag an item straight from the character sheet. Dragging a tile also sets the order the bar shows - the same order icons dragged onto each other on the bar itself produce.",
   "dnd5e-hud-to-rule-them-all.config.zones.hidden": "Not on the bar",
   "dnd5e-hud-to-rule-them-all.config.zones.hiddenHint": "Nothing here. Drop something to keep it off the bar.",
   "dnd5e-hud-to-rule-them-all.config.zones.empty": "Nothing here. Drop an entry to add it.",
@@ -104,5 +104,12 @@
   "dnd5e-hud-to-rule-them-all.config.zones.splitBody": "\"{name}\" currently has buttons in more than one pool, because its activities disagree about what it costs. Move all of it to {target}, or only the group you dragged?",
   "dnd5e-hud-to-rule-them-all.config.zones.moveWhole": "Move all of {name}",
   "dnd5e-hud-to-rule-them-all.config.zones.moveGroup": "Only this group",
-  "dnd5e-hud-to-rule-them-all.config.zones.splitMark": "This feature has buttons in more than one pool. Drag one onto the other's zone to merge them."
+  "dnd5e-hud-to-rule-them-all.config.zones.splitMark": "This feature has buttons in more than one pool. Drag one onto the other's zone to merge them.",
+  "dnd5e-hud-to-rule-them-all.hide.title": "Take this off the bar?",
+  "dnd5e-hud-to-rule-them-all.hide.body": "Do you want to hide {name} from the HUD?",
+  "dnd5e-hud-to-rule-them-all.hide.hint": "Hidden entries stay in the gear dialog, under \"Not on the bar\", and can be dragged back into a pool at any time.",
+  "dnd5e-hud-to-rule-them-all.config.zones.resetOrder": "Reset order",
+  "dnd5e-hud-to-rule-them-all.config.zones.resetOrderHint": "Forget every position set here or on the bar and go back to the automatic order.",
+  "dnd5e-hud-to-rule-them-all.config.zones.resetOrderTitle": "Reset the icon order",
+  "dnd5e-hud-to-rule-them-all.config.zones.resetOrderBody": "Put every icon of {name} back where the module would place it? Pool assignments, attack marks and hidden entries are kept."
 }

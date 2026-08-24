@@ -591,6 +591,10 @@ export function collectActions(actor) {
       details: single ? detailsFor(single) : null,
       description: plainDescription(item),
       key: entry.key,
+      // Every config key this one button covers. Carried onto the button so the bar's
+      // own drag handling can write a position or a `hidden` without enumerating the
+      // whole sheet again for the keys it already had in hand.
+      keys: entry.keys,
       countsAsAttack: entry.attack,
       attacks: entry.attacks,
       sort: entry.sort

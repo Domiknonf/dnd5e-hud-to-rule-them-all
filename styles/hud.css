@@ -743,6 +743,21 @@
       inset 0 0 0.5em rgb(0 0 0 / 0.8);
     z-index: 1;
   }
+  /* Arranging (see hud.mjs #onSlotDragStart). The dragged slot fades where it came
+     from, the one under the pointer lights up in the same blue the config dialog's
+     drop zones use - the two gestures are the same gesture. Deliberately no
+     `cursor: grab`: a slot is a button first, and clicking it is what nearly every
+     press is for. */
+  #hud-to-rule-them-all .hudtra-slot.dragging {
+    opacity: 0.4;
+  }
+  #hud-to-rule-them-all .hudtra-slot.drop-target {
+    border-color: var(--color-border-highlight, #7ba7d7);
+    box-shadow:
+      0 0 0.6em rgb(123 167 215 / 0.6),
+      inset 0 0 0.5em rgb(0 0 0 / 0.8);
+    z-index: 1;
+  }
   /* Passive features are read-only reference cards, not buttons that "do"
      something - the dashed frame sets them apart from usable slots. */
   #hud-to-rule-them-all .hudtra-group[data-group="passive"] .hudtra-slot {
@@ -1204,6 +1219,22 @@
     min-height: 8rem;
     flex: 1 1 auto;
     padding-right: 0.35rem;
+  }
+  /* The hint and the way back from any arrangement, on one line. */
+  #hudtra-config .hudtra-config-zones-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  #hudtra-config .hudtra-config-zones-head .hint {
+    margin: 0;
+    flex: 1 1 auto;
+  }
+  #hudtra-config .hudtra-config-zones-head button {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+    font-size: var(--font-size-12, 0.85em);
   }
   #hudtra-config .hudtra-zone {
     border: 1px dashed var(--color-border-light-tertiary, rgb(128 128 128 / 0.4));

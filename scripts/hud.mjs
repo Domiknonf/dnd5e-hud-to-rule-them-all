@@ -10,9 +10,9 @@ import {
 import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
-import { configTarget } from "./config.mjs";
+import { configTarget, setEntryOrder, setEntryHidden } from "./config.mjs";
 
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 /**
  * The hover card's fixed wording, localized once instead of per row per entry per
@@ -253,7 +253,30 @@ function gridFor(buckets, category) {
       entries.push(entry);
     }
   }
-  return entries;
+  return arranged(entries);
+}
+
+/**
+ * Put a list of buttons in the order the player arranged them. `sort` is a GLOBAL
+ * index (see config.setEntryOrder), which is what lets an icon dropped on an icon
+ * from another pool actually trade places with it - in the grid, pool order is only
+ * the seed. Array#sort is stable, so anything with no position keeps the pool-first
+ * order it arrived in and lands after the arranged ones.
+ */
+function arranged(entries) {
+  return entries.sort((a, b) => (a.sort ?? Infinity) - (b.sort ?? Infinity));
+}
+
+/**
+ * Every button on this creature's bar, in the order it is drawn - the list a swap
+ * renumbers. Built from collectActions rather than from the DOM: a category tab shows
+ * a subset, and renumbering a subset would scramble everything it hides.
+ */
+function arrangedButtons(actor) {
+  const buckets = collectActions(actor);
+  const all = [];
+  for (const key of POOL_ORDER) for (const entry of buckets[key] ?? []) all.push(entry);
+  return arranged(all);
 }
 
 /** The tab strip: every category this creature actually has something in. */
@@ -331,6 +354,18 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Who the bar showed last render, so a change can close a stale description. */
   #shownActorUuid = null;
+
+  /**
+   * Arranging state, all of it alive only between dragstart and dragend: the key of
+   * the button being dragged, the slot currently lit up under it, and whether the
+   * user may write config for the creature shown at all (the same answer the gear
+   * button uses). `#dragKey` doubles as "this drag is still unhandled" - the drop
+   * clears it, so dragend can tell a swap from a release outside the bar.
+   */
+  #dragKey = null;
+  #dragGroup = null;
+  #dropSlot = null;
+  #editable = false;
 
   /**
    * Whether the bar is slid down out of view. Tracked here AND as a CSS class on
@@ -442,6 +477,129 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       CombatHUD.#onShowDescription.call(this, event, target);
     });
+
+    // DOCUMENTED EXCEPTION, the same one config-app.mjs makes and for the same
+    // reason: HTML5 drag events cannot be routed through ApplicationV2's action
+    // dispatcher, which binds click and contextmenu only. Four listeners, delegated
+    // from the persistent root and bound once. No dragleave: dragover fires for the
+    // frame around the slots too, which is where the highlight is cleared, and
+    // dragend clears whatever is left when the pointer leaves the bar entirely.
+    this.element.addEventListener("dragstart", this.#onSlotDragStart.bind(this));
+    this.element.addEventListener("dragover", this.#onSlotDragOver.bind(this));
+    this.element.addEventListener("drop", this.#onSlotDrop.bind(this));
+    this.element.addEventListener("dragend", this.#onSlotDragEnd.bind(this));
+  }
+
+  /* -------------------------------------------- */
+  /*  Arranging                                    */
+  /* -------------------------------------------- */
+
+  /** The slot lit up as the drop target, or null to clear it. */
+  #markDropSlot(slot) {
+    if (this.#dropSlot === slot) return;
+    this.#dropSlot?.classList.remove("drop-target");
+    slot?.classList.add("drop-target");
+    this.#dropSlot = slot ?? null;
+  }
+
+  #onSlotDragStart(event) {
+    const slot = event.target?.closest?.(".hudtra-slot[data-key]");
+    if (!slot) return;
+    // Nobody who cannot write the config gets to start the gesture: the confirmation
+    // at the end of it would promise something the write then refuses.
+    if (!this.#editable) return event.preventDefault();
+    this.#dragKey = slot.dataset.key;
+    // A swap only ever happens WITHIN one rendered group. In the played grid that is
+    // no limit at all - the whole bar is one group, which is what lets an icon trade
+    // places with one from another pool. In the GM layout the groups are the pool
+    // columns, and a swap across two of them would move nothing anybody can see,
+    // because that bar orders by pool first. Refusing it says so; doing it silently
+    // would look broken.
+    this.#dragGroup = slot.closest(".hudtra-group")?.dataset.group ?? null;
+    event.dataTransfer.effectAllowed = "move";
+    // A type nothing else understands. The canvas and the macro bar both read this
+    // payload on drop, so a miss lands nowhere rather than somewhere surprising.
+    event.dataTransfer.setData("text/plain", JSON.stringify({
+      type: "hudtra-slot", key: this.#dragKey
+    }));
+    slot.classList.add("dragging");
+  }
+
+  #onSlotDragOver(event) {
+    if (!this.#dragKey) return;
+    const slot = event.target?.closest?.(".hudtra-slot[data-key]");
+    const takes = !!slot && slot.dataset.key !== this.#dragKey
+      && (slot.closest(".hudtra-group")?.dataset.group ?? null) === this.#dragGroup;
+    this.#markDropSlot(takes ? slot : null);
+    if (!this.#dropSlot) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  /** Icon onto icon: the two trade places, wherever on the bar they sit. */
+  async #onSlotDrop(event) {
+    const from = this.#dragKey;
+    if (!from) return;
+    // Ours from here on, whatever it landed on inside the bar: the browser must not
+    // also do whatever it does with a dropped payload.
+    event.preventDefault();
+    const to = event.target?.closest?.(".hudtra-slot[data-key]")?.dataset.key;
+    // Cleared BEFORE the await: this drag is handled either way, and dragend (which
+    // fires while the write is still in flight) must not offer to hide it as well.
+    this.#dragKey = null;
+    this.#dragGroup = null;
+    this.#markDropSlot(null);
+    if (!to || to === from) return;
+    const actor = this.subjectActor;
+    if (!actor) return;
+    const buttons = arrangedButtons(actor);
+    const dragged = buttons.findIndex(entry => entry.key === from);
+    const target = buttons.findIndex(entry => entry.key === to);
+    if (dragged < 0 || target < 0) return;
+    [buttons[dragged], buttons[target]] = [buttons[target], buttons[dragged]];
+    // Every button is renumbered, not just the two: positions are one global run, so
+    // handing out two fresh indices without the rest to compare against says nothing.
+    return setEntryOrder(actor, buttons);
+  }
+
+  /**
+   * Let go outside the bar: offer to take the button off it. Hiding is exactly what
+   * the gear dialog's "not on the bar" zone does, and that zone is also the way back.
+   */
+  async #onSlotDragEnd(event) {
+    const key = this.#dragKey;
+    this.#dragKey = null;
+    this.#dragGroup = null;
+    this.#markDropSlot(null);
+    for (const el of this.element.querySelectorAll(".hudtra-slot.dragging")) {
+      el.classList.remove("dragging");
+    }
+    // A swap already consumed this drag, or it was never ours.
+    if (!key) return;
+    // Escape reports no position at all. Only a real release counts as "out".
+    if (!event.clientX && !event.clientY) return;
+    const rect = this.element.querySelector(".hudtra-frame")?.getBoundingClientRect();
+    if (!rect) return;
+    const inside = event.clientX >= rect.left && event.clientX <= rect.right
+      && event.clientY >= rect.top && event.clientY <= rect.bottom;
+    if (inside) return;
+
+    const actor = this.subjectActor;
+    const button = actor ? arrangedButtons(actor).find(b => b.key === key) : null;
+    if (!button) return;
+    // On a split button the activity's own name is the only thing telling it from the
+    // item's other half, so the question has to carry it - and only this half is hidden.
+    const name = button.subtitle ? `${button.name} (${button.subtitle})` : button.name;
+    const ok = await DialogV2.confirm({
+      window: { title: game.i18n.localize(`${MODULE_ID}.hide.title`) },
+      content: `<p>${game.i18n.format(`${MODULE_ID}.hide.body`, {
+        name: Handlebars.escapeExpression(name)
+      })}</p><p class="hint">${game.i18n.localize(`${MODULE_ID}.hide.hint`)}</p>`,
+      modal: true,
+      rejectClose: false
+    }).catch(() => false);
+    if (!ok) return;
+    return setEntryHidden(actor, button.keys, true);
   }
 
   /** @override */
@@ -505,6 +663,8 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const inCombat = !!combatant;
     const isMyTurn = !!combatant && game.combat?.combatant?.id === combatant.id;
     const isMine = actor?.isOwner === true;
+    // Also read by the drag handlers, which run outside a render and have no context.
+    this.#editable = isMine || game.user.isGM;
 
     // Whether anything is COUNTED for this creature. A GM-run monster gets the whole
     // bar - portrait, groups, buttons, the gear - and no economy: see
@@ -745,7 +905,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       configTooltip: notice
         ? game.i18n.format(`${MODULE_ID}.config.notice.gear`, notice)
         : game.i18n.localize(`${MODULE_ID}.config.open`),
-      editable: isMine || game.user.isGM
+      editable: this.#editable
     };
   }
 
