@@ -126,15 +126,16 @@
   #hud-to-rule-them-all .hudtra-reopen { display: none; }
   /* Clear of the sidebar, not in the screen's corner: the bar is fixed across the
      WHOLE viewport width, so a handle at `right: 0` lands on top of whatever the chat
-     column keeps down there - a dice tray, in this table's case. `--sidebar-width` is
-     core's own variable; the fallback is v13's default width, so a renamed variable
-     shifts the handle by a few pixels instead of putting it back under the tray. With
-     the sidebar collapsed there is nothing to clear and it takes the corner back. */
+     column keeps down there - a dice tray, in this table's case. Two floors, whichever
+     is larger: `--sidebar-width` (core's own variable, fallback v13's default) keeps it
+     clear of a sidebar of any width, and 375px is the hand-set inset that also clears
+     the tray's own overhang. With the sidebar collapsed there is nothing to clear and
+     it takes the corner back. */
   #hud-to-rule-them-all.collapsed .hudtra-reopen {
     display: block;
     pointer-events: all;
     position: absolute;
-    right: calc(var(--sidebar-width, 300px) + 0.8rem);
+    right: max(375px, calc(var(--sidebar-width, 300px) + 0.8rem));
     bottom: 0;
     height: 1.5rem;
     padding: 0 0.9rem;
