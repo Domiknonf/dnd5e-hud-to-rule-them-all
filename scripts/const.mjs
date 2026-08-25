@@ -94,6 +94,12 @@ export const SECTION_MIN_ENTRIES = 8;
 export const SPELL_PIP_LIMIT = 6;
 
 /**
+ * How many death saving throws it takes either way. Three and three - not a table to
+ * extend, it is the rules, the same reason spells.mjs stops at level 9.
+ */
+export const DEATH_SAVE_PIPS = 3;
+
+/**
  * Where a pinned description card is allowed to sit, in CSS pixels (see hud.mjs
  * #placeCard).
  *

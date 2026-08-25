@@ -5,7 +5,7 @@ can actually use, grouped by action type — and, for the creatures your players
 track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
 hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `1.0.0`
+**Foundry v13** · **dnd5e 5.x** · MIT · `1.2.0`
 
 ---
 
@@ -82,10 +82,11 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   Click the card, middle-click the slot again, or switch creature to dismiss it.
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
   get their own tab or section as read-only reference cards.
-- **Portrait shortcuts.** Click for the character sheet; at 0 HP it turns into a skull that
-  rolls a death saving throw. The ring around it is the HP gauge, and its rim turns cyan
-  while the creature is carrying temporary hit points — the amount rides on the HP label
-  as a `+7`, because temp HP sits on top of `value/max` rather than being part of it.
+- **Portrait shortcuts.** Click for the character sheet; at 0 HP it turns into a skull
+  that rolls a death saving throw, with the successes and failures as pips under it. The
+  ring around it is the HP gauge, and its rim turns cyan while the creature is carrying
+  temporary hit points — the amount rides on the HP label as a `+7`, because temp HP sits
+  on top of `value/max` rather than being part of it.
 
 ## Compatibility
 
@@ -179,6 +180,12 @@ translated or renamed content needs the dialog.
 - **Stunned, Paralyzed, Unconscious, Petrified, Incapacitated** bar the economy
   outright; the pips stay visible and struck through, so it reads as the condition
   rather than as a broken bar.
+
+- **A refill that never happened.** Turn resets run on the active GM's client, so a
+  reconnect or a throttled background tab could leave a player's pools spent into the
+  next round — a bar refusing a legitimate action while looking entirely certain about
+  it. If a creature's turn comes round and its economy was never refilled, the bar
+  notices and treats it as refilled.
 
 The GM can correct any pool by hand: click a pool to hand one pip back, right-click to
 spend one. There is also a *Reset turn* button that refills everything.

@@ -45,6 +45,20 @@
               data-tooltip-text="{{portraitTooltip}}">
         <img class="hudtra-portrait" src="{{img}}" alt="{{name}}">
         {{#if isDying}}<i class="hudtra-skull fa-solid fa-skull"></i>{{/if}}
+        {{!-- Death saves, inside the portrait rather than under it: the button clips
+             to its circle, so this cannot push the name or the HP pill around no
+             matter how the bar is scaled. After the skull in source order, which is
+             what puts it over that overlay without a z-index. --}}
+        {{#if deathSaves}}
+        <span class="hudtra-death">
+          <span class="hudtra-death-group success">
+            {{#each deathSaves.success}}<span class="hudtra-death-pip {{#if on}}on{{/if}}"></span>{{/each}}
+          </span>
+          <span class="hudtra-death-group failure">
+            {{#each deathSaves.failure}}<span class="hudtra-death-pip {{#if on}}on{{/if}}"></span>{{/each}}
+          </span>
+        </span>
+        {{/if}}
       </button>
       {{!-- Temp HP rides on the label rather than getting a badge of its own: it is
            a number you read, the corners around the portrait are taken, and one more

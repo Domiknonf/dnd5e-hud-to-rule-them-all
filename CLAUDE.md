@@ -139,6 +139,12 @@ Consequences to respect:
   fixed: `used` and `granted` are the only nested maps, and both are full maps from
   `freshEconomy` with the stored partial laid over them. **A new field on the economy
   has to be added to that merge**, or it will not survive a read.
+- **`econ.key` and `econ.resetRound` are not the same question.** Every spend rewrites
+  `key` with the CURRENT turn, so it means "last touched" and moves during somebody
+  else's turn. `resetRound` is written only by `freshEconomy`, so it stays put through a
+  whole round of reactions and is the only honest answer to "has this creature's turn
+  been refilled yet". The staleness guard reads that one; reading `key` instead would
+  call a live economy stale mid-round and refund a spent reaction.
 - **`getEconomy` recomputes the maxima and the fresh ones win.** Letting the stored
   ones override froze `max` at whatever it was when the flag was last written, so a
   Haste landing mid-turn did nothing until the next turn reset. Nothing writes a max
@@ -563,8 +569,16 @@ Do not "fix" these casually — each needs a design decision.
   encounter, so their reaction pip is visible and clickable during someone else's turn.
   `setCombatant` still exists and nothing calls it — it is now only a GM convenience
   (pin a combatant instead of following the turn), not a gap.
-- **Missed hooks.** If the GM client misses a turn change, no reset happens. The flag's
-  `key` field records `round:turn` as the hook for a future staleness guard.
+- **Missed hooks.** Solved for the turn reset. `economy.isStale` catches a refill that
+  never happened - the creature's turn has come round while `econ.resetRound` is still
+  an earlier round - and `getEconomy` answers with a fresh economy instead. Repaired on
+  the READ, so there is no second write site for the flag; the next spend starts from
+  that answer and persists the corrected round with it. Two traps are why this is not
+  the one-liner it looks like, and both have a test case: it must NOT fire before the
+  creature's own turn in the round (a reaction spent out of last round's economy is
+  correctly still spent), and it compares the ROUND rather than `key`'s `round:turn`
+  because the turn index shifts whenever a GM clears a dead monster off the tracker -
+  where a false positive hands back an action that was already spent.
 - **Midi QoL** wraps activity usage. VERIFIED LIVE: both `dnd5e.preUseActivity` and
   `dnd5e.postUseActivity` do fire, in that order, around Midi's own workflow, and
   `activity.type` / `activation.type` still read correctly (`attack` / `action`).

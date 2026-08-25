@@ -267,6 +267,13 @@ export function freshEconomy(combatant) {
   for (const key of Object.keys(RESOURCES)) { used[key] = 0; granted[key] = 0; }
   return {
     key: turnKey(combatant?.combat),
+    // WHICH ROUND THIS ECONOMY WAS REFILLED FOR, and the one field `key` cannot be.
+    // `key` is written by every spend with the CURRENT turn, so it means "last
+    // touched" - during somebody else's turn it moves without this creature's own
+    // turn having come round. Only freshEconomy sets this one, so it stays put
+    // through a whole round of reactions and is the only honest answer to "has this
+    // creature's turn been refilled yet". See isStale below.
+    resetRound: combatant?.combat?.round ?? 0,
     used,
     // What a feature handed out this turn (Action Surge: one more action). Kept
     // apart from `max` because max is recomputed from settings on every read, and
@@ -280,10 +287,54 @@ export function freshEconomy(combatant) {
   };
 }
 
+/**
+ * Has this combatant's turn in the CURRENT round already started?
+ *
+ * The whole staleness question hangs off this. A creature's pools refill at the start
+ * of ITS turn, so before that moment an economy from the previous round is not stale
+ * at all - it is exactly right, and a reaction spent out of it must stay spent.
+ * Afterwards it is provably overdue.
+ */
+function turnHasBegun(combatant) {
+  const combat = combatant?.combat;
+  if (!combat?.started) return false;
+  const index = combat.turns?.findIndex?.(t => t.id === combatant.id) ?? -1;
+  if (index < 0) return false;
+  return index <= (combat.turn ?? 0);
+}
+
+/**
+ * Did this creature's turn come round without its economy being refilled?
+ *
+ * THE FAILURE THIS CATCHES: resetTurn only ever runs on the active GM's client, off
+ * combatTurnChange. Miss that hook - a reconnect, a throttled background tab - and no
+ * reset happens, so a player sits there with pools that stay spent and a bar that
+ * refuses a legitimate action while looking entirely certain about it. That is the
+ * worst way this module can fail, because nothing about it invites doubt.
+ *
+ * Deliberately compared on the ROUND and not on `key`'s round:turn. The turn INDEX
+ * shifts under a combatant being removed mid-round, which happens every time a GM
+ * clears a dead monster off the tracker - and a false positive here does not show a
+ * stale bar, it hands back an action that was already spent.
+ *
+ * A flag written before this field existed reports nothing, and nothing is what it
+ * gets: guessing it stale would wipe a live economy on upgrade, mid-encounter.
+ */
+function isStale(combatant, stored, round) {
+  if (!Number.isFinite(stored?.resetRound)) return false;
+  if (stored.resetRound === round) return false;
+  return turnHasBegun(combatant);
+}
+
 export function getEconomy(combatant) {
   const stored = combatant?.getFlag?.(MODULE_ID, FLAGS.ECONOMY);
   const fresh = freshEconomy(combatant);
   if (!stored) return fresh;
+  // A reset that never happened. Answered on the READ rather than by writing here:
+  // this runs on every client and a repair from a read path would be a second write
+  // site for the flag (load-bearing decision 1). It needs none - the next spend
+  // starts from what this returns and persists the corrected round with it.
+  if (isStale(combatant, stored, fresh.resetRound)) return fresh;
   // Always recompute maxima (level ups, effects, settings changes) but keep `used`.
   // The FRESH maxima win outright. Letting the stored ones override was the same
   // line, and it meant the opposite: max was frozen at whatever it happened to be
@@ -298,6 +349,7 @@ export function getEconomy(combatant) {
   // which is precisely what the merge did.
   return {
     key: stored.key ?? fresh.key,
+    resetRound: stored.resetRound ?? fresh.resetRound,
     used: { ...fresh.used, ...stored.used },
     granted: { ...fresh.granted, ...stored.granted },
     max: fresh.max,
@@ -534,6 +586,11 @@ export function diagnose(actor = null) {
     // a coupling looks like nothing at all until one of the pair is spent.
     coupledPools: probe ? [...coupledPools(probe)] : [],
     coupledOutNow: combatant ? [...coupledOutPools(combatant)] : [],
+    // A refill that was missed and is being covered for on the fly. `resetRound`
+    // behind the current round while the creature's turn has already come is the
+    // whole of the reading (see isStale).
+    resetRound: econ?.resetRound ?? null,
+    turnHasBegun: combatant ? turnHasBegun(combatant) : false,
     used: econ?.used ?? null,
     grantedThisTurn: econ?.granted ?? null,
     attacksLeft: econ?.attacksLeft ?? null

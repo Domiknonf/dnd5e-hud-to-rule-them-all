@@ -280,6 +280,37 @@
     font-size: 1.9em;
     text-shadow: 0 0 6px #000;
   }
+  /* Death saves, low in the portrait's circle so the skull above keeps the middle.
+     Successes green, failures red - the sheet's own convention, and the only thing
+     telling the two groups apart, which is why they are separated by a gap wider
+     than the one inside either. */
+  #hud-to-rule-them-all .hudtra-death {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.55em;
+    display: flex;
+    justify-content: center;
+    gap: 0.45em;
+  }
+  #hud-to-rule-them-all .hudtra-death-group {
+    display: flex;
+    gap: 0.14em;
+  }
+  #hud-to-rule-them-all .hudtra-death-pip {
+    width: 0.26em;
+    height: 0.26em;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.55);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.7);
+  }
+  #hud-to-rule-them-all .hudtra-death-group.success .hudtra-death-pip.on {
+    background: var(--hudtra-hp);
+  }
+  #hud-to-rule-them-all .hudtra-death-group.failure .hudtra-death-pip.on {
+    background: var(--hudtra-danger);
+  }
+
   #hud-to-rule-them-all .hudtra-portrait-ring.dying {
     box-shadow:
       0 0 0 2px var(--hudtra-danger),

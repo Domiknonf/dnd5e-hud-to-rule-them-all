@@ -1,6 +1,6 @@
 import {
   MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
-  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS, DESC_CARD
+  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS, DESC_CARD, DEATH_SAVE_PIPS
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
@@ -260,6 +260,16 @@ function spellBarFor(rows) {
         + game.i18n.format(`${MODULE_ID}.spells.slotsLeft`, pact)
     }
   };
+}
+
+/**
+ * One row of death-save pips, filled up to `n`. Same reasoning as the spell slots:
+ * three dots answer "how close is this" without being read, which at 0 HP is the only
+ * way anybody is going to read it.
+ */
+function deathPips(n) {
+  const filled = Math.clamp(Number(n) || 0, 0, DEATH_SAVE_PIPS);
+  return Array.fromRange(DEATH_SAVE_PIPS).map(i => ({ on: i < filled }));
 }
 
 /* ---------------------------------------------- */
@@ -1138,6 +1148,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // ring's rim and are named on the label instead (see .hudtra-portrait-ring
     // .has-temp). Read defensively: `temp` is null on an untouched sheet.
     const tempHp = Math.max(0, Number(hp?.temp) || 0);
+    // Successes and failures, but only where they are actually rolled: rollsDeathSave
+    // already means "dying AND a character", and an NPC statblock carries no
+    // `attributes.death` at all, so both halves of this guard earn their place.
+    const death = actor?.system?.attributes?.death;
+    const deathSaves = rollsDeathSave && death
+      ? { success: deathPips(death.success), failure: deathPips(death.failure) }
+      : null;
     const hpPct = hp?.max > 0 ? Math.round(100 * Math.clamp(hp.value, 0, hp.max) / hp.max) : 0;
 
     // A level-up can change what the detection would suggest without changing
@@ -1165,6 +1182,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       hpPct,
       tempHp,
       tempTooltip: game.i18n.format(`${MODULE_ID}.tempHp`, { value: tempHp }),
+      deathSaves,
       scale: game.settings.get(MODULE_ID, "scale") ?? 1,
       isDying,
       portraitTooltip: game.i18n.localize(`${MODULE_ID}.${rollsDeathSave ? "deathSave" : "openSheet"}`),
