@@ -7,6 +7,14 @@ hotbar across the bottom of the screen.
 
 **Foundry v13** · **dnd5e 5.x** · MIT · `1.2.2`
 
+<!-- HERO SHOT - drop the file in and delete the comment markers around the line below.
+     Wanted: a player character's bar mid-combat, at the default scale. The whole frame:
+     portrait with its HP ring, the pip row, the spell slots, the category tabs and a
+     grid with a few empty cells left in it. This is the one image that decides whether
+     anybody reads the rest.
+![The bar during a player character's turn](docs/images/hero.png)
+-->
+
 ---
 
 ## Why another combat HUD
@@ -19,6 +27,29 @@ This module treats the action economy as the primary feature and the button grid
 thing wrapped around it.
 
 Also most of the other ones just simply don't suit my parties needs, so I'm making this one.
+
+## What it looks like
+
+<!-- Each shot is its own comment block: to publish one, delete the `<!--` line above
+     it and the `-->` line below it. They stand alone, so there is no need to do all
+     three at once. Files go in docs/images/, which the release workflow does not pack
+     into module.zip. -->
+
+<!-- THE GM LAYOUT, the half the hero shot cannot show: a monster's bar with the pool
+     columns and their headers, ideally with one section folded so the chip is visible
+     with its count on it.
+![A GM-run creature keeps the auto-grouped pool columns](docs/images/bar-gm.png)
+-->
+
+<!-- THE GEAR DIALOG, which is where the module stops guessing: the drag-and-drop zones
+     with entries in them, and at least one tile carrying its "overridden" mark.
+![The per-character dialog: drag an entry into the pool it belongs to](docs/images/gear-dialog.png)
+-->
+
+<!-- A PINNED DESCRIPTION, because it is the feature nobody expects: a middle click on
+     a slot, with dnd5e's own item card floating beside it over the bar.
+![Middle-click a slot to pin dnd5e's own item card beside it](docs/images/description-card.png)
+-->
 
 ## Features
 
