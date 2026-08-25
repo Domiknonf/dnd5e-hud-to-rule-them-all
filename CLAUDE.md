@@ -321,6 +321,17 @@ Two rules keep it honest:
     `data-tooltip-class`, so the card would otherwise inherit the bar's leather palette
     over dnd5e's own — and would land in the set the *next* middle click dismisses
     (that dismissal is what stops the bar's stat card from being pinned twice).
+  - **The card is placed by us, after it is styled** (`hud.mjs -> #placeCard`). Core
+    measures a tooltip and positions it while `hudtra-desc-pin` is not on it yet, so
+    it sizes an unbounded box - a long feature is taller than the screen - and anchors
+    from that height; its own clamp has no answer for a box that does not fit. The
+    order is therefore cap, measure, place, and the cap comes from the space really
+    above the slot, not a fixed `60vh`: the bar's height is a setting
+    (`--hudtra-scale`, `gridRows`). **Anchor by one fixed edge, never by a measured
+    height** - `bottom` with room above, `top` without - because dnd5e's card carries
+    an `<img>` that lands after the measurement, and a card positioned as "slot minus
+    my height" grows straight back off screen. Not centred on the viewport: several
+    cards can be pinned at once and would stack on one spot.
   - Pins are dismissed by clicking them, by middle-clicking the same slot again, and by
     anything that changes what the slots mean: a different creature in the bar, or the
     bar collapsing.

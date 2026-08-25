@@ -1,6 +1,6 @@
 import {
   MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
-  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS
+  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS, DESC_CARD
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
@@ -815,9 +815,13 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#dressCard(tips.tooltip, card);
     const locked = tips.lockTooltip?.();
     // No pinning API (a core version that dropped it): the card still showed, it just
-    // fades with the pointer. Degraded, not broken, and nothing to clean up.
-    if (!locked) return;
+    // fades with the pointer. Degraded, not broken, and nothing to clean up - but it
+    // is still the live element that needs placing.
+    if (!locked) return this.#placeCard(tips.tooltip, slot);
     this.#dressCard(locked, card);
+    // AFTER dressing, and after locking: the clone copies the live tooltip's inline
+    // styles, so placing it before this would be overwritten by core's own numbers.
+    this.#placeCard(locked, slot);
     this.#pinned.set(uuid, locked);
     // Click to dismiss, the way core's own pinned tooltips behave. Bound on the
     // element we just created (and gone with it), and skipped on links so a @UUID
@@ -826,6 +830,67 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       if (event.target?.closest?.("a")) return;
       this.#unpin(uuid);
     });
+  }
+
+  /**
+   * PUT A PINNED CARD WHERE IT ACTUALLY FITS.
+   *
+   * Core anchors a tooltip to the element it was opened on, measures it, and clamps
+   * the result into the viewport. That is right for a two-line hover card and wrong
+   * for a full item description, for one reason that is entirely ours: the card is
+   * measured BEFORE `hudtra-desc-pin` is on it, so core sizes a completely unbounded
+   * box - a long feature is easily taller than the screen - and positions from that
+   * height. Its clamp cannot save it either, because clamping a box taller than the
+   * viewport has no answer. The height cap then lands a moment later and shrinks the
+   * card, but the top it was given is already far off the screen, which is exactly
+   * what a long description looked like: pinned somewhere above the ceiling.
+   *
+   * So: cap first, measure second, place third. The cap comes from the space that is
+   * really above the slot rather than a fixed fraction of the viewport, because the
+   * bar's own height is a setting (--hudtra-scale, and the grid's row count) and a
+   * tall bar eats the space a fixed 60vh assumes is there. Past the cap the card
+   * scrolls inside itself - see .hudtra-desc-pin.
+   *
+   * ANCHORED TO THE SLOT, NOT CENTRED ON THE SCREEN, deliberately: several cards can
+   * be pinned at once, and centring would stack them all on the same spot. Above the
+   * slot, because the bar owns the bottom edge; centred over it horizontally and
+   * clamped, so a card opened on the last button does not run off the right.
+   */
+  #placeCard(el, slot) {
+    if (!el || !slot) return;
+    const { margin, minHeight } = DESC_CARD;
+    const anchor = slot.getBoundingClientRect();
+    // The bar owns the bottom edge, so the space above the slot is all there is.
+    const above = anchor.top - margin * 2;
+    const roomy = above >= minHeight;
+    const cap = roomy ? above : Math.min(minHeight, window.innerHeight - margin * 2);
+    el.style.setProperty("--hudtra-desc-max", `${Math.round(cap)}px`);
+
+    // ANCHORED BY ONE FIXED EDGE, never by a measured height. dnd5e's card carries an
+    // <img>, and an uncached one loads after this runs - a card positioned as
+    // "slot.top minus my height" would then grow straight back off the screen, which
+    // is the bug this method exists for in its second form. With room above, the fixed
+    // edge is the bottom and the card grows upwards into the space the cap already
+    // reserved. Without room it is the top, and the cap keeps the growth inside the
+    // viewport; the card then overlaps the bar, which on a screen that short is the
+    // better trade - a readable card covering some buttons can be clicked away, one
+    // squeezed into a letterbox is simply useless.
+    if (roomy) {
+      el.style.top = "auto";
+      el.style.bottom = `${Math.round(window.innerHeight - anchor.top + margin)}px`;
+    } else {
+      el.style.bottom = "auto";
+      el.style.top = `${margin}px`;
+    }
+
+    // Width is CSS-driven for both card kinds (dnd5e's own, and the plain fallback's
+    // max-width), so unlike the height it does not move after being read.
+    const width = el.getBoundingClientRect().width;
+    el.style.left = `${Math.round(Math.clamp(
+      anchor.left + (anchor.width - width) / 2,
+      margin,
+      Math.max(margin, window.innerWidth - width - margin)
+    ))}px`;
   }
 
   /** dnd5e's classes on, the bar's hover-card class off. Both elements, see above. */

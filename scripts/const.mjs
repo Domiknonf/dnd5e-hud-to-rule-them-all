@@ -94,6 +94,18 @@ export const SECTION_MIN_ENTRIES = 8;
 export const SPELL_PIP_LIMIT = 6;
 
 /**
+ * Where a pinned description card is allowed to sit, in CSS pixels (see hud.mjs
+ * #placeCard).
+ *
+ * `margin` is the gap it keeps from the slot it belongs to and from every screen
+ * edge. `minHeight` is the floor: on a viewport too short to fit anything worth
+ * reading above the slot, the card is allowed to overlap the bar rather than be
+ * squeezed into a two-line letterbox - a card covering some buttons is recoverable
+ * (click it away), a card too small to read is not.
+ */
+export const DESC_CARD = { margin: 8, minHeight: 220 };
+
+/**
  * How far right the played creature's grid may run, in cells. Positions are absolute
  * cell numbers (see hud.mjs gridCells), and every cell up to the last occupied one is
  * a real element - so a nonsense number in a hand-edited flag would ask the browser

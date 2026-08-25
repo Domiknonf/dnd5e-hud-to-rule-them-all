@@ -166,8 +166,16 @@
      dnd5e's own styling does the looks; all we add is what keeps a very long
      feature on screen, plus the clicks our dismissal needs. */
   :is(#tooltip, .locked-tooltip).hudtra-desc-pin {
-    max-height: 60vh;
+    /* --hudtra-desc-max is written by hud.mjs #placeCard, from the space that is
+       actually above the slot the card was opened on. A fixed fraction of the
+       viewport cannot do this job: the bar's height is a setting (--hudtra-scale,
+       plus the grid's row count), so on a tall bar 60vh is more room than there is.
+       The fallback is still 60vh, for the degraded path where no placement runs. */
+    max-height: var(--hudtra-desc-max, 60vh);
     overflow-y: auto;
+    /* Reaching the end of a long feature must not start scrolling whatever is behind
+       the card. */
+    overscroll-behavior: contain;
     scrollbar-width: thin;
     pointer-events: all;
   }
