@@ -1,6 +1,7 @@
 import {
   MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
-  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS, DESC_CARD, DEATH_SAVE_PIPS
+  GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS, DESC_CARD, DEATH_SAVE_PIPS,
+  HUD_SCALE
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
@@ -1183,7 +1184,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       tempHp,
       tempTooltip: game.i18n.format(`${MODULE_ID}.tempHp`, { value: tempHp }),
       deathSaves,
-      scale: game.settings.get(MODULE_ID, "scale") ?? 1,
+      scale: game.settings.get(MODULE_ID, "scale") ?? HUD_SCALE.default,
       isDying,
       portraitTooltip: game.i18n.localize(`${MODULE_ID}.${rollsDeathSave ? "deathSave" : "openSheet"}`),
       ac: actor?.system?.attributes?.ac?.value ?? null,

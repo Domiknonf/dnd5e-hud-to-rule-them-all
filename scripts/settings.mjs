@@ -1,4 +1,4 @@
-import { MODULE_ID, GRID_ROWS } from "./const.mjs";
+import { MODULE_ID, GRID_ROWS, HUD_SCALE } from "./const.mjs";
 import { refreshHUD } from "./hud.mjs";
 import { HudConfig } from "./config-app.mjs";
 
@@ -55,7 +55,11 @@ export function registerSettings() {
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
   reg("groupSections",      { ...CLIENT, type: Boolean, default: true });
-  reg("scale",              { ...CLIENT, type: Number, default: 1, range: { min: 0.6, max: 1.6, step: 0.05 } });
+  reg("scale", {
+    ...CLIENT, type: Number,
+    default: HUD_SCALE.default,
+    range: { min: HUD_SCALE.min, max: HUD_SCALE.max, step: HUD_SCALE.step }
+  });
 
   /**
    * How many slot rows the played-creature grid has. Written by the +/- buttons on the

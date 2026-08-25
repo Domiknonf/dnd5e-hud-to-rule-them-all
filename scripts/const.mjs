@@ -129,6 +129,18 @@ export const GRID_CELL_LIMIT = 100;
 export const GRID_ROWS = { min: 1, max: 4, default: 2 };
 
 /**
+ * How far the whole bar may be scaled, and where it starts. One line drives every
+ * em-based size on it (see .hudtra-frame's font-size), so this is the only knob.
+ *
+ * DEFAULTS TO THE MAXIMUM, deliberately. The bar is read mid-turn, at a glance, from
+ * across a table - and an icon you have to lean in for is an icon you stop using. The
+ * cost of starting too big is one slider drag on a small screen; the cost of starting
+ * too small is that nobody ever finds the slider. Client-scoped, so that drag is per
+ * person and nobody else's bar moves.
+ */
+export const HUD_SCALE = { min: 0.6, max: 1.6, step: 0.05, default: 1.6 };
+
+/**
  * The category tabs above that grid, in order. `passive` is last and deliberately
  * included: passives are not actions and have no business filling hotbar slots, but
  * they are still the answer to "what does this creature have", so they get a tab
