@@ -703,11 +703,25 @@
   #hud-to-rule-them-all .hudtra-group.exhausted .hudtra-entries {
     filter: grayscale(0.75) brightness(0.55);
   }
+  /* THE SLOT FIELD, in both layouts. These two were the whole visual gap between the
+     played grid and the GM's pool columns: the field was painted only behind the grid,
+     and the row count was fixed at 2 outside it - so the same slots, in the same
+     two-row column flow, read as a hotbar on one bar and as a loose row of icons on
+     the other. That was never a design decision, only the order things were built in:
+     the columns are the original bar, and everything since went into the grid.
+     What stays different is what the two layouts actually disagree about - headers,
+     tabs, and whether an arrangement is remembered. */
   #hud-to-rule-them-all .hudtra-entries {
     display: grid;
     grid-auto-flow: column;
-    grid-template-rows: repeat(2, var(--hudtra-slot));
+    grid-template-rows: repeat(var(--hudtra-rows, 2), var(--hudtra-slot));
     gap: 0.3em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect x='1' y='1' width='90.3' height='90.3' rx='10' fill='rgb(0,0,0,0.22)' stroke='rgb(200,163,82,0.22)' stroke-width='2' stroke-dasharray='7 5'/%3E%3C/svg%3E");
+    background-size: calc(var(--hudtra-slot) + 0.3em) calc(var(--hudtra-slot) + 0.3em);
+    background-repeat: repeat;
+    /* The painted field is exactly as tall as the rows, so a half-drawn row can never
+       appear under the last one. */
+    background-clip: content-box;
   }
 
   /* ---- the played-creature grid (BG3) ----
@@ -726,16 +740,13 @@
     min-width: 0;
   }
   #hud-to-rule-them-all .hudtra-grid .hudtra-sections { width: 100%; }
+  /* Grid-only: the field has to REACH the far edge here, because this layout is one
+     headerless run across the whole bar rather than a column sized to its contents.
+     The explicit height keeps the painted field from running past the last row once
+     the element is stretched. */
   #hud-to-rule-them-all .hudtra-grid .hudtra-entries {
     width: 100%;
     justify-content: start;
-    grid-template-rows: repeat(var(--hudtra-rows, 2), var(--hudtra-slot));
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect x='1' y='1' width='90.3' height='90.3' rx='10' fill='rgb(0,0,0,0.22)' stroke='rgb(200,163,82,0.22)' stroke-width='2' stroke-dasharray='7 5'/%3E%3C/svg%3E");
-    background-size: calc(var(--hudtra-slot) + 0.3em) calc(var(--hudtra-slot) + 0.3em);
-    background-repeat: repeat;
-    /* The painted field is exactly as tall as the rows, so a half-drawn row can never
-       appear under the last one. */
-    background-clip: content-box;
     height: calc(var(--hudtra-rows, 2) * var(--hudtra-slot) + (var(--hudtra-rows, 2) - 1) * 0.3em);
   }
 

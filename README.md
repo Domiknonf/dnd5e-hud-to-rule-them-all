@@ -5,7 +5,7 @@ can actually use, grouped by action type — and, for the creatures your players
 track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
 hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `1.2.2`
+**Foundry v13** · **dnd5e 5.x** · MIT · `1.3.0`
 
 <!-- HERO SHOT - drop the file in and delete the comment markers around the line below.
      Wanted: a player character's bar mid-combat, at the default scale. The whole frame:
@@ -82,9 +82,11 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   currently acting.
 - **Two layouts, decided by ownership.** A creature somebody plays gets a BG3-style
   hotbar: one grid of slots with the empty ones drawn in, the action cost as a marker on
-  each slot, category tabs above it and `+`/`-` for how many rows you want. A creature
-  only the GM owns keeps the auto-grouped columns — nobody arranges twelve goblins by
-  hand. A chain-pact imp or a summoned drake counts as played, because someone plays it.
+  each slot and category tabs above it. A creature only the GM owns keeps the
+  auto-grouped pool columns — nobody arranges twelve goblins by hand, and the headers
+  are how an unfamiliar statblock is read. Both sit on the same painted slot field and
+  share the `+`/`-` for how many rows you want. A chain-pact imp or a summoned drake
+  counts as played, because someone plays it.
 - **Arrange the bar by dragging its icons.** Drop an icon on another and the two trade
   places; drop it on an empty cell and it moves there, leaving the gap you made on
   purpose intact. Let go outside the bar and it offers to take that button off it. The

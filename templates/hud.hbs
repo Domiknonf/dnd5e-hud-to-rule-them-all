@@ -245,9 +245,9 @@
   </div>
 
   {{!-- BG3 puts these next to End Turn, and so do we: how tall the hotbar is, is a
-       question about one person's screen. Only rendered where there is a grid to
-       resize, and only the button that has somewhere left to go. --}}
-  {{#if played}}
+       question about one person's screen. Both layouts honour it now - the pool
+       columns are the same two-row flow the grid is - so this is no longer gated on
+       `played`; only the button that has somewhere left to go is rendered. --}}
   <div class="hudtra-rows">
     <button type="button" data-action="rows" data-delta="1"
             {{#unless canAddRow}}disabled{{/unless}} data-tooltip-text="{{addRowTooltip}}">
@@ -258,7 +258,6 @@
       <i class="fa-solid fa-minus"></i>
     </button>
   </div>
-  {{/if}}
 
   {{#if editable}}
   <div class="hudtra-controls">
