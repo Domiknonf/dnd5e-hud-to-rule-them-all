@@ -28,10 +28,14 @@ up, ending one slides it away — the handle in the bottom-right corner brings i
 hand at any time. Foundry's own macro hotbar hides itself while the bar is up and returns
 the moment you collapse it.
 
-**It shows exactly one creature.** A selected token always wins, for everyone. Without
-one, the GM sees whoever is currently acting, and a player sees *their own* character —
-never the acting monster. Following the turn pointer meant a player's bar filled up with
-a goblin's ability list at exactly the moment their own reaction pip mattered.
+**It shows exactly one creature, and never one you do not own.** Each client picks its
+own subject. A token *you* selected wins over everything else — provided you own its
+actor, which for a player is the only kind Foundry lets them select anyway. With nothing
+selected, the GM falls back to whoever is currently acting; a player falls back to their
+own character, or to whichever of their creatures is in the fight if they have none
+assigned. A player's bar is therefore always one of theirs. It never follows the turn
+pointer onto the acting monster, which used to fill their bar with a goblin's ability
+list at exactly the moment their own reaction pip mattered.
 
 **Buttons come from activities, not items.** In dnd5e 4.x+ the unit of "a thing you do"
 is an Activity, and one item can carry several with different costs. A Net whose attack
