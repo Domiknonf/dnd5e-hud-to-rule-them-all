@@ -54,7 +54,6 @@ export function registerSettings() {
 
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
-  reg("groupSections",      { ...CLIENT, type: Boolean, default: true });
   reg("scale", {
     ...CLIENT, type: Number,
     default: HUD_SCALE.default,
@@ -74,26 +73,4 @@ export function registerSettings() {
     default: GRID_ROWS.default
   });
 
-  /**
-   * Which groups and sections this user has folded away, as `{ id: true }` - a pool
-   * key ("passive") for a whole group, "pool:section" for one section of one.
-   *
-   * NOT in the settings menu (`config: false`): it is written by clicking the bar's
-   * own headers, and a raw list of keys is nothing anybody would want to edit by
-   * hand. Client-scoped because a fold is a preference about one person's screen, not
-   * a fact about the creature - two people looking at the same character fold
-   * different things away. This is also why it is not an actor flag: a player would
-   * need write access to every monster the GM shows them.
-   *
-   * Passives start folded: a dozen read-only reference cards are the one part of the
-   * bar that is never a turn's business, and the header keeps saying how many are
-   * behind it. Unfolding them writes an object without that key, so the default is
-   * gone for good rather than coming back on the next reload.
-   */
-  game.settings.register(MODULE_ID, "folded", {
-    scope: "client",
-    config: false,
-    type: Object,
-    default: { passive: true }
-  });
 }

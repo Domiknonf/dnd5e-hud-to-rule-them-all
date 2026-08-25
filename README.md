@@ -5,7 +5,7 @@ can actually use, grouped by action type — and, for the creatures your players
 track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
 hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `1.3.0`
+**Foundry v13** · **dnd5e 5.x** · MIT · `1.4.0`
 
 <!-- HERO SHOT - drop the file in and delete the comment markers around the line below.
      Wanted: a player character's bar mid-combat, at the default scale. The whole frame:
@@ -35,10 +35,9 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
      three at once. Files go in docs/images/, which the release workflow does not pack
      into module.zip. -->
 
-<!-- THE GM LAYOUT, the half the hero shot cannot show: a monster's bar with the pool
-     columns and their headers, ideally with one section folded so the chip is visible
-     with its count on it.
-![A GM-run creature keeps the auto-grouped pool columns](docs/images/bar-gm.png)
+<!-- A MONSTER'S BAR, to show that a statblock gets the same hotbar a character does -
+     ideally a legendary creature, so the legendary marker is on some of the slots.
+![The same bar for a GM-run creature, with no economy counted](docs/images/bar-gm.png)
 -->
 
 <!-- THE GEAR DIALOG, which is where the module stops guessing: the drag-and-drop zones
@@ -80,24 +79,19 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   their creatures is in the fight, and never the acting monster — so their reaction pip
   is on screen during somebody else's turn. The GM's bar falls back to whoever is
   currently acting.
-- **Two layouts, decided by ownership.** A creature somebody plays gets a BG3-style
-  hotbar: one grid of slots with the empty ones drawn in, the action cost as a marker on
-  each slot and category tabs above it. A creature only the GM owns keeps the
-  auto-grouped pool columns — nobody arranges twelve goblins by hand, and the headers
-  are how an unfamiliar statblock is read. Both sit on the same painted slot field and
-  share the `+`/`-` for how many rows you want. A chain-pact imp or a summoned drake
-  counts as played, because someone plays it.
+- **One bar, for every creature.** A BG3-style hotbar: one grid of slots on a painted
+  field with the empty ones drawn in, the action cost as a marker on each slot, category
+  tabs above it and `+`/`-` for how many rows you want. A goblin gets the same bar a
+  wizard does — only the economy differs, and only because nothing is counted for a
+  creature the GM runs.
 - **Arrange the bar by dragging its icons.** Drop an icon on another and the two trade
   places; drop it on an empty cell and it moves there, leaving the gap you made on
   purpose intact. Let go outside the bar and it offers to take that button off it. The
   gear dialog has a *Reset order* button that undoes the lot.
-- **Category tabs** (played layout). *All* leads the strip, then Weapons, Spells,
-  Features, Consumables, Gear and Passives — only the ones this creature actually has
-  something in. Clicking the lit tab widens the grid again.
-- **Sections you can fold away** (GM layout). A crowded group is split into Weapons, Spells,
-  Features, Consumables and Gear. Click a group's name to fold the whole thing, or one of
-  the chips beside it to fold a single section — a folded chip names what it is holding
-  and how much of it. Remembered per user. Passives start folded.
+- **Category tabs.** *All* leads the strip, then Weapons, Spells, Features, Consumables,
+  Gear and Passives — only the ones this creature actually has something in. Clicking the
+  lit tab widens the grid again. Passives sit on their own tab rather than filling
+  hotbar slots.
 - **Spell slots, next to the pips.** One row per spell level with a pip per slot, so you
   see what is left without reading a number. Pact Magic gets its own row. Spells you have
   no slot left for grey themselves out — upcasting counted, cantrips and at-will casting
@@ -107,14 +101,14 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   remaining charges, attacks left inside the current action, and a link-slash when the
   item has a second button elsewhere. Each badge owns its own corner, so a Breath Weapon
   really can show all of them at once.
-- **Nothing moves.** The bar has a fixed width, so folding a section, switching tabs or
-  switching creatures never slides the buttons out from under your pointer.
+- **Nothing moves.** The bar has a fixed width, so switching tabs or switching creatures
+  never slides the buttons out from under your pointer.
 - **Descriptions, pinned.** Middle-click any slot (or left-click a passive) to pin
   dnd5e's own item card — the same card the character sheet shows — beside the button.
   It floats above everything, so no sheet covers it and the bar costs no height for it.
   Click the card, middle-click the slot again, or switch creature to dismiss it.
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
-  get their own tab or section as read-only reference cards.
+  get their own tab as read-only reference cards, out of the hotbar slots entirely.
 - **Portrait shortcuts.** Click for the character sheet; at 0 HP it turns into a skull
   that rolls a death saving throw, and the label below takes the successes and failures
   as pips — while you are dying, `0/40` says nothing the skull has not already said. The
@@ -151,9 +145,8 @@ Settings live under *Configure Settings → Module Settings*.
 
 **Content filters** — hide unequipped gear, hide unprepared spells.
 
-**Presentation** (per user) — HUD scale, sort order, and whether crowded groups are split
-into sections. How many rows the grid has, and which groups and sections you have folded
-away, are remembered per user and are set by clicking the bar itself, not in this menu.
+**Presentation** (per user) — HUD scale and sort order. How many rows the grid has is
+remembered per user too, but is set with the `+`/`-` on the bar itself rather than here.
 
 ### Who gets counted
 
@@ -166,7 +159,7 @@ have an action economy.** Everything else about the bar is identical either way.
 | --- | --- | --- |
 | Ability list, grouped by pool | yes | yes |
 | Which pool an entry belongs to (gear dialog) | yes | yes |
-| Legendary / reaction / bonus action **sections** | yes | yes |
+| Category tabs, arranging, the gear dialog | yes | yes |
 | Pips, booking, enforcement, Extra Attack counting | yes | — |
 
 It is an **ownership** question, not an `actor.type` one: a wildshaped druid, a summoned

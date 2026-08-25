@@ -1,12 +1,12 @@
 import {
-  MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SECTION_MIN_ENTRIES, SPELL_PIP_LIMIT,
+  MODULE_ID, RESOURCES, POOL_ORDER, SECTIONS, SPELL_PIP_LIMIT,
   GRID_ROWS, GRID_TABS, ALL_TAB, GRID_CELL_LIMIT, DEBOUNCE_MS, DESC_CARD, DEATH_SAVE_PIPS,
   HUD_SCALE
 } from "./const.mjs";
 import {
   getEconomy, resetTurn, remainingOf, getAttacksPerAction, combatantFor, spend,
   refund, poolMax, blockedPools, blockingConditions, coupledOutPools, coupledPools,
-  isTracked, isPlayed
+  isTracked
 } from "./economy.mjs";
 import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
@@ -107,80 +107,6 @@ async function descriptionCard(uuid) {
 }
 
 /* ---------------------------------------------- */
-/*  Folding                                        */
-/* ---------------------------------------------- */
-
-/**
- * Which groups and sections this user keeps folded away, as `{ id: true }`. Always an
- * object - the setting is written by the bar itself (see #onToggleFold) and read on
- * every render.
- */
-function foldedIds() {
-  return game.settings.get(MODULE_ID, "folded") ?? {};
-}
-
-function foldTooltip(label, count, folded) {
-  return game.i18n.format(`${MODULE_ID}.fold.${folded ? "show" : "hide"}`, { label, count });
-}
-
-/**
- * Split one group's entries into sections (see SECTIONS in const.mjs), or leave it as
- * the single plain grid it has always been.
- *
- * There is one code path either way: the flat case is one nameless section, so the
- * template has one loop over sections and not two copies of the slot markup. The three
- * ways to stay flat, in order:
- *
- * 1. The user turned sectioning off.
- * 2. The group is small enough that dividers and chips cost more than they save.
- * 3. Everything in it is the same kind of thing anyway - a passive list is all feats,
- *    and one section spanning the whole group says nothing while still charging for
- *    the chrome.
- *
- * Sections group BEFORE the per-entry `sort` rule, which orders entries within one.
- * That is the trade: a spell dragged to the front of the Action zone leads the spells
- * rather than the whole group. Turning the setting off gives the flat order back.
- *
- * `grouping` is the setting, handed in rather than read here: this runs once per pool
- * group, and a client-scoped setting is fetched and parsed out of browser storage on
- * every read.
- */
-function sectionsFor(poolKey, entries, folded, grouping) {
-  const flat = { sectioned: false, sections: [{ key: "", collapsed: false, entries }] };
-  if (!grouping) return flat;
-  if (entries.length < SECTION_MIN_ENTRIES) return flat;
-
-  const byKey = new Map();
-  for (const entry of entries) {
-    if (!byKey.has(entry.section)) byKey.set(entry.section, []);
-    byKey.get(entry.section).push(entry);
-  }
-  if (byKey.size < 2) return flat;
-
-  const sections = [...byKey]
-    .sort((a, b) => (SECTIONS[a[0]]?.order ?? 99) - (SECTIONS[b[0]]?.order ?? 99))
-    .map(([key, list]) => {
-      const id = `${poolKey}:${key}`;
-      const label = game.i18n.localize(`${MODULE_ID}.section.${key}`);
-      const collapsed = folded[id] === true;
-      // Spells read by level, the way every character sheet lists them: cantrips
-      // first, then 1st upwards. Array#sort is stable, so the configured order (and
-      // the A-Z setting) still decides within one level.
-      const ordered = key === "spell"
-        ? [...list].sort((a, b) => (a.level ?? 0) - (b.level ?? 0))
-        : list;
-      return {
-        key, id, label, collapsed,
-        entries: ordered,
-        count: list.length,
-        icon: SECTIONS[key]?.icon ?? "fa-solid fa-circle",
-        tooltip: foldTooltip(label, list.length, collapsed)
-      };
-    });
-  return { sectioned: true, sections };
-}
-
-/* ---------------------------------------------- */
 /*  Spell strip                                    */
 /* ---------------------------------------------- */
 
@@ -274,12 +200,12 @@ function deathPips(n) {
 }
 
 /* ---------------------------------------------- */
-/*  The played-creature grid                       */
+/*  The slot grid                                  */
 /* ---------------------------------------------- */
 
 /**
- * BG3's model, for creatures somebody plays (economy.isPlayed): ONE grid of slots
- * instead of a column per pool, with the pool drawn as a marker on each slot. The
+ * BG3's model, for every creature: ONE grid of slots rather than a column per pool,
+ * with the pool drawn as a marker on each slot. The
  * empty slots are painted by CSS rather than rendered, so the field is always a full
  * rectangle at any width without anybody counting columns.
  *
@@ -447,7 +373,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       use: CombatHUD.#onUse,
       describe: CombatHUD.#onShowDescription,
       collapse: CombatHUD.#onCollapse,
-      toggleFold: CombatHUD.#onToggleFold,
       toggleCategory: CombatHUD.#onToggleCategory,
       rows: CombatHUD.#onRows,
       portrait: CombatHUD.#onPortrait,
@@ -479,7 +404,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   #pinned = new Map();
 
   /**
-   * Category tab the played-creature grid is narrowed to (a SECTIONS key, or
+   * Category tab the grid is narrowed to (a SECTIONS key, or
    * "passive"), or null for "everything that is an action".
    *
    * Instance state, deliberately NOT persisted: a fold says "I never want to look at
@@ -646,7 +571,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // at the end of it would promise something the write then refuses.
     if (!this.#editable) return event.preventDefault();
     this.#dragKey = slot.dataset.key;
-    // A swap only ever happens WITHIN one rendered group. In the played grid that is
+    // A swap only ever happens WITHIN one rendered group. In the grid that is
     // no limit at all - the whole bar is one group, which is what lets an icon trade
     // places with one from another pool. In the GM layout the groups are the pool
     // columns, and a swap across two of them would move nothing anybody can see,
@@ -722,7 +647,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * position. Which run it is depends on what was picked up, and the three cases are
    * the three things a position can mean on this bar:
    *
-   * - the played grid: absolute cells, gaps and all (see gridCells)
+   * - the grid: absolute cells, gaps and all (see gridCells)
    * - the passives of that grid: their tab is a packed list, so a plain rank
    * - the GM's pool columns: the whole bar, packed, a plain rank
    *
@@ -731,7 +656,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #placement(actor, key) {
     const buckets = collectActions(actor);
-    if (!isPlayed(actor)) return barButtons(buckets);
     // Passives are never IN the grid (gridFor keeps them on their own tab), so they
     // keep a run of their own - and stay out of the grid's cell numbering, where they
     // would show up as holes nobody can fill.
@@ -1016,13 +940,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const buckets = collectActions(actor);
     const attacksPerAction = getAttacksPerAction(econCombatant);
-    // TWO LAYOUTS, ONE SWITCH (see economy.isPlayed). Resolved BEFORE the groups are
-    // built, because in the grid layout the sectioning, the fold state and their
-    // tooltips are all discarded again - the grid is one headerless field - and the
-    // cheapest way to compute them is not to.
-    const played = isPlayed(actor);
-    const folded = played ? {} : foldedIds();
-    const grouping = !played && game.settings.get(MODULE_ID, "groupSections");
     const slotRows = spellSlots(actor);
     const spellBar = spellBarFor(slotRows);
     // The ceiling every leveled spell on the bar is measured against, resolved once
@@ -1087,57 +1004,39 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
             enriched.tooltipHtml = tooltipFor(enriched, label);
             return enriched;
           });
-        // In the grid layout this object is nothing but a carrier for its entries:
-        // the grid is rebuilt from them below and drawn headerless, so the sections,
-        // the chips, the fold state and their tooltips would all be discarded again.
-        if (played) return { key, entries };
-
-        const collapsed = folded[key] === true;
-        const { sectioned, sections } = sectionsFor(key, entries, folded, grouping);
-        return {
-          key,
-          icon: def.icon,
-          label,
-          entries,
-          collapsed,
-          count: entries.length,
-          foldTooltip: foldTooltip(label, entries.length, collapsed),
-          sections,
-          // The same section objects, named for the other job they do: the chips in
-          // the header. Null while the whole group is folded, where per-section
-          // controls would toggle something nobody can see.
-          chips: sectioned && !collapsed ? sections : null,
-          // Pool columns carry a header; the grid below is one headerless field.
-          header: true,
-          exhausted
-        };
+        // Nothing but a carrier for its entries: the grid is rebuilt from them below
+        // and drawn as one headerless field, so a group object of its own would be
+        // discarded again the moment it was built.
+        return { key, entries };
       })
       .filter(g => g.entries.length);
 
-    // A creature somebody plays gets BG3's single grid - the pool moves onto each slot
-    // as a marker, the categories move into tabs above it. A GM-only creature keeps
-    // the auto-grouped columns: nobody curates twelve goblins, and the headers are how
-    // that bar is read. (`played` itself is resolved further up, where it also decides
-    // how much of each group above is worth building.)
+    // ONE LAYOUT, FOR EVERY CREATURE: BG3's single grid, with the pool drawn as a
+    // marker on each slot and the categories as tabs above it.
+    //
+    // There used to be a second one - auto-grouped pool columns with foldable headers,
+    // for creatures only the GM owns - on the reasoning that nobody curates twelve
+    // goblins and that the headers are how an unfamiliar statblock is read. The first
+    // half was never a reason for a different LAYOUT: an unarranged grid packs itself
+    // in pool order and needs no curating. The second was answered by the cost marker
+    // and the tabs, which say the same thing in less space. What it actually produced
+    // was one bar that kept getting better and a second that quietly stayed behind.
     const enriched = Object.fromEntries(poolGroups.map(g => [g.key, g.entries]));
-    const tabs = played ? tabsFor(enriched, this.#category) : [];
+    const tabs = tabsFor(enriched, this.#category);
     // Same self-clearing rule the spell filter follows: a tab that is no longer there
     // cannot be un-picked, so the filter drops rather than emptying the grid.
-    if (played && this.#category && !tabs.some(t => t.key === this.#category)) this.#category = null;
+    if (this.#category && !tabs.some(t => t.key === this.#category)) this.#category = null;
     const rows = gridRowCount();
-    const gridEntries = played ? gridFor(enriched, this.#category) : [];
-    // The unfiltered grid is drawn as CELLS, so the gaps a player left are gaps and
+    const gridEntries = gridFor(enriched, this.#category);
+    // The unfiltered grid is drawn as CELLS, so the gaps somebody left are gaps and
     // the empty ones can be dropped on. A category tab is a lens, not an arrangement:
     // it packs, because a filtered grid full of holes where the other categories sit
     // would say nothing about anything.
-    const cells = played && !this.#category ? gridCells(gridEntries, rows) : gridEntries;
-    const groups = played
-      ? (gridEntries.length
-        ? [{ key: "grid", header: false, exhausted: false, entries: cells,
-             collapsed: false, chips: null,
-             sections: [{ key: "", collapsed: false, entries: cells }] }]
-        : [])
-      : poolGroups;
+    const cells = this.#category ? gridEntries : gridCells(gridEntries, rows);
+    const groups = gridEntries.length
+      ? [{ key: "grid", exhausted: false, entries: cells,
+           sections: [{ key: "", entries: cells }] }]
+      : [];
     const hp = actor?.system?.attributes?.hp ?? null;
     const isDying = !!hp && hp.value <= 0;
     const rollsDeathSave = isDying && actor?.type === "character";
@@ -1206,7 +1105,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       // The column beside the portrait exists for either half: a wizard out of combat
       // has no pips and still wants to see slots.
       resources: showEconomy || !!spellBar,
-      played,
       tabs,
       // The grid's height in rows. Clamped on read as well as on write: the setting is
       // a number a user could have edited to anything.
@@ -1258,29 +1156,6 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#collapsed = !this.#collapsed;
     if (this.#collapsed) this.#unpinAll();
     this.element.classList.toggle("collapsed", this.#collapsed);
-  }
-
-  /**
-   * Fold one group ("passive") or one section of one ("action:spell") away, and
-   * remember it for this user. The header that folded it stays, with a count on it,
-   * so the way back is the thing you just clicked.
-   *
-   * Deliberately NOT the bar's own collapse (#onCollapse), which toggles a class
-   * without a re-render so the slide animates: a fold re-renders, because folded
-   * content has to be out of the DOM rather than merely invisible - a slot hidden with
-   * CSS is still a slot the browser lays out, on a bar whose Action group runs to
-   * twenty-odd of them.
-   */
-  static async #onToggleFold(event, target) {
-    const id = target.dataset.fold;
-    if (!id) return;
-    const folded = { ...foldedIds() };
-    if (folded[id]) delete folded[id];
-    else folded[id] = true;
-    // No onChange on this setting: a click re-renders right here rather than through
-    // the debounce, so the fold answers immediately.
-    await game.settings.set(MODULE_ID, "folded", folded);
-    return this.render();
   }
 
   /**

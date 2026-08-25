@@ -20,10 +20,10 @@
     <i class="fa-solid fa-chevron-down"></i>
   </button>
 
-  {{!-- Category tabs, BG3's row above the hotbar. Only for a creature somebody plays:
-       a GM-run statblock keeps its pool columns, which are already the categories it
-       needs. Each tab narrows the grid; the lit one clears it again. --}}
-  {{#if played}}
+  {{!-- Category tabs, BG3's row above the hotbar. Each tab narrows the grid; the lit
+       one clears it again. Rendered for every creature - a statblock you have never
+       used needs them more than a character you know by heart. --}}
+  {{#if tabs.length}}
   <div class="hudtra-tabs">
     {{#each tabs}}
     <button type="button" class="hudtra-tab {{#if active}}on{{/if}}"
@@ -149,47 +149,15 @@
        empty slots are painted by CSS (see .hudtra-grid), so the hotbar is always a
        full rectangle at any width; a GM-run creature keeps its pool columns with their
        fold controls. --}}
-  <div class="hudtra-groups {{#if played}}hudtra-grid{{/if}}" style="--hudtra-rows: {{gridRows}}"
+  <div class="hudtra-groups hudtra-grid" style="--hudtra-rows: {{gridRows}}"
        data-tooltip-class="hudtra-tooltip" data-tooltip-direction="UP">
     {{#each groups}}
     <section class="hudtra-group {{#if exhausted}}exhausted{{/if}}" data-group="{{key}}">
-      {{#if header}}
-      {{!-- The header is the fold control: the label folds the whole group, each chip
-           one section of it. It keeps its full gold while folded and gains a count -
-           it is then the only thing left of the group, so it has to say how much is
-           behind it and stay the easiest thing there to hit. --}}
-      <h4>
-        <button type="button" class="hudtra-group-head" data-action="toggleFold"
-                data-fold="{{key}}" data-tooltip-text="{{foldTooltip}}">
-          <i class="hudtra-caret fa-solid {{#if collapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}}"></i>
-          <i class="{{icon}}"></i>
-          <span>{{label}}</span>
-          {{#if collapsed}}<span class="hudtra-count">{{count}}</span>{{/if}}
-        </button>
-        {{#if chips}}
-        <span class="hudtra-chips">
-          {{#each chips}}
-          <button type="button" class="hudtra-chip {{#if collapsed}}folded{{/if}}"
-                  data-action="toggleFold" data-fold="{{id}}" data-tooltip-text="{{tooltip}}">
-            <i class="{{icon}}"></i>
-            {{!-- Folded, the chip says WHAT is folded and how much of it - an icon
-                 alone leaves you counting section icons to work out what is missing.
-                 Unfolded it stays an icon, because the slots are right there. --}}
-            {{#if collapsed}}<span class="hudtra-chip-name">{{label}}</span><span class="hudtra-count">{{count}}</span>{{/if}}
-          </button>
-          {{/each}}
-        </span>
-        {{/if}}
-      </h4>
-      {{/if}}
-
-      {{!-- One loop, whether the group is sectioned or not: an unsectioned group is a
-           single nameless section (see hud.mjs sectionsFor), which is what keeps the
-           slot markup below from existing twice. --}}
-      {{#unless collapsed}}
+      {{!-- The grid is one nameless section. The loop survives the second layout it was
+           written for, because it is what keeps the slot markup below from having to
+           exist twice the day a second one comes back. --}}
       <div class="hudtra-sections">
         {{#each sections}}
-        {{#unless collapsed}}
         <div class="hudtra-entries" data-section="{{key}}">
           {{#each entries}}
           {{#if empty}}
@@ -236,10 +204,8 @@
           {{/if}}
           {{/each}}
         </div>
-        {{/unless}}
         {{/each}}
       </div>
-      {{/unless}}
     </section>
     {{/each}}
   </div>

@@ -76,15 +76,6 @@ export const ITEM_TYPE_SECTIONS = {
 export const DEFAULT_SECTION = "gear";
 
 /**
- * Below this many entries a group stays one plain grid. Sections cost a chip in the
- * header and a divider per section, which under a handful of buttons is more furniture
- * than the clutter it removes. Sized against the bar this was built for: an Action
- * group of twenty-odd entries splits, the Bonus Action group of three beside it
- * does not.
- */
-export const SECTION_MIN_ENTRIES = 8;
-
-/**
  * Above this many slots at one level, the strip stops drawing a pip per slot and falls
  * back to "3/4". Pips answer "how many do I have left" without reading anything, which
  * is the whole point - but a row of fifteen of them is a number again, only harder to
