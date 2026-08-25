@@ -20,40 +20,6 @@ thing wrapped around it.
 
 Also most of the other ones just simply don't suit my parties needs, so I'm making this one.
 
-## How it works
-
-**The bar is always there.** It is not tied to combat: it renders whenever there is
-somebody to show, and only closes when there is nobody. Starting an encounter pulls it
-up, ending one slides it away — the handle in the bottom-right corner brings it back by
-hand at any time. Foundry's own macro hotbar hides itself while the bar is up and returns
-the moment you collapse it.
-
-**It shows exactly one creature, and never one you do not own.** Each client picks its
-own subject. A token *you* selected wins over everything else — provided you own its
-actor, which for a player is the only kind Foundry lets them select anyway. With nothing
-selected, the GM falls back to whoever is currently acting; a player falls back to their
-own character, or to whichever of their creatures is in the fight if they have none
-assigned. A player's bar is therefore always one of theirs. It never follows the turn
-pointer onto the acting monster, which used to fill their bar with a goblin's ability
-list at exactly the moment their own reaction pip mattered.
-
-**Buttons come from activities, not items.** In dnd5e 4.x+ the unit of "a thing you do"
-is an Activity, and one item can carry several with different costs. A Net whose attack
-is an action and whose utility is a bonus action is therefore two buttons, in two places,
-because that is what it actually is. An item whose activities all agree stays one button
-that opens dnd5e's own activity picker.
-
-**Clicking a button just uses the thing.** The HUD never books a cost itself. Costs are
-booked in `dnd5e.postUseActivity`, which means a click here, a click on the character
-sheet, a macro and a Midi QoL workflow all count identically — and none of them
-double-count. Turn the bar off mid-session and your sheet still counts correctly.
-
-**What it cannot know for certain, it asks.** Which pool an odd feature belongs to, how
-many attacks your Attack action grants, how big a pool is — all of that is answered once
-in the gear dialog, by whoever owns the character. Detection still runs, but only to
-prefill that dialog and as the fallback until you correct it. Configuration always wins,
-and nothing is ever silently rewritten behind your back.
-
 ## Features
 
 - **Activity-aware action list.** Walks every activity on every item, not just items, so
@@ -72,6 +38,17 @@ and nothing is ever silently rewritten behind your back.
 - **Extra Attack.** Several attacks share one action instead of each burning their own,
   with the attacks left in the current action shown on the slot. The Dragonborn's Breath
   Weapon counts as one of those attacks, per the 2024 rules.
+- **A bar that is always there.** Bottom-anchored hotbar of square icon slots, and not
+  tied to combat: it renders whenever there is somebody to show. Starting an encounter
+  pulls it up, ending one slides it away, and the handle in the bottom-right corner
+  brings it back by hand. Foundry's own macro hotbar hides itself while the bar is up
+  and returns the moment you collapse it.
+- **You only ever see your own creatures.** Each client picks its own subject: a token
+  you selected wins, provided you own its actor — for a player, the only kind Foundry
+  lets them select anyway. Otherwise a player gets their own character, or whichever of
+  their creatures is in the fight, and never the acting monster — so their reaction pip
+  is on screen during somebody else's turn. The GM's bar falls back to whoever is
+  currently acting.
 - **Two layouts, decided by ownership.** A creature somebody plays gets a BG3-style
   hotbar: one grid of slots with the empty ones drawn in, the action cost as a marker on
   each slot, category tabs above it and `+`/`-` for how many rows you want. A creature
