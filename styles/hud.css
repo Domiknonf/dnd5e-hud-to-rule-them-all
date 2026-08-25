@@ -280,35 +280,43 @@
     font-size: 1.9em;
     text-shadow: 0 0 6px #000;
   }
-  /* Death saves, low in the portrait's circle so the skull above keeps the middle.
-     Successes green, failures red - the sheet's own convention, and the only thing
-     telling the two groups apart, which is why they are separated by a gap wider
-     than the one inside either. */
+  /* DEATH SAVES GO IN THE HP PILL, not inside the portrait. Inside, the button clips
+     to its circle - and the bottom of a circle is its narrowest point - so the row
+     came out cropped, on top of the darkest part of the skull overlay. The pill sits
+     outside that clip, on a solid ground with a gold rim, and is already the place
+     under the portrait where its state is written.
+     Successes green, failures red, per the sheet's own convention; the gap between
+     the two groups is wider than the one inside either, because colour alone is not
+     enough to tell them apart at this size. */
+  #hud-to-rule-them-all .hudtra-hp-label.saves {
+    padding: 0.22em 0.55em;
+  }
   #hud-to-rule-them-all .hudtra-death {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0.55em;
     display: flex;
-    justify-content: center;
-    gap: 0.45em;
+    align-items: center;
+    gap: 0.5em;
   }
   #hud-to-rule-them-all .hudtra-death-group {
     display: flex;
-    gap: 0.14em;
+    gap: 0.18em;
   }
+  /* AN EMPTY SLOT HAS TO BE VISIBLE TOO, or two failures look like the whole row.
+     The first version painted these near-black on a near-black overlay, so only the
+     filled ones existed and there was no way to see how many were left. */
   #hud-to-rule-them-all .hudtra-death-pip {
-    width: 0.26em;
-    height: 0.26em;
+    width: 0.55em;
+    height: 0.55em;
     border-radius: 50%;
-    background: rgb(0 0 0 / 0.55);
-    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.7);
+    background: rgb(255 255 255 / 0.09);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3);
   }
   #hud-to-rule-them-all .hudtra-death-group.success .hudtra-death-pip.on {
     background: var(--hudtra-hp);
+    box-shadow: 0 0 0.35em color-mix(in oklab, var(--hudtra-hp) 70%, transparent);
   }
   #hud-to-rule-them-all .hudtra-death-group.failure .hudtra-death-pip.on {
     background: var(--hudtra-danger);
+    box-shadow: 0 0 0.35em color-mix(in oklab, var(--hudtra-danger) 70%, transparent);
   }
 
   #hud-to-rule-them-all .hudtra-portrait-ring.dying {

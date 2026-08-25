@@ -5,7 +5,7 @@ can actually use, grouped by action type — and, for the creatures your players
 track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
 hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `1.2.0`
+**Foundry v13** · **dnd5e 5.x** · MIT · `1.2.1`
 
 ---
 

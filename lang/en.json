@@ -2,6 +2,7 @@
   "dnd5e-hud-to-rule-them-all.round": "Round",
   "dnd5e-hud-to-rule-them-all.resetTurn": "Refill this turn's resources",
   "dnd5e-hud-to-rule-them-all.endTurn": "End turn",
+  "dnd5e-hud-to-rule-them-all.deathSaves": "Death saves: {success}/{max} successes, {failure}/{max} failures — 0/{hpMax} HP",
   "dnd5e-hud-to-rule-them-all.tempHp": "Temporary hit points: {value}",
   "dnd5e-hud-to-rule-them-all.openSheet": "Open character sheet",
   "dnd5e-hud-to-rule-them-all.deathSave": "Roll a death saving throw",

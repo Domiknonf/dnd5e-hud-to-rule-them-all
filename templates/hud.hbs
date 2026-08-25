@@ -45,12 +45,17 @@
               data-tooltip-text="{{portraitTooltip}}">
         <img class="hudtra-portrait" src="{{img}}" alt="{{name}}">
         {{#if isDying}}<i class="hudtra-skull fa-solid fa-skull"></i>{{/if}}
-        {{!-- Death saves, inside the portrait rather than under it: the button clips
-             to its circle, so this cannot push the name or the HP pill around no
-             matter how the bar is scaled. After the skull in source order, which is
-             what puts it over that overlay without a z-index. --}}
+      </button>
+      {{!-- Temp HP rides on the label rather than getting a badge of its own: it is
+           a number you read, the corners around the portrait are taken, and one more
+           floating chip beside the skull would be clutter at every scale. --}}
+      {{!-- While a creature is dying the number here is "0/something" and says nothing
+           anybody needs; the death saves are the only live information left, so they
+           take the slot. A dying NPC rolls none and keeps its numbers. --}}
+      {{#if hp}}
+      <span class="hudtra-hp-label {{#if deathSaves}}saves{{/if}}">
         {{#if deathSaves}}
-        <span class="hudtra-death">
+        <span class="hudtra-death" data-tooltip-text="{{deathTooltip}}">
           <span class="hudtra-death-group success">
             {{#each deathSaves.success}}<span class="hudtra-death-pip {{#if on}}on{{/if}}"></span>{{/each}}
           </span>
@@ -58,13 +63,10 @@
             {{#each deathSaves.failure}}<span class="hudtra-death-pip {{#if on}}on{{/if}}"></span>{{/each}}
           </span>
         </span>
-        {{/if}}
-      </button>
-      {{!-- Temp HP rides on the label rather than getting a badge of its own: it is
-           a number you read, the corners around the portrait are taken, and one more
-           floating chip beside the skull would be clutter at every scale. --}}
-      {{#if hp}}<span class="hudtra-hp-label">{{hp.value}}/{{hp.max}}{{#if tempHp}}<span
-        class="hudtra-temp" data-tooltip-text="{{tempTooltip}}">+{{tempHp}}</span>{{/if}}</span>{{/if}}
+        {{else}}{{hp.value}}/{{hp.max}}{{#if tempHp}}<span
+          class="hudtra-temp" data-tooltip-text="{{tempTooltip}}">+{{tempHp}}</span>{{/if}}{{/if}}
+      </span>
+      {{/if}}
     </div>
     <span class="hudtra-name">{{name}}</span>
     <span class="hudtra-vitals">

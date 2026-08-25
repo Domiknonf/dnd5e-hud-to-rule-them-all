@@ -1156,6 +1156,17 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const deathSaves = rollsDeathSave && death
       ? { success: deathPips(death.success), failure: deathPips(death.failure) }
       : null;
+    // The pips take the pill's slot from the HP numbers while dying, so the reading
+    // that is no longer written out goes in the tooltip - including the max, which is
+    // the one thing the numbers were still saying.
+    const deathTooltip = deathSaves
+      ? game.i18n.format(`${MODULE_ID}.deathSaves`, {
+        success: Math.clamp(Number(death.success) || 0, 0, DEATH_SAVE_PIPS),
+        failure: Math.clamp(Number(death.failure) || 0, 0, DEATH_SAVE_PIPS),
+        max: DEATH_SAVE_PIPS,
+        hpMax: hp?.max ?? 0
+      })
+      : "";
     const hpPct = hp?.max > 0 ? Math.round(100 * Math.clamp(hp.value, 0, hp.max) / hp.max) : 0;
 
     // A level-up can change what the detection would suggest without changing
@@ -1184,6 +1195,7 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       tempHp,
       tempTooltip: game.i18n.format(`${MODULE_ID}.tempHp`, { value: tempHp }),
       deathSaves,
+      deathTooltip,
       scale: game.settings.get(MODULE_ID, "scale") ?? HUD_SCALE.default,
       isDying,
       portraitTooltip: game.i18n.localize(`${MODULE_ID}.${rollsDeathSave ? "deathSave" : "openSheet"}`),
