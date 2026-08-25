@@ -22,6 +22,7 @@
     --hudtra-spent: #45403a;
     --hudtra-danger: #c0392b;
     --hudtra-hp: #57a64a;
+    --hudtra-hp-temp: #5fb9d9;
     --hudtra-pool-action: #57a64a;
     --hudtra-pool-bonus: #e0862b;
     --hudtra-pool-reaction: #a75ce0;
@@ -227,6 +228,19 @@
       0 0 0 2px var(--hudtra-gold-dark),
       0 0 0.6em rgb(0 0 0 / 0.6);
   }
+  /* TEMP HP IS THE RIM, NOT AN ARC. An arc would have to share the ring with the HP
+     it sits on top of, and at full health there is no room left to draw it in - which
+     is exactly when a party picks temp HP up (Inspiring Leader, Aid, anything off a
+     rest), so the indicator would vanish in the commonest case. The rim is always
+     there to be coloured, and it is the mechanism `.dying` below already uses. Stated
+     before that rule on purpose: same specificity, so dying wins, and a creature down
+     at 0 with a shield still reads as dying first. */
+  #hud-to-rule-them-all .hudtra-portrait-ring.has-temp {
+    box-shadow:
+      0 0 0 2px var(--hudtra-hp-temp),
+      0 0 0.6em color-mix(in oklab, var(--hudtra-hp-temp) 45%, transparent);
+  }
+
   #hud-to-rule-them-all .hudtra-portrait-btn {
     position: relative;
     display: block;
@@ -245,6 +259,15 @@
     border: 1px solid rgb(0 0 0 / 0.7);
     border-radius: 50%;
   }
+  /* The shield's own number, on the HP label. Same colour as its arc on the ring, so
+     the two read as one thing; a `+` because temp HP sits ON TOP of value/max rather
+     than being part of it. */
+  #hud-to-rule-them-all .hudtra-temp {
+    margin-left: 0.35em;
+    color: var(--hudtra-hp-temp);
+    font-weight: 600;
+  }
+
   /* 0 HP: skull overlay on the portrait; clicking it rolls a death save for PCs. */
   #hud-to-rule-them-all .hudtra-skull {
     position: absolute;

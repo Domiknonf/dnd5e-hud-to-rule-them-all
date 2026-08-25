@@ -39,13 +39,18 @@
   <div class="hudtra-main">
 
   <div class="hudtra-char">
-    <div class="hudtra-portrait-ring {{#if isDying}}dying{{/if}}" style="--hudtra-hp-pct: {{hpPct}}">
+    <div class="hudtra-portrait-ring {{#if isDying}}dying{{/if}} {{#if tempHp}}has-temp{{/if}}"
+         style="--hudtra-hp-pct: {{hpPct}}">
       <button type="button" class="hudtra-portrait-btn" data-action="portrait"
               data-tooltip-text="{{portraitTooltip}}">
         <img class="hudtra-portrait" src="{{img}}" alt="{{name}}">
         {{#if isDying}}<i class="hudtra-skull fa-solid fa-skull"></i>{{/if}}
       </button>
-      {{#if hp}}<span class="hudtra-hp-label">{{hp.value}}/{{hp.max}}</span>{{/if}}
+      {{!-- Temp HP rides on the label rather than getting a badge of its own: it is
+           a number you read, the corners around the portrait are taken, and one more
+           floating chip beside the skull would be clutter at every scale. --}}
+      {{#if hp}}<span class="hudtra-hp-label">{{hp.value}}/{{hp.max}}{{#if tempHp}}<span
+        class="hudtra-temp" data-tooltip-text="{{tempTooltip}}">+{{tempHp}}</span>{{/if}}</span>{{/if}}
     </div>
     <span class="hudtra-name">{{name}}</span>
     <span class="hudtra-vitals">

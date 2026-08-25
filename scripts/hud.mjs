@@ -1130,6 +1130,15 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const hp = actor?.system?.attributes?.hp ?? null;
     const isDying = !!hp && hp.value <= 0;
     const rollsDeathSave = isDying && actor?.type === "character";
+    // Temporary hit points are a BUFFER, not part of the pool: they are spent first,
+    // they do not heal, and they do not raise the maximum. So they are neither folded
+    // into value/max - which would claim the creature has more hit points than it has -
+    // nor drawn as an arc on the ring, which has no room left at full health - the
+    // one state a creature is usually in when it picks temp HP up. They colour the
+    // ring's rim and are named on the label instead (see .hudtra-portrait-ring
+    // .has-temp). Read defensively: `temp` is null on an untouched sheet.
+    const tempHp = Math.max(0, Number(hp?.temp) || 0);
+    const hpPct = hp?.max > 0 ? Math.round(100 * Math.clamp(hp.value, 0, hp.max) / hp.max) : 0;
 
     // A level-up can change what the detection would suggest without changing
     // anything visible in the bar (Extra Attack adds no new entry), so a new
@@ -1153,7 +1162,9 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       hp,
       // Presentation-only fields: the CSS scales the whole bar off --hudtra-scale
       // and draws the portrait's HP ring from --hudtra-hp-pct.
-      hpPct: hp?.max > 0 ? Math.round(100 * Math.clamp(hp.value, 0, hp.max) / hp.max) : 0,
+      hpPct,
+      tempHp,
+      tempTooltip: game.i18n.format(`${MODULE_ID}.tempHp`, { value: tempHp }),
       scale: game.settings.get(MODULE_ID, "scale") ?? 1,
       isDying,
       portraitTooltip: game.i18n.localize(`${MODULE_ID}.${rollsDeathSave ? "deathSave" : "openSheet"}`),

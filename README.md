@@ -83,7 +83,9 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
   get their own tab or section as read-only reference cards.
 - **Portrait shortcuts.** Click for the character sheet; at 0 HP it turns into a skull that
-  rolls a death saving throw. The ring around it is the HP gauge.
+  rolls a death saving throw. The ring around it is the HP gauge, and its rim turns cyan
+  while the creature is carrying temporary hit points — the amount rides on the HP label
+  as a `+7`, because temp HP sits on top of `value/max` rather than being part of it.
 
 ## Compatibility
 
