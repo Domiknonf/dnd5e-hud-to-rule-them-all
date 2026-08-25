@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in the bar is wrong, missing, or not counted correctly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The single most useful thing you can paste here is the output of
+        `game.modules.get("dnd5e-hud-to-rule-them-all").api.diagnose()`, run in the
+        browser console (F12) with the affected token selected. It prints what the
+        module believes about that creature — whether it is tracked at all, whose turn
+        it thinks it is, which effects matched, and what has been spent. Almost every
+        "nothing happens" report is answered by that one object.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnose
+    attributes:
+      label: api.diagnose() output
+      description: Select the affected token first. Skip it if the bar does not appear at all.
+      render: json
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: This module, Foundry, and the dnd5e system.
+      placeholder: "HUD 1.2.2 · Foundry 13.351 · dnd5e 5.3.3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: modules
+    attributes:
+      label: Other modules involved
+      description: >
+        Midi QoL, DAE and Times Up in particular change how activities are used, and
+        this module reads what they leave behind. Say if any are active.
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before reporting
+      options:
+        - label: The creature has a player owner, or "Count creatures without a player owner" is on. Without either, nothing is counted by design.
+        - label: My compendium content is English. The detection matches English SRD names; anything else needs the gear dialog.

@@ -100,6 +100,17 @@ export const SPELL_PIP_LIMIT = 6;
 export const DEATH_SAVE_PIPS = 3;
 
 /**
+ * The shape of the per-actor config flag, as stored (see config.mjs).
+ *
+ * Raise this ONLY together with a step in config.migrate(), and only when the stored
+ * SHAPE changes - a new optional field needs nothing, because a config that lacks it
+ * already reads correctly. What needs a step is a field that changes meaning, the way
+ * `sort` once went from a rank within a pool to an absolute grid cell: same key, same
+ * type, and every stored value silently wrong.
+ */
+export const CONFIG_SCHEMA = 1;
+
+/**
  * Where a pinned description card is allowed to sit, in CSS pixels (see hud.mjs
  * #placeCard).
  *

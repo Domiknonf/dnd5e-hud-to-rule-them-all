@@ -2,11 +2,10 @@
   "id": "dnd5e-hud-to-rule-them-all",
   "title": "A DnD 5e HUD To Rule Them All",
   "description": "Combat HUD for D&D 5e that shows every available activity grouped by action type, and tracks the action / bonus action / reaction economy for the creatures your players control.",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "authors": [
     {
-      "name": "Dominik Königseder",
-      "discord": ""
+      "name": "Dominik Königseder"
     }
   ],
   "compatibility": {
@@ -41,7 +40,7 @@
   "socket": true,
   "url": "https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all",
   "manifest": "https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all/releases/latest/download/module.json",
-  "download": "https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all/releases/download/v1.2.1/module.zip",
+  "download": "https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all/releases/download/v1.2.2/module.zip",
   "license": "LICENSE",
   "readme": "README.md",
   "bugs": "https://github.com/Domiknonf/dnd5e-hud-to-rule-them-all/issues"
