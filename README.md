@@ -5,7 +5,7 @@ can actually use, grouped by action type — and, for the creatures your players
 track the action / bonus action / reaction economy. Styled as a Baldur's Gate 3-like
 hotbar across the bottom of the screen.
 
-**Foundry v13** · **dnd5e 5.x** · MIT · `0.7.2` (pre-alpha)
+**Foundry v13** · **dnd5e 5.x** · MIT · `1.0.0`
 
 ---
 
@@ -20,11 +20,42 @@ thing wrapped around it.
 
 Also most of the other ones just simply don't suit my parties needs, so I'm making this one.
 
+## How it works
+
+**The bar is always there.** It is not tied to combat: it renders whenever there is
+somebody to show, and only closes when there is nobody. Starting an encounter pulls it
+up, ending one slides it away — the handle in the bottom-right corner brings it back by
+hand at any time. Foundry's own macro hotbar hides itself while the bar is up and returns
+the moment you collapse it.
+
+**It shows exactly one creature.** A selected token always wins, for everyone. Without
+one, the GM sees whoever is currently acting, and a player sees *their own* character —
+never the acting monster. Following the turn pointer meant a player's bar filled up with
+a goblin's ability list at exactly the moment their own reaction pip mattered.
+
+**Buttons come from activities, not items.** In dnd5e 4.x+ the unit of "a thing you do"
+is an Activity, and one item can carry several with different costs. A Net whose attack
+is an action and whose utility is a bonus action is therefore two buttons, in two places,
+because that is what it actually is. An item whose activities all agree stays one button
+that opens dnd5e's own activity picker.
+
+**Clicking a button just uses the thing.** The HUD never books a cost itself. Costs are
+booked in `dnd5e.postUseActivity`, which means a click here, a click on the character
+sheet, a macro and a Midi QoL workflow all count identically — and none of them
+double-count. Turn the bar off mid-session and your sheet still counts correctly.
+
+**What it cannot know for certain, it asks.** Which pool an odd feature belongs to, how
+many attacks your Attack action grants, how big a pool is — all of that is answered once
+in the gear dialog, by whoever owns the character. Detection still runs, but only to
+prefill that dialog and as the fallback until you correct it. Configuration always wins,
+and nothing is ever silently rewritten behind your back.
+
 ## Features
 
 - **Activity-aware action list.** Walks every activity on every item, not just items, so
   a weapon with an attack plus a utility activity shows up in both the action and the
-  bonus action group.
+  bonus action group. An item that lands in two pools is marked as such, and the hover
+  card names the other place it lives.
 - **Economy tracking, for the creatures somebody plays.** Action, bonus action, reaction
   and legendary actions, tracked per combatant — including reactions spent on other
   creatures' turns. A creature only the GM owns is **not** counted: it gets the same bar,
@@ -34,16 +65,21 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   a click on the character sheet, a macro and a Midi QoL workflow all count identically
   and none of them double-count.
 - **Three enforcement levels.** Track silently, warn, or block the usage outright.
-- **Extra Attack.** Several attacks share one action instead of each burning their own.
-  The Dragonborn's Breath Weapon counts as one of those attacks, per the 2024 rules.
-- **BG3-style bar.** Bottom-anchored hotbar with square icon slots, a portrait HP ring and
-  per-pool markers. Collapses out of view when you need the screen. Foundry's own macro
-  hotbar hides itself while it is up.
+- **Extra Attack.** Several attacks share one action instead of each burning their own,
+  with the attacks left in the current action shown on the slot. The Dragonborn's Breath
+  Weapon counts as one of those attacks, per the 2024 rules.
 - **Two layouts, decided by ownership.** A creature somebody plays gets a BG3-style
   hotbar: one grid of slots with the empty ones drawn in, the action cost as a marker on
   each slot, category tabs above it and `+`/`-` for how many rows you want. A creature
   only the GM owns keeps the auto-grouped columns — nobody arranges twelve goblins by
   hand. A chain-pact imp or a summoned drake counts as played, because someone plays it.
+- **Arrange the bar by dragging its icons.** Drop an icon on another and the two trade
+  places; drop it on an empty cell and it moves there, leaving the gap you made on
+  purpose intact. Let go outside the bar and it offers to take that button off it. The
+  gear dialog has a *Reset order* button that undoes the lot.
+- **Category tabs** (played layout). *All* leads the strip, then Weapons, Spells,
+  Features, Consumables, Gear and Passives — only the ones this creature actually has
+  something in. Clicking the lit tab widens the grid again.
 - **Sections you can fold away** (GM layout). A crowded group is split into Weapons, Spells,
   Features, Consumables and Gear. Click a group's name to fold the whole thing, or one of
   the chips beside it to fold a single section — a folded chip names what it is holding
@@ -53,14 +89,20 @@ Also most of the other ones just simply don't suit my parties needs, so I'm maki
   no slot left for grey themselves out — upcasting counted, cantrips and at-will casting
   never — so "can I still cast this" is answered before you ask. Spells sort by level,
   cantrips first.
-- **Nothing moves.** The bar has a fixed width, so folding a section, filtering by level
-  or switching creatures never slides the buttons out from under your pointer.
-- **Descriptions in place.** Middle-click any slot to expand dnd5e's own item card above
-  the bar, without opening a sheet or a window.
+- **Everything a slot needs to say, on the slot.** Its pool as a coloured marker,
+  remaining charges, attacks left inside the current action, and a link-slash when the
+  item has a second button elsewhere. Each badge owns its own corner, so a Breath Weapon
+  really can show all of them at once.
+- **Nothing moves.** The bar has a fixed width, so folding a section, switching tabs or
+  switching creatures never slides the buttons out from under your pointer.
+- **Descriptions, pinned.** Middle-click any slot (or left-click a passive) to pin
+  dnd5e's own item card — the same card the character sheet shows — beside the button.
+  It floats above everything, so no sheet covers it and the bar costs no height for it.
+  Click the card, middle-click the slot again, or switch creature to dismiss it.
 - **Passive features.** Feats with nothing to click (Weapon Mastery, Tactical Shift, …)
-  get their own section as read-only reference cards.
+  get their own tab or section as read-only reference cards.
 - **Portrait shortcuts.** Click for the character sheet; at 0 HP it turns into a skull that
-  rolls a death saving throw.
+  rolls a death saving throw. The ring around it is the HP gauge.
 
 ## Compatibility
 
@@ -92,8 +134,8 @@ Settings live under *Configure Settings → Module Settings*.
 **Content filters** — hide unequipped gear, hide unprepared spells.
 
 **Presentation** (per user) — HUD scale, sort order, and whether crowded groups are split
-into sections. Which groups and sections you have folded away is remembered per user and
-is set by clicking the bar itself, not in this menu.
+into sections. How many rows the grid has, and which groups and sections you have folded
+away, are remembered per user and are set by clicking the bar itself, not in this menu.
 
 ### Who gets counted
 
@@ -131,6 +173,9 @@ by whoever owns the character (the GM owns everyone).
   on a GM-only creature these do nothing, so they are not shown. Anything already stored
   is kept, and comes back if the creature is handed to a player later.
 
+Configuration is stored on the base actor, so five unlinked goblins from one prototype
+share it instead of needing five identical dialogs.
+
 Detection still runs, but only to prefill that dialog and as the fallback while nothing
 has been configured. **Configuration always wins.**
 
@@ -146,13 +191,14 @@ translated or renamed content needs the dialog.
 - **Opportunity Attacks.** Nothing in dnd5e marks one, so an action-cost activity used
   on somebody else's turn is booked as the Reaction it actually is.
 - **Action Surge** and anything else configured to *grant* pool capacity.
-- **Haste** and **Slow**, read off the effects of whoever has them.
+- **Haste** and **Slow**, read off the effects of whoever has them. Slow couples the
+  action with the bonus action — either, not both — and bars reactions outright.
 - **Stunned, Paralyzed, Unconscious, Petrified, Incapacitated** bar the economy
   outright; the pips stay visible and struck through, so it reads as the condition
   rather than as a broken bar.
 
 The GM can correct any pool by hand: click a pool to hand one pip back, right-click to
-spend one.
+spend one. There is also a *Reset turn* button that refills everything.
 
 ## Public API
 
@@ -185,26 +231,31 @@ Then restart Foundry and enable the module. Code changes need only a browser rel
 changes to `module.json`, `lang/*.json`, or the file lists in `esmodules`/`styles` need a
 server restart.
 
+`node tools/verify.mjs` checks the things a syntax check cannot see: that every template
+part renders a single root element, that no `data-action` is wired to nothing, that the
+imports stay acyclic and that the i18n keys line up.
+
 Releases are cut by pushing a tag — the workflow stamps `module.json` and publishes the
 zip:
 
 ```bash
-git tag v0.7.2 && git push --tags
+git tag v1.0.0 && git push --tags
 ```
 
-## Roadmap
+## Status
 
-- [x] **M0** — scaffold, HUD renders for the active combatant
-- [x] **M1** — economy correct across a full round, undo
-- [x] **M3** — configurability: zones, filters, per-entry rules, per-actor overrides
-- [ ] **M4** — parity: spell slots, item uses, concentration, targeting, Extra Attack
-- [x] **M5** — BG3-style theming; keybindings and repositioning still open
+1.0 covers what the module set out to do: the ability list, the economy behind it, the
+two layouts, and enough configuration that nothing has to be guessed at twice.
 
-Movement tracking (former **M2**), the generic intrinsic actions (Dash, Dodge, Hide, …)
-and the Free Interaction pool shipped in early versions and were **deliberately removed**
-again — they are not coming back. Neither is the **Multiattack editor**, dropped in 0.5.0
+**Deliberately not here, and not coming back.** Movement tracking, the generic intrinsic
+actions (Dash, Dodge, Hide, …) and the Free Interaction pool all shipped in early
+versions and were removed again. So was the **Multiattack editor**, dropped in 0.5.0
 along with the economy on GM-run creatures: it existed to describe monsters, and monsters
-are no longer counted. Every heuristic that read statblock prose went with it.
+are no longer counted. Every heuristic that read statblock prose went with it — if a
+counted creature needs a number, it gets a field in the dialog instead.
+
+**Not there yet.** Concentration, targeting, keybindings, moving the bar somewhere other
+than the bottom edge, and any language but English.
 
 ## Acknowledgements
 
