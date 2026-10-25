@@ -12,6 +12,7 @@ import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 import { configTarget, setEntryOrder, setEntryHidden } from "./config.mjs";
+import { resolveActivity, beforeUse, afterUse } from "./targeting.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -1131,12 +1132,23 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const doc = await fromUuid(entry.uuid);
     if (!doc) return;
     // entry.kind is "item" for items with several activities in the same economy
-    // bucket (see actions.collectActions) - Item5e#use() shows the same activity
-    // picker the character sheet's own roll button does. Otherwise it's a single
-    // unambiguous activity, used directly.
+    // bucket (see actions.collectActions) - resolveActivity() shows the same activity
+    // picker Item5e#use() and the character sheet's own roll button do. Otherwise it's
+    // a single unambiguous activity, used directly.
     // NOTE: we do NOT spend here. scripts/module.mjs listens to dnd5e.postUseActivity,
     // so macros, chat cards and Midi rolls all book through the same code path.
-    return doc.use({ event });
+    //
+    // Targeting has to happen BEFORE use(): dnd5e copies game.user.targets onto the
+    // usage card and the attack roll from inside it (see targeting.beforeUse). So the
+    // activity is resolved here first - the same choice Item5e#use would offer.
+    const activity = await resolveActivity(doc, event);
+    if (activity === undefined) return doc.use({ event });
+    if (!activity) return;
+    const plan = await beforeUse(activity, event);
+    if (plan === false) return;
+    const results = await activity.use({ event });
+    await afterUse(activity, plan, results);
+    return results;
   }
 
   /**

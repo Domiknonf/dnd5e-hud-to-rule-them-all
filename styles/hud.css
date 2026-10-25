@@ -1315,4 +1315,51 @@
     padding-top: 0.5rem;
   }
   #hudtra-config .hudtra-config-save { font-weight: bold; }
+
+  /* Target picker (targeting.pickTargets). A core DialogV2, so like the config window
+     it follows Foundry's theme rather than the bar's leather; only the list is ours. */
+  .hudtra-targets .hudtra-targets-body { display: flex; flex-direction: column; gap: 0.35rem; }
+  .hudtra-targets .hudtra-targets-what { margin: 0; opacity: 0.75; }
+  .hudtra-targets .hudtra-targets-count { margin: 0; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .hudtra-targets .hudtra-targets-divider {
+    margin: 0.3rem 0 0;
+    font-size: var(--font-size-12, 0.85em);
+    opacity: 0.7;
+    border-top: 1px solid currentColor;
+    padding-top: 0.25rem;
+  }
+  .hudtra-targets .hudtra-target-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 18rem;
+    overflow-y: auto;
+  }
+  .hudtra-targets .hudtra-target label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0.3rem;
+    border-left: 3px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .hudtra-targets .hudtra-target.friendly label { border-left-color: #43a047; }
+  .hudtra-targets .hudtra-target.neutral label { border-left-color: #f1c40f; }
+  .hudtra-targets .hudtra-target.hostile label { border-left-color: #c0392b; }
+  .hudtra-targets .hudtra-target label:hover,
+  .hudtra-targets .hudtra-target.selected label { background: rgba(200, 163, 82, 0.2); }
+  .hudtra-targets .hudtra-target.out { opacity: 0.6; }
+  .hudtra-targets .hudtra-target input { flex: 0 0 auto; margin: 0; }
+  .hudtra-targets .hudtra-target input:disabled + img { filter: grayscale(1); }
+  .hudtra-targets .hudtra-target img {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    border: none;
+  }
+  .hudtra-targets .hudtra-target .name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hudtra-targets .hudtra-target .name em { opacity: 0.7; }
+  .hudtra-targets .hudtra-target .dist { flex: 0 0 auto; font-variant-numeric: tabular-nums; opacity: 0.8; }
 }
