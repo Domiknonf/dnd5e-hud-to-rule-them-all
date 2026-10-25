@@ -48,9 +48,26 @@ export function registerSettings() {
   // per-user one.
   reg("trackEveryone",   { ...WORLD, type: Boolean, default: false });
 
+  /* --- House rules ------------------------------------------ */
+  // World scope: what a spell costs is a table rule, not a per-player preference.
+  reg("materialGold",    { ...WORLD, type: Boolean, default: false });
+
   /* --- Content filters -------------------------------------- */
   reg("hideUnequipped",     { ...WORLD, type: Boolean, default: true });
   reg("hideUnprepared",     { ...WORLD, type: Boolean, default: true });
+
+  /* --- Targeting ------------------------------------------- */
+  // Per user: whether a click on the bar may retarget is a question about how one
+  // person likes to play, and the GM running twelve goblins answers it differently
+  // from the player with one character. See targeting.beforeUse.
+  reg("targetPicker", {
+    ...CLIENT, type: String, default: "always",
+    choices: {
+      always:  `${MODULE_ID}.settings.targetPicker.always`,
+      missing: `${MODULE_ID}.settings.targetPicker.missing`,
+      off:     `${MODULE_ID}.settings.targetPicker.off`
+    }
+  });
 
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
