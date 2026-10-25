@@ -148,6 +148,17 @@ Settings live under *Configure Settings → Module Settings*.
 
 **Enforcement** — `Track only`, `Warn`, or `Block the usage`, plus a GM bypass.
 
+**House rules** — *Pay costly material components in gold* (off by default): a spell
+whose component has a price is cast without carrying the item, as long as the character
+has the money. What the spell consumes is paid — in the same write as the spell slot, so
+the chat card's refund button returns the gold too — and what it does not consume
+(Identify's pearl, Chromatic Orb's diamond) only has to be affordable. The price is read
+from the component text ("a diamond worth 300+ GP, which the spell consumes"), because
+the 2024 compendium leaves the spell's *Cost* field at 0; a cost entered there wins over
+the text. Player characters' own spells only: scrolls, wands and monsters cast without
+components. Not enough money blocks the cast, except for the GM when *GM bypasses
+enforcement* is on.
+
 **Content filters** — hide unequipped gear, hide unprepared spells.
 
 **Targeting** (per user) — when the target picker opens: *Always* (current targets

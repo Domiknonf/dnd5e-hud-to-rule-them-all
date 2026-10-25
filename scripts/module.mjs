@@ -11,6 +11,7 @@ import {
 } from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
+import { checkMaterials, payMaterials } from "./materials.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -68,6 +69,17 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
   if (result === "block") { ui.notifications.warn(msg); return false; }
   ui.notifications.info(msg);
   return true;
+});
+
+/**
+ * House rule: costly material components are paid in gold instead of carried (see
+ * materials.mjs). Checked before the usage, paid inside dnd5e's own consumption step
+ * so the coins leave in the same write as the spell slot - and come back with it if
+ * the chat card's refund button is used.
+ */
+Hooks.on("dnd5e.preUseActivity", (activity) => checkMaterials(activity));
+Hooks.on("dnd5e.activityConsumption", (activity, usageConfig, messageConfig, updates) => {
+  payMaterials(activity, usageConfig, updates);
 });
 
 /**

@@ -48,6 +48,10 @@ export function registerSettings() {
   // per-user one.
   reg("trackEveryone",   { ...WORLD, type: Boolean, default: false });
 
+  /* --- House rules ------------------------------------------ */
+  // World scope: what a spell costs is a table rule, not a per-player preference.
+  reg("materialGold",    { ...WORLD, type: Boolean, default: false });
+
   /* --- Content filters -------------------------------------- */
   reg("hideUnequipped",     { ...WORLD, type: Boolean, default: true });
   reg("hideUnprepared",     { ...WORLD, type: Boolean, default: true });

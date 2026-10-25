@@ -126,5 +126,9 @@
   "dnd5e-hud-to-rule-them-all.targets.none": "No suitable token on this scene.",
   "dnd5e-hud-to-rule-them-all.targets.outOfRange": "Out of range",
   "dnd5e-hud-to-rule-them-all.targets.beyondTouch": "Beyond touch — reach or size may still allow it",
-  "dnd5e-hud-to-rule-them-all.targets.overcount": "{name}: {count} creatures targeted, but a level {level} casting affects only {allowed}."
+  "dnd5e-hud-to-rule-them-all.targets.overcount": "{name}: {count} creatures targeted, but a level {level} casting affects only {allowed}.",
+  "dnd5e-hud-to-rule-them-all.settings.materialGold.name": "Pay costly material components in gold",
+  "dnd5e-hud-to-rule-them-all.settings.materialGold.hint": "House rule: a spell that needs a component with a price (\"a diamond worth 300+ GP\") is cast without carrying it, as long as the character has that much money. Components the spell consumes are paid for; the others only have to be affordable. Applies to player characters' own spells, not to scrolls, wands or monsters.",
+  "dnd5e-hud-to-rule-them-all.materials.short": "{name} needs components worth {cost} — only {have} in the purse.",
+  "dnd5e-hud-to-rule-them-all.materials.paid": "{name}: {cost} paid for the material components."
 }
