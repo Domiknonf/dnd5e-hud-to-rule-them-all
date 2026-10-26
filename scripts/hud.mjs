@@ -13,6 +13,7 @@ import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 import { configTarget, setEntryOrder, setEntryHidden } from "./config.mjs";
 import { resolveActivity, beforeUse, afterUse } from "./targeting.mjs";
+import { showsPurse, wealth, formatCoins } from "./materials.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -29,7 +30,7 @@ function tooltipLabels() {
   const of = (key) => esc(game.i18n.localize(`${MODULE_ID}.tooltip.${key}`));
   return (ttLabels = {
     range: of("range"), target: of("target"), damage: of("damage"),
-    uses: of("uses"), alsoIn: of("alsoIn"), middleClick: of("middleClick")
+    materials: of("materials"), uses: of("uses"), alsoIn: of("alsoIn"), middleClick: of("middleClick")
   });
 }
 
@@ -56,6 +57,7 @@ function tooltipFor(entry, poolLabel) {
   if (entry.details?.range) row("range", entry.details.range);
   if (entry.details?.target) row("target", entry.details.target);
   if (entry.details?.damage) row("damage", entry.details.damage);
+  if (entry.goldBadge) row("materials", entry.goldBadge.hint);
   if (entry.uses) row("uses", `${entry.uses.value}/${entry.uses.max}`);
   // Answers "why is this on my bar twice" in the one place with room for it.
   if (entry.otherPools?.length) row("alsoIn", entry.otherPools.join(", "));
@@ -946,6 +948,10 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     // The ceiling every leveled spell on the bar is measured against, resolved once
     // per render rather than per slot.
     const castable = highestCastable(slotRows);
+    // Gold-for-components house rule (materials.mjs): the purse, in copper, that every
+    // priced spell on the bar is measured against. null when the rule is off or this
+    // is not a player character - then no coin badge and no purse readout either.
+    const purse = showsPurse(actor) ? wealth(actor) : null;
     const poolGroups = POOL_ORDER
       .map(key => {
         const def = RESOURCES[key];
@@ -1002,6 +1008,22 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
             enriched.unavailable = entry.itemType === "spell" && !entry.atWill
               && castable !== null && Number(entry.level ?? 0) > 0
               && Number(entry.level ?? 0) > castable;
+            // A priced material component: coins on the slot when casting spends the
+            // gold, a gem when the money only has to be there. A purse
+            // too light for it greys the spell exactly like a missing slot does,
+            // because the cast would be refused the same way.
+            if (purse !== null && entry.materials) {
+              const { required, consumed } = entry.materials;
+              const affordable = purse >= required;
+              const cost = formatCoins(consumed || required);
+              enriched.goldBadge = {
+                consumed: consumed > 0, affordable,
+                hint: game.i18n.format(`${MODULE_ID}.materials.${consumed ? "spends" : "needs"}`, {
+                  cost, purse: formatCoins(purse)
+                })
+              };
+              if (!affordable) enriched.unavailable = true;
+            }
             enriched.tooltipHtml = tooltipFor(enriched, label);
             return enriched;
           });
@@ -1103,6 +1125,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       round: game.combat?.round ?? 0,
       pools,
       spellBar,
+      // Shown beside the spell slots whenever the house rule is on: the budget the
+      // coin badges are measured against, always in view.
+      purse: purse !== null && spellBar ? {
+        label: formatCoins(purse),
+        tooltip: game.i18n.format(`${MODULE_ID}.materials.purse`, { purse: formatCoins(purse) })
+      } : null,
       // The column beside the portrait exists for either half: a wizard out of combat
       // has no pips and still wants to see slots.
       resources: showEconomy || !!spellBar,

@@ -11,7 +11,7 @@ import {
 } from "./actions.mjs";
 import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
-import { checkMaterials, payMaterials } from "./materials.mjs";
+import { checkMaterials, payMaterials, decorateUsageDialog } from "./materials.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -81,6 +81,8 @@ Hooks.on("dnd5e.preUseActivity", (activity) => checkMaterials(activity));
 Hooks.on("dnd5e.activityConsumption", (activity, usageConfig, messageConfig, updates) => {
   payMaterials(activity, usageConfig, updates);
 });
+// ...and says so in dnd5e's casting dialog before anything is spent.
+Hooks.on("renderActivityUsageDialog", (app, element) => decorateUsageDialog(app, element));
 
 /**
  * Book the cost AFTER a successful usage. This is the single write path — it also

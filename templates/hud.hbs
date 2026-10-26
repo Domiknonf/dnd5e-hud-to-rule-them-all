@@ -138,6 +138,13 @@
         {{#if spellBar.pact.slots}}<span class="hudtra-level-slots">{{spellBar.pact.slots}}</span>{{/if}}
       </span>
       {{/if}}
+      {{!-- The purse, while material components are paid in gold: the budget the
+           coin on a priced spell is measured against. --}}
+      {{#if purse}}
+      <span class="hudtra-purse" data-tooltip-text="{{purse.tooltip}}">
+        <i class="fa-solid fa-coins"></i> <span>{{purse.label}}</span>
+      </span>
+      {{/if}}
     </div>
     {{/if}}
   </div>
@@ -200,6 +207,11 @@
                  uses AND stands in for an attack). Just the number - the total is one
                  hover away, and a square wants one glyph. --}}
             {{#if attacksBadge}}<span class="hudtra-attacks">{{attacksBadge.available}}</span>{{/if}}
+            {{!-- A priced material component, top-left: the attacks badge is the only
+                 other tenant of that corner and a spell never carries one. Coins when
+                 casting pays, a gem when the money only has to be there (a focus the
+                 spell keeps), red when the purse cannot cover it. --}}
+            {{#if goldBadge}}{{#unless attacksBadge}}<span class="hudtra-gold {{#if goldBadge.consumed}}spends{{/if}} {{#unless goldBadge.affordable}}short{{/unless}}"><i class="fa-solid {{#if goldBadge.consumed}}fa-coins{{else}}fa-gem{{/if}}"></i></span>{{/unless}}{{/if}}
           </button>
           {{/if}}
           {{/each}}

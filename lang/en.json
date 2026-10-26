@@ -130,5 +130,12 @@
   "dnd5e-hud-to-rule-them-all.settings.materialGold.name": "Pay costly material components in gold",
   "dnd5e-hud-to-rule-them-all.settings.materialGold.hint": "House rule: a spell that needs a component with a price (\"a diamond worth 300+ GP\") is cast without carrying it, as long as the character has that much money. Components the spell consumes are paid for; the others only have to be affordable. Applies to player characters' own spells, not to scrolls, wands or monsters.",
   "dnd5e-hud-to-rule-them-all.materials.short": "{name} needs components worth {cost} — only {have} in the purse.",
-  "dnd5e-hud-to-rule-them-all.materials.paid": "{name}: {cost} paid for the material components."
+  "dnd5e-hud-to-rule-them-all.materials.paid": "{name}: {cost} paid for the material components.",
+  "dnd5e-hud-to-rule-them-all.tooltip.materials": "Components",
+  "dnd5e-hud-to-rule-them-all.materials.spends": "{cost}, paid when cast — purse {purse}",
+  "dnd5e-hud-to-rule-them-all.materials.needs": "{cost} in the purse, kept — purse {purse}",
+  "dnd5e-hud-to-rule-them-all.materials.purse": "Purse: {purse}. Spells with a priced material component are paid from it.",
+  "dnd5e-hud-to-rule-them-all.materials.cueTitle": "Material components, paid in gold",
+  "dnd5e-hud-to-rule-them-all.materials.cuePay": "Pays {cost} — purse {purse} → {after}",
+  "dnd5e-hud-to-rule-them-all.materials.cueNeed": "Needs {cost} in the purse, nothing is spent — purse {purse}"
 }
