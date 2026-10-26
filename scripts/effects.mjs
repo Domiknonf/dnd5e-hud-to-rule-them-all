@@ -10,6 +10,8 @@ import { requestFromGM } from "./socket.mjs";
  * nothing but concentrate" was dnd5e's normal behaviour - this finishes the job
  * once the target picker has said who the spell is for.
  *
+ * Under Midi QoL only when Midi's own auto-apply is off (see midiAppliesEffects).
+ *
  * Only for activities that put an effect on their target unconditionally. A save
  * (Hold Person) or an attack (Ray of Enfeeblement) applies its effect only on a
  * failed save or a hit, which the card resolves later - those keep the manual button.
@@ -18,9 +20,25 @@ const UNCONDITIONAL = new Set(["utility", "heal"]);
 
 export function shouldApply(activity) {
   if (!game.settings.get(MODULE_ID, "autoApplyEffects")) return false;
-  // Midi QoL applies effects in its own workflow; doing it again would race it.
-  if (game.modules.get("midi-qol")?.active) return false;
+  if (midiAppliesEffects()) return false;
   return UNCONDITIONAL.has(activity?.type);
+}
+
+/**
+ * Whether Midi QoL puts item effects on the targets itself. Midi does only when its
+ * "Auto apply item effects to targets" is set to anything but off - and off is
+ * Midi's default, in which case nobody applies them unless this module does. When
+ * Midi's settings cannot be read, assume it does: applying twice is worse than a
+ * button left to click.
+ */
+function midiAppliesEffects() {
+  if (!game.modules.get("midi-qol")?.active) return false;
+  try {
+    const mode = game.settings.get("midi-qol", "ConfigSettings")?.autoItemEffects;
+    return !!mode && mode !== "off";
+  } catch {
+    return true;
+  }
 }
 
 /**

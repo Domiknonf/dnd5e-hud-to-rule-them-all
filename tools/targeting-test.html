@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Targeting test</title></head><body>
+<!-- Foundry, dnd5e and (optionally) Midi QoL stubbed just far enough to drive
+     scripts/targeting.mjs end to end. Run with: node tools/targeting-test.cjs -->
+<script>
+window.Handlebars = { escapeExpression: s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) };
+window.targets = new Set();
+window.log = [];
+const mkActor = (name, owner) => ({ name, uuid: "Actor." + name, isOwner: owner, created: [],
+  effects: { list: [], find(fn) { return this.list.find(fn); }, get: id => id === "conc1" ? { uuid: "Actor." + name + ".ActiveEffect.conc1" } : null } });
+const mkTok = (id, x, disp, owner) => ({ id, actor: mkActor(id, owner), visible: true, center: {x: x*100+50, y: 50},
+  document: { name: id, disposition: disp, hidden: false, width: 1, texture: {src: ""}, getOccupiedGridSpaceOffsets: () => [{i:0,j:x}] } });
+window.toks = [mkTok("me",0,1,true), mkTok("ally",1,1,false), mkTok("gob",3,-1,false), mkTok("orc",20,-1,false)];
+window.CONST = { TOKEN_DISPOSITIONS: { SECRET: -2, HOSTILE: -1, NEUTRAL: 0, FRIENDLY: 1 } };
+window.CONFIG = { DND5E: { movementUnits: { ft: {}, mi: {} }, currencies: {} } };
+window.settings = { targetPicker: "always", autoApplyEffects: true, materialGold: false };
+window.midi = { active: false, autoItemEffects: "applyRemove" };
+window.game = { user: { isGM: false, get targets() { const s = new Set([...window.targets].map(id => toks.find(t => t.id === id))); s.size; return s; } },
+  users: { activeGM: { id: "gm" } }, socket: { emit: (s, d) => log.push(["socket", d.action, d.data.actorUuid]) },
+  settings: { get: (m, k) => m === "midi-qol" ? { autoItemEffects: midi.autoItemEffects } : settings[k] },
+  modules: { get: id => id === "midi-qol" ? { active: midi.active } : null },
+  i18n: { localize: k => k.split(".").pop(), format: (k, d) => k.split(".").pop() + JSON.stringify(d) } };
+window.canvas = { ready: true, scene: { grid: { units: "ft" } }, dimensions: { distancePixels: 20 },
+  grid: { isGridless: false, distance: 5, getCenterPoint: o => ({x: o.j*100+50, y: 50}), measurePath: ([p,q]) => ({distance: Math.abs(p.x-q.x)/100*5}) },
+  tokens: { controlled: [toks[0]], placeables: toks, get: id => toks.find(t => t.id === id), setTargets: ids => { window.targets = new Set(ids); } } };
+window.ActiveEffect = { implementation: { create: async (data, { parent }) => { parent.effects.list.push(data); log.push(["effect", parent.name]); return data; } } };
+window.Item = class {};
+window.ui = { notifications: { info: () => {}, warn: () => {} } };
+window.foundry = { utils: {
+  deepClone: o => structuredClone(o), setProperty() {},
+  mergeObject: (a, b) => { for (const [k, v] of Object.entries(b)) a[k] = (v && typeof v === "object" && !Array.isArray(v) && a[k] && typeof a[k] === "object") ? foundry.utils.mergeObject(a[k], v) : v; return a; } },
+  applications: { api: { DialogV2: { wait(cfg) { return new Promise(res => {
+    const el = document.createElement("div"); el.id = "dlg";
+    el.innerHTML = `<form>${cfg.content}<footer>${cfg.buttons.map(b => `<button type="button" data-action="${b.action}">${b.label}</button>`).join("")}</footer></form>`;
+    document.body.append(el); log.push(["picker"]);
+    el.querySelectorAll("footer button").forEach(btn => btn.addEventListener("click", () => { el.remove(); res(cfg.buttons.find(x => x.action === btn.dataset.action).callback()); }));
+    cfg.render(new Event("render"), { element: el }); }); } } } } };
+// Hooks: only what the module registers
+window.hooks = [];
+window.Hooks = { call: (name, ...args) => { for (const [n, fn] of hooks) if (n === name && fn(...args) === false) return false; return true; } };
+</script><script type="module">
+import * as T from "../scripts/targeting.mjs";
+window.T = T;
+hooks.push(["dnd5e.preUseActivity", T.interceptUse]);
+const actor = toks[0].actor;
+const effect = { uuid: "Item.x.ActiveEffect.e", name: "Protected", type: "base", toObject: () => ({ name: "Protected" }), constructor: { getInitialDuration: () => ({}) } };
+// An activity whose use() behaves like dnd5e's (or Midi's): Midi reads the targets
+// when its workflow starts, dnd5e snapshots them for the card; then the hook fires.
+window.mkAct = (id, o) => {
+  const act = { id, uuid: "Actor.me.Item.i.Activity." + id, name: id, labels: {}, type: o.type ?? "utility",
+    range: o.range ?? { units: "touch" }, target: { affects: o.affects ?? {}, template: o.template ?? {} },
+    effects: o.effects ? [{ effect }] : [], applicableEffects: o.effects ? [effect] : [],
+    item: { id: "i", name: o.name ?? id, system: { level: 1 } }, actor, canUse: true };
+  act.use = async (usage = {}) => {
+    const seen = [...targets];
+    const clone = { ...act };                       // dnd5e hands the hook a working clone
+    if (Hooks.call("dnd5e.preUseActivity", clone, { ...usage }, {}, {}) === false) { log.push(["use-stopped", id]); return; }
+    log.push(["use", id, seen.join(",")]);
+    return { message: { system: { concentration: "conc1" } }, templates: [] };
+  };
+  return act;
+};
+actor.items = { get: () => ({ system: { activities: { get: id => window.acts[id] } } }) };
+window.acts = {};
+// dnd5e's activity choice dialog, answering with the activity named in window.choose
+window.dnd5e = { applications: { activity: { ActivityChoiceDialog: { create: async () => { log.push(["choice"]); return window.acts[window.choose] ?? null; } } } } };
+window.mkItem = (ids) => ({ documentName: "Item", system: { activities: { filter: fn => ids.map(id => window.acts[id]).filter(fn) } }, use: async () => log.push(["item.use"]) });
+window.ready = true;
+</script></body></html>

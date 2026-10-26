@@ -92,6 +92,32 @@ export function targetPlan(activity) {
     kind: "pick", filter: "any", count: 1, maxCount: 1, ...rangeOf(activity), excludeSelf: true, preferSelf: false
   };
 
+  // No target entered, but a range that reaches past yourself. Homebrew, imports and
+  // older items often leave "Target" blank - a Protection from Evil and Good with
+  // range touch and no target type used to fall through to "nothing to aim at", got
+  // no picker, and went to nobody. Asked for here instead, when the activity can only
+  // mean somebody else: a buff or heal that carries an effect, or a save or damage
+  // roll at range against one creature (a poisoned blade's save, Acid Arrow's acid).
+  // A cantrip-style utility with no effect (Prestidigitation, Thaumaturgy) stays
+  // "none" - it has nobody to put anything on.
+  const reaches = units === "touch" || units in (CONFIG.DND5E?.movementUnits ?? {});
+  if (reaches && (activity.type === "heal" || (activity.type === "utility" && hasEffects(activity)))) {
+    const n = units === "touch" ? 1 : null;
+    return {
+      kind: "pick", filter: "creature", count: n, maxCount: n, ...rangeOf(activity),
+      excludeSelf: false, preferSelf: units === "touch", rider: false
+    };
+  }
+  // These are follow-ups on a creature already engaged (Acid Arrow's end-of-turn
+  // damage, the poison save after a hit), so the current target is kept preselected.
+  // Distance only: a touch-range damage without a target is Meld into Stone's damage
+  // to the caster, and a check without one is a grappled creature's Escape Check -
+  // neither is aimed at anybody by the one who clicks it.
+  if (units !== "touch" && reaches && ROLL_AT_ONE.has(activity.type)) return {
+    kind: "pick", filter: "any", count: 1, maxCount: 1, ...rangeOf(activity),
+    excludeSelf: true, preferSelf: false, rider: true
+  };
+
   // Nothing targeted and range self: Rage, Second Wind, Action Surge, Mirror Image.
   // Limited to activity types that cannot hurt anyone - a "damage, range self, no
   // target" activity is Divine Smite's rider, and targeting yourself there would put
@@ -108,6 +134,18 @@ export function targetPlan(activity) {
  * a Wand of Magic Missiles must not end up aimed at its wielder.
  */
 const SELF_RANGE_TYPES = new Set(["utility", "heal", "enchant", "check"]);
+
+/** Activity types that, without a stated target, still roll against one creature. */
+const ROLL_AT_ONE = new Set(["save", "damage"]);
+
+/** Whether the activity puts an effect on anyone (dnd5e's own list of them). */
+function hasEffects(activity) {
+  try {
+    return (activity.applicableEffects?.length ?? activity.effects?.length ?? 0) > 0;
+  } catch {
+    return (activity.effects?.length ?? 0) > 0;
+  }
+}
 
 /**
  * Activity types where a self- or touch-range picker starts with the caster selected;
@@ -294,8 +332,7 @@ const mode = () => game.settings.get(MODULE_ID, "targetPicker");
  * Protection from Evil and Good is meant for, and preselecting them made a quick
  * Enter cast it on the wrong creature. So the picker opens empty, or on yourself for
  * a touch buff or heal, and only an attack rider keeps the creature just attacked.
- * An activity that aims at nothing (Misty Step, a summon) clears them as well, so
- * its chat card does not claim targets it never had.
+ * An activity that aims at nothing (Misty Step, a summon) does not touch them.
  *
  * Shift-click skips the picker (dnd5e's own "fast-forward" modifier) and keeps
  * whatever is targeted - the path for targeting on the canvas first. The "missing"
@@ -316,11 +353,10 @@ export async function beforeUse(activity, event) {
     setTargets([]);
     return plan;
   }
-  if (event?.shiftKey) return plan;
-  if (plan.kind !== "pick") {
-    if (mode() === "always") setTargets([]);
-    return plan;
-  }
+  // Shift-click keeps whatever is targeted. An activity that aims at nothing leaves
+  // the targets alone as well: clearing them took the targets away from Midi QoL,
+  // which hands an activity's effects to whatever is targeted when it runs.
+  if (event?.shiftKey || plan.kind !== "pick") return plan;
 
   const pool = candidates(plan, caster);
   const allowed = new Set(pool.map(c => c.token.id));
@@ -359,8 +395,9 @@ export async function afterUse(activity, plan, results) {
   const templates = results.templates ?? [];
   if (!templates.length) return;
   // Midi QoL targets the tokens in a placed template itself (its "auto target"
-  // option); doing it twice would fight over the result.
-  if (game.modules.get("midi-qol")?.active) return;
+  // option); doing it twice would fight over the result. Its targets are then the
+  // aura's, and effects still go to them when Midi does not apply them itself.
+  if (game.modules.get("midi-qol")?.active) return applyToTargets(activity, results);
 
   const caster = casterToken(activity.actor);
   let inside = candidates(plan, caster)
@@ -566,28 +603,81 @@ function hoverToken(event, on) {
 }
 
 /* -------------------------------------------- */
-/*  Uses that do not start on the bar            */
+/*  Using an activity                            */
 /* -------------------------------------------- */
+
+/**
+ * Activities this client is aiming and using right now, by uuid. interceptUse lets
+ * them through: they have their targets already. A module-level set rather than a
+ * flag on the usage config, because Midi QoL rebuilds that config inside its own
+ * use() and nothing guarantees a foreign key survives it. The uuid is the same on
+ * the working clone dnd5e hands the hook (the item is cloned with its id kept).
+ */
+const aiming = new Set();
+
+async function useAimed(activity, usage = {}, dialog = {}, message = {}) {
+  aiming.add(activity.uuid);
+  try {
+    return await activity.use({ ...usage, [AIMED]: true }, dialog, message);
+  } finally {
+    aiming.delete(activity.uuid);
+  }
+}
+
+/**
+ * A click on the bar. The picker runs BEFORE use(), always, also under Midi QoL:
+ * dnd5e copies the targets onto the usage card and the attack roll from inside use(),
+ * and Midi reads game.user.targets when its workflow starts - so targets settled here
+ * are the targets everything downstream sees.
+ */
+export async function useFromBar(doc, event) {
+  const activity = await resolveActivity(doc, event);
+  if (activity === undefined) return doc.use({ event });
+  if (!activity) return;
+  const plan = await beforeUse(activity, event);
+  if (plan === false) return;
+  const results = await useAimed(activity, { event });
+  await afterUse(activity, plan, results);
+  return results;
+}
+
+/**
+ * Item5e#use, minus the use: which activity a click on a multi-activity item means.
+ * The bar needs the activity before use() to know what to aim at.
+ */
+async function resolveActivity(doc, event) {
+  if (doc?.documentName !== "Item") return doc;
+  const activities = doc.system.activities?.filter(a => a.canUse) ?? [];
+  // undefined hands the click back to Item5e#use (an item without activities posts
+  // its card); null is a closed choice dialog, which uses nothing.
+  if (!activities.length) return undefined;
+  if (activities.length === 1 || event?.shiftKey) return activities[0];
+  const Choice = globalThis.dnd5e?.applications?.activity?.ActivityChoiceDialog;
+  return Choice ? (await Choice.create(doc)) ?? null : undefined;
+}
 
 /**
  * Marks a usage this module has already aimed, so the interceptor lets it through.
  * A plain key rather than a dotted one: usage configs go through mergeObject, which
  * would expand "a.b" into a nested object.
  */
-export const AIMED = "hudtraAimed";
+const AIMED = "hudtraAimed";
 
 /**
- * dnd5e.preUseActivity, registered before every other handler of this module: the
- * ONE place a use gets aimed, whether the click was on the bar or on the character
- * sheet - the bar calls use() exactly as the sheet does, so the two cannot diverge.
+ * dnd5e.preUseActivity, registered before every other handler of this module: aim
+ * a use that started on the character sheet the way the bar aims its own clicks.
  *
  * The hook cannot wait for a picker, so the usage is stopped here and started again
  * once the targets are settled - with the same configuration and the AIMED mark.
- * Left alone: uses without a click (macros, other modules' automation), uses caused
- * by another activity, shift-clicks, and everything while Midi QoL runs the show.
+ * Left alone: uses the bar has aimed already, uses without a click (macros, other
+ * modules' automation), uses caused by another activity, shift-clicks - and sheet
+ * casts while Midi QoL is active. Midi already rebuilds use() around its own target
+ * confirmation; stopping and restarting its workflow from a hook is not something
+ * to do to it, and a sheet cast under Midi works as Midi is configured.
  */
 export function interceptUse(activity, usageConfig, dialogConfig, messageConfig) {
-  if (usageConfig?.[AIMED] || !usageConfig?.event || usageConfig.cause) return true;
+  if (aiming.has(activity?.uuid) || usageConfig?.[AIMED]) return true;
+  if (!usageConfig?.event || usageConfig.cause) return true;
   if (mode() === "off" || !canvas?.ready || game.modules.get("midi-qol")?.active) return true;
   if (usageConfig.event.shiftKey) return true;
   if (targetPlan(activity).kind === "none") return true;
@@ -605,7 +695,7 @@ async function aimAndUse(activity, usageConfig, dialogConfig, messageConfig) {
     const message = foundry.utils.deepClone(messageConfig ?? {});
     // Snapshotted before the targets were settled; dropped so use() takes a fresh one.
     delete message.data?.flags?.dnd5e?.targets;
-    const results = await activity.use({ ...usageConfig, [AIMED]: true }, dialogConfig, message);
+    const results = await useAimed(activity, usageConfig, dialogConfig, message);
     await afterUse(activity, plan, results);
   } catch (err) {
     console.error(`${MODULE_ID} | aiming ${activity.name} failed`, err);

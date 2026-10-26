@@ -254,9 +254,11 @@ activity is being used, so the bar settles them first, from the activity's own
 | *Any number of creatures* (Beacon of Hope) | Picker without a limit. |
 | A weapon or spell attack with no stated target (every weapon, Scorching Ray) | Picker for one target. You are not on your own attack's list. |
 | *Touch* (Cure Wounds, Protection from Evil and Good, Shocking Grasp) | Picker; a touch heal or buff starts on you. Anyone beyond 5 ft is listed under *Beyond touch* rather than hidden, since reach and size stretch it. |
+| No target entered, but a buff or heal with an effect at touch or range — homebrew, imports, older items | Picker all the same (one creature at touch, any number at range): a blank *Target* field must not mean "nobody". |
+| No target entered, a save or damage roll at range (Acid Arrow's lingering acid, a poisoned blade's save) | Picker for one, the creature you just targeted preselected. |
 | Range *Self* with a creature target — riders and handed-over items (Sneak Attack, Stunning Strike, Lay on Hands, a Potion of Healing) | Picker for one, no range limit, an attack rider keeps the creature you just attacked; a heal or potion starts on you. |
 | An area (Fireball, Burning Hands, Spirit Guardians, a breath weapon) | dnd5e places the template as usual; afterwards everything inside is targeted and the card's *Targeted* list is updated, so its damage and save buttons apply to them. A Cone, Line, Cube or Emanation that starts at you leaves you out (2024 rules); a Sphere at range does not. *Creatures of your choice* (Spirit Guardians) and areas that affect fewer creatures than they cover (Phantasmal Force) open the picker with the catch preselected. |
-| A space or point (Misty Step, Spiritual Weapon, a summon) | Clears your targets, so the card claims none. |
+| A space or point, or nothing to aim at (Misty Step, Spiritual Weapon, a summon, Prestidigitation) | Nothing — your targets are left exactly as they are. |
 
 Spells whose target count grows with the slot (Bless, Hold Person, Magic Missile) let
 you pick up to what your highest remaining slot allows, because the slot is only chosen
@@ -275,19 +277,19 @@ effects of utility and healing activities (Protection from Evil and Good, Bless,
 Rage) are applied to the chosen targets right away, tied to the caster's concentration
 exactly as dnd5e's button would, so dropping concentration removes them. Creatures the
 caster does not own are written by the GM's client. Effects behind a saving throw or an
-attack roll keep the manual button; with Midi QoL active this is left to Midi.
+attack roll keep the manual button. With Midi QoL, the bar applies them only while Midi's
+own *Auto apply item effects* is off (Midi's default) — otherwise Midi does it, once.
 
 *Cancel* in the picker aborts the use and puts your old targets back; *Without a target*
 uses it with none. **Shift-click** a slot to skip the picker once and use whatever is
 targeted — the way to target on the canvas first. The *Only when the current targets
 don't fit* setting keeps fitting targets without asking, leftovers included.
 
-**With Midi QoL active, targeting belongs to Midi.** Midi replaces dnd5e's usage with its
-own workflow — its own target confirmation, range checks, template targeting and effect
-application — so the bar stays out of it entirely: no picker, no auto-targeting, no
-effects of its own. A click on the bar is used exactly the way the character sheet uses
-it, so whatever Midi does for a sheet cast it does for the bar. For a picker on every
-cast, set Midi's *Target Confirmation* to taste.
+**With Midi QoL.** A click on the bar gets the picker exactly as without Midi: the
+targets are settled before the use starts, and Midi's workflow picks them up from there.
+Two things are left to Midi: the tokens inside a placed template (Midi's own template
+targeting), and a cast started on the character sheet — Midi rebuilds the use around its
+own *Target Confirmation*, so a sheet cast works the way Midi is set up.
 
 ## Public API
 
@@ -323,6 +325,12 @@ server restart.
 `node tools/verify.mjs` checks the things a syntax check cannot see: that every template
 part renders a single root element, that no `data-action` is wired to nothing, that the
 imports stay acyclic and that the i18n keys line up.
+
+`node tools/targeting-test.cjs` (needs Playwright with Chromium) drives the target picker
+end to end against stubbed Foundry and dnd5e: bar and sheet clicks, with and without Midi
+QoL, Protection from Evil and Good with and without target data, Bless after stale
+targets, Misty Step, shift-click, cancel, multi-activity items. Run it after any change
+to `scripts/targeting.mjs` or `scripts/effects.mjs`.
 
 Releases are cut by pushing a tag — the workflow stamps `module.json` and publishes the
 zip:
