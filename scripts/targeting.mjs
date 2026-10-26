@@ -565,21 +565,6 @@ function hoverToken(event, on) {
   }
 }
 
-/**
- * Item5e#use, minus the use: which activity a click on a multi-activity item means.
- * The HUD needs the activity before use() to know what to aim at.
- */
-export async function resolveActivity(doc, event) {
-  if (doc?.documentName !== "Item") return doc;
-  const activities = doc.system.activities?.filter(a => a.canUse) ?? [];
-  // undefined hands the click back to Item5e#use (an item without activities posts
-  // its card); null is a closed choice dialog, which uses nothing.
-  if (!activities.length) return undefined;
-  if (activities.length === 1 || event?.shiftKey) return activities[0];
-  const Choice = globalThis.dnd5e?.applications?.activity?.ActivityChoiceDialog;
-  return Choice ? (await Choice.create(doc)) ?? null : undefined;
-}
-
 /* -------------------------------------------- */
 /*  Uses that do not start on the bar            */
 /* -------------------------------------------- */
@@ -592,10 +577,9 @@ export async function resolveActivity(doc, event) {
 export const AIMED = "hudtraAimed";
 
 /**
- * dnd5e.preUseActivity, registered before every other handler of this module: aim
- * uses that started on the character sheet (or anywhere a person clicked) the way
- * the bar aims its own. Without this, Protection from Evil and Good cast from the
- * sheet asked nobody who it was for and went to whatever happened to be targeted.
+ * dnd5e.preUseActivity, registered before every other handler of this module: the
+ * ONE place a use gets aimed, whether the click was on the bar or on the character
+ * sheet - the bar calls use() exactly as the sheet does, so the two cannot diverge.
  *
  * The hook cannot wait for a picker, so the usage is stopped here and started again
  * once the targets are settled - with the same configuration and the AIMED mark.
