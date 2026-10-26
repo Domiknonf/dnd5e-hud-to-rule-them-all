@@ -844,6 +844,49 @@
     text-shadow: 0 1px 3px #000, 0 0 0.4em #000;
   }
 
+  /* Priced material component (gold-for-components house rule). TOP-LEFT, shared
+     only with the attacks badge, which a spell never carries. Coins when casting
+     spends gold, a gem when the money only has to be there; red when the purse is
+     short, which also greys the slot (.unavailable). */
+  #hud-to-rule-them-all .hudtra-gold {
+    position: absolute;
+    left: 0.12em;
+    top: 0.12em;
+    display: grid;
+    place-items: center;
+    width: 1.15em;
+    height: 1.15em;
+    border: 1px solid var(--hudtra-gold-dark);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.85);
+    font-size: 0.7em;
+    color: var(--hudtra-text-dim);
+  }
+  #hud-to-rule-them-all .hudtra-gold.spends {
+    border-color: var(--hudtra-gold);
+    color: var(--hudtra-gold-bright);
+    box-shadow: 0 0 0.35em rgb(236 209 147 / 0.55);
+  }
+  #hud-to-rule-them-all .hudtra-gold.short {
+    border-color: var(--hudtra-danger);
+    color: #ff8a7a;
+    box-shadow: none;
+  }
+
+  /* The purse, under the spell slots while the house rule is on. */
+  #hud-to-rule-them-all .hudtra-purse {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    margin-top: 0.1em;
+    padding: 0.05em 0.35em;
+    font-size: 0.78em;
+    font-variant-numeric: tabular-nums;
+    color: var(--hudtra-gold-bright);
+    white-space: nowrap;
+  }
+  #hud-to-rule-them-all .hudtra-purse i { color: var(--hudtra-gold); }
+
   /* Charges/uses: gold, bottom-right. */
   #hud-to-rule-them-all .hudtra-uses {
     position: absolute;
@@ -1362,4 +1405,26 @@
   .hudtra-targets .hudtra-target .name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hudtra-targets .hudtra-target .name em { opacity: 0.7; }
   .hudtra-targets .hudtra-target .dist { flex: 0 0 auto; font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+  /* The line injected into dnd5e's casting dialog (materials.decorateUsageDialog).
+     dnd5e's dialog keeps its own look; only this strip is ours, in the bar's gold so
+     it reads as "the HUD's house rule" rather than as a dnd5e field. */
+  .activity-usage .hudtra-materials-cue {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #c8a352;
+    border-left-width: 4px;
+    border-radius: 4px;
+    background: rgb(200 163 82 / 0.14);
+  }
+  .activity-usage .hudtra-materials-cue > i { margin-top: 0.15rem; font-size: 1.2rem; color: #b8862b; }
+  .activity-usage .hudtra-materials-cue > div { display: flex; flex-direction: column; gap: 0.1rem; }
+  .activity-usage .hudtra-materials-cue span { font-variant-numeric: tabular-nums; }
+  .activity-usage .hudtra-materials-cue small { opacity: 0.7; font-style: italic; }
+  .activity-usage .hudtra-materials-cue:not(.spends) { border-color: rgb(200 163 82 / 0.5); background: transparent; }
+  .activity-usage .hudtra-materials-cue.short { border-color: #c0392b; background: rgb(192 57 43 / 0.12); }
+  .activity-usage .hudtra-materials-cue.short > i { color: #c0392b; }
 }

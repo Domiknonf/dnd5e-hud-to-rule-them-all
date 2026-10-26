@@ -74,9 +74,14 @@ export function targetPlan(activity) {
       ...rangeOf(activity),
       // Nearest-first would otherwise put the attacker at the top of its own list.
       excludeSelf: activity.type === "attack",
-      // Who to start from when the user has nothing targeted: a potion or Lay on
-      // Hands is most often for yourself, an attack rider never is.
-      preferSelf: units === "self" && SELF_FIRST_TYPES.has(activity.type)
+      // Where the picker starts (see beforeUse). A buff or a heal you deliver by hand
+      // - Protection from Evil and Good, Cure Wounds, a potion, Lay on Hands - is most
+      // often for yourself.
+      preferSelf: (units === "self" || units === "touch") && SELF_FIRST_TYPES.has(activity.type),
+      // A rider on the attack you just made (Sneak Attack, Stunning Strike, Divine
+      // Strike) applies to exactly the creature that attack was aimed at - the one
+      // case where the previous target is the right answer rather than a leftover.
+      rider: units === "self" && !SELF_FIRST_TYPES.has(activity.type)
     };
   }
 
@@ -103,7 +108,10 @@ export function targetPlan(activity) {
  */
 const SELF_RANGE_TYPES = new Set(["utility", "heal", "enchant", "check"]);
 
-/** Activity types where a self-range picker starts with the caster selected. */
+/**
+ * Activity types where a self- or touch-range picker starts with the caster selected;
+ * with range self, every other type is a rider on an attack (see targetPlan).
+ */
 const SELF_FIRST_TYPES = new Set(["heal", "utility"]);
 
 /**
@@ -279,8 +287,18 @@ const mode = () => game.settings.get(MODULE_ID, "targetPicker");
 /**
  * Before use(): aim the activity. Resolves to the plan to carry into afterUse(), or
  * false when the user cancelled the picker - the usage is then not made at all.
+ *
+ * Every click starts from a clean slate. Targets left over from the last spell are
+ * not a choice about this one: three allies still targeted from Bless are NOT who
+ * Protection from Evil and Good is meant for, and preselecting them made a quick
+ * Enter cast it on the wrong creature. So the picker opens empty, or on yourself for
+ * a touch buff or heal, and only an attack rider keeps the creature just attacked.
+ * An activity that aims at nothing (Misty Step, a summon) clears them as well, so
+ * its chat card does not claim targets it never had.
+ *
  * Shift-click skips the picker (dnd5e's own "fast-forward" modifier) and keeps
- * whatever is targeted; a self effect is still pointed at yourself, it costs no click.
+ * whatever is targeted - the path for targeting on the canvas first. The "missing"
+ * mode keeps the old behaviour: current targets that fit are used without asking.
  */
 export async function beforeUse(activity, event) {
   if (mode() === "off" || !canvas?.ready) return { kind: "none" };
@@ -297,17 +315,25 @@ export async function beforeUse(activity, event) {
     setTargets([]);
     return plan;
   }
-  if (plan.kind !== "pick" || event?.shiftKey) return plan;
+  if (event?.shiftKey) return plan;
+  if (plan.kind !== "pick") {
+    if (mode() === "always") setTargets([]);
+    return plan;
+  }
 
   const pool = candidates(plan, caster);
   const allowed = new Set(pool.map(c => c.token.id));
   const limit = plan.maxCount ?? plan.count;
-  let preselect = currentTargetIds().filter(id => allowed.has(id));
-  const fits = preselect.length > 0 && (!limit || preselect.length <= limit);
+  const current = currentTargetIds().filter(id => allowed.has(id));
+  const fits = current.length > 0 && (!limit || current.length <= limit);
   if (mode() === "missing" && fits) return plan;
 
-  if (!preselect.length && plan.preferSelf && caster && allowed.has(caster.id)) preselect = [caster.id];
+  let preselect = [];
+  if (plan.rider) preselect = current;
+  else if (plan.preferSelf && caster && allowed.has(caster.id)) preselect = [caster.id];
   if (limit) preselect = preselect.slice(0, limit);
+  // The picker replaces the canvas targets with `preselect` as it opens, so only
+  // what is being chosen shows - and puts the old ones back on Cancel.
 
   const chosen = await pickTargets({ activity, plan, pool, caster, preselect });
   if (chosen === null) return false;

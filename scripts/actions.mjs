@@ -4,6 +4,7 @@ import {
   ITEM_TYPE_SECTIONS, DEFAULT_SECTION
 } from "./const.mjs";
 import { entryConfig, entryRules, ruleFor, entryKey } from "./config.mjs";
+import { materialCost } from "./materials.mjs";
 
 /**
  * In dnd5e 4.x+ the unit of "a thing you do" is an Activity, not an Item.
@@ -588,6 +589,11 @@ export function collectActions(actor) {
         item.system?.method ?? item.system?.preparation?.mode ?? ""
       ),
       uses: usesFor(single, item),
+      // What its material components cost, for the gold-for-components house rule
+      // (materials.mjs). Not on a spell's follow-up activities (Hex's extra damage):
+      // those spend no slot and are not charged. The HUD decides whether to show it.
+      materials: item.type === "spell" && single?.consumption?.spellSlot !== false
+        ? materialCost(item) : null,
       details: single ? detailsFor(single) : null,
       description: plainDescription(item),
       key: entry.key,

@@ -156,7 +156,10 @@ the chat card's refund button returns the gold too — and what it does not cons
 from the component text ("a diamond worth 300+ GP, which the spell consumes"), because
 the 2024 compendium leaves the spell's *Cost* field at 0; a cost entered there wins over
 the text. Player characters' own spells only: scrolls, wands and monsters cast without
-components. Not enough money blocks the cast, except for the GM when *GM bypasses
+components. While the rule is on, the purse sits under the spell slots, a priced spell
+carries a coin (spends gold) or a gem (money only has to be there) on its slot — red,
+and the spell greyed, when the purse is short — and dnd5e's casting dialog says what is
+about to be paid: *Pays 300 gp — purse 512 gp → 212 gp*. Not enough money blocks the cast, except for the GM when *GM bypasses
 enforcement* is on.
 
 **Content filters** — hide unequipped gear, hide unprepared spells.
@@ -247,13 +250,13 @@ activity is being used, so the bar settles them first, from the activity's own
 | --- | --- |
 | Target *Self* (Second Wind, Action Surge, Rage, Shield, Detect Magic) | Targets your own token, no question asked. |
 | No target, range *Self*, and nothing that deals damage (Mirror Image, Blur) | Same — it can only be about you. |
-| *N creatures / allies / enemies / objects* (Fire Bolt, Healing Word, Bless, Hold Person, Magic Missile) | Picker, nearest first, with what is out of range below a divider. Allies and enemies are told apart by token disposition. At *N* the remaining rows lock; with one target, clicking another row moves the choice, and a double-click confirms. |
+| *N creatures / allies / enemies / objects* (Fire Bolt, Healing Word, Bless, Hold Person, Magic Missile) | Picker, starting empty — targets left over from the last spell are cleared, never preselected — nearest first, with what is out of range below a divider. Allies and enemies are told apart by token disposition. At *N* the remaining rows lock; with one target, clicking another row moves the choice, and a double-click confirms. |
 | *Any number of creatures* (Beacon of Hope) | Picker without a limit. |
 | A weapon or spell attack with no stated target (every weapon, Scorching Ray) | Picker for one target. You are not on your own attack's list. |
-| *Touch* (Cure Wounds, Shocking Grasp) | Picker; anyone beyond 5 ft is listed under *Beyond touch* rather than hidden, since reach and size stretch it. |
-| Range *Self* with a creature target — riders and handed-over items (Sneak Attack, Stunning Strike, Lay on Hands, a Potion of Healing) | Picker for one, no range limit, starting from whoever is targeted already — or from you, for a heal. |
+| *Touch* (Cure Wounds, Protection from Evil and Good, Shocking Grasp) | Picker; a touch heal or buff starts on you. Anyone beyond 5 ft is listed under *Beyond touch* rather than hidden, since reach and size stretch it. |
+| Range *Self* with a creature target — riders and handed-over items (Sneak Attack, Stunning Strike, Lay on Hands, a Potion of Healing) | Picker for one, no range limit, an attack rider keeps the creature you just attacked; a heal or potion starts on you. |
 | An area (Fireball, Burning Hands, Spirit Guardians, a breath weapon) | dnd5e places the template as usual; afterwards everything inside is targeted and the card's *Targeted* list is updated, so its damage and save buttons apply to them. A Cone, Line, Cube or Emanation that starts at you leaves you out (2024 rules); a Sphere at range does not. *Creatures of your choice* (Spirit Guardians) and areas that affect fewer creatures than they cover (Phantasmal Force) open the picker with the catch preselected. |
-| A space or point (Misty Step, Spiritual Weapon, a summon) | Nothing — your targets stay as they are. |
+| A space or point (Misty Step, Spiritual Weapon, a summon) | Clears your targets, so the card claims none. |
 
 Spells whose target count grows with the slot (Bless, Hold Person, Magic Missile) let
 you pick up to what your highest remaining slot allows, because the slot is only chosen
@@ -262,7 +265,8 @@ more creatures than that casting affects.
 
 *Cancel* in the picker aborts the use and puts your old targets back; *Without a target*
 uses it with none. **Shift-click** a slot to skip the picker once and use whatever is
-targeted. With Midi QoL active, filling an area is left to Midi's own auto-targeting.
+targeted — the way to target on the canvas first. The *Only when the current targets
+don't fit* setting keeps fitting targets without asking, leftovers included. With Midi QoL active, filling an area is left to Midi's own auto-targeting.
 
 ## Public API
 

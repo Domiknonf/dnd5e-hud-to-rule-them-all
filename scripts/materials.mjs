@@ -77,7 +77,7 @@ export function materialCost(item, { targets = 1 } = {}) {
 }
 
 /** The purse in copper. */
-function wealth(actor) {
+export function wealth(actor) {
   const values = coinValues();
   const purse = actor?.system?.currency ?? {};
   return Object.entries(values).reduce((sum, [key, v]) => sum + (Number(purse[key]) || 0) * v, 0);
@@ -144,6 +144,11 @@ export function appliesTo(activity) {
   return true;
 }
 
+/** Whether the bar should show prices and the purse for this creature at all. */
+export function showsPurse(actor) {
+  return !!game.settings.get(MODULE_ID, "materialGold") && actor?.type === "character";
+}
+
 const targetCount = () => Math.max(1, game.user.targets?.size ?? 1);
 
 /**
@@ -187,4 +192,42 @@ export function payMaterials(activity, usageConfig, updates) {
   ui.notifications.info(game.i18n.format(`${MODULE_ID}.materials.paid`, {
     name: activity.item.name, cost: formatCoins(cost.consumed)
   }));
+}
+
+/**
+ * The cue at the moment of casting, from renderActivityUsageDialog: dnd5e's own
+ * casting dialog (slot, concentration, template) gets a line saying what the purse
+ * is about to lose - "300 gp · 512 gp → 212 gp" - so spending money is never a
+ * surprise found in the chat log afterwards. Re-inserted on every render, because
+ * changing the slot re-renders the dialog's parts.
+ */
+export function decorateUsageDialog(app, element) {
+  const activity = app?.activity;
+  const root = element instanceof HTMLElement ? element : app?.element;
+  if (!root || !appliesTo(activity)) return;
+  root.querySelector(".hudtra-materials-cue")?.remove();
+  const cost = materialCost(activity.item, { targets: targetCount() });
+  if (!cost) return;
+
+  const esc = foundry.utils.escapeHTML ?? Handlebars.escapeExpression;
+  const purse = wealth(activity.actor);
+  const consumed = cost.consumed > 0;
+  const short = purse < cost.required;
+  const line = consumed
+    ? game.i18n.format(`${MODULE_ID}.materials.cuePay`, {
+      cost: formatCoins(cost.consumed), purse: formatCoins(purse),
+      after: formatCoins(Math.max(0, purse - cost.consumed))
+    })
+    : game.i18n.format(`${MODULE_ID}.materials.cueNeed`, {
+      cost: formatCoins(cost.required), purse: formatCoins(purse)
+    });
+
+  const cue = document.createElement("div");
+  cue.className = `hudtra-materials-cue${consumed ? " spends" : ""}${short ? " short" : ""}`;
+  cue.innerHTML = `<i class="fa-solid ${consumed ? "fa-coins" : "fa-gem"}"></i>`
+    + `<div><strong>${esc(game.i18n.localize(`${MODULE_ID}.materials.cueTitle`))}</strong>`
+    + `<span>${esc(line)}</span>`
+    + `<small>${esc(activity.item.system.materials?.value ?? "")}</small></div>`;
+  const host = root.querySelector(".window-content") ?? root;
+  host.prepend(cue);
 }
