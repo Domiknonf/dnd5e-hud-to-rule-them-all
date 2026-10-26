@@ -13,6 +13,7 @@ import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 import { configTarget, setEntryOrder, setEntryHidden } from "./config.mjs";
 import { showsPurse, wealth, formatCoins } from "./materials.mjs";
+import { useFromBar } from "./targeting.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -1159,19 +1160,12 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const doc = await fromUuid(entry.uuid);
     if (!doc) return;
     // entry.kind is "item" for items with several activities in the same economy
-    // bucket (see actions.collectActions) - Item5e#use() shows the same activity
-    // picker the character sheet's own roll button does. Otherwise it's a single
-    // unambiguous activity, used directly.
+    // bucket (see actions.collectActions) - useFromBar shows the same activity picker
+    // Item5e#use() and the character sheet's own roll button do, then the target
+    // picker, then uses it (see targeting.useFromBar).
     // NOTE: we do NOT spend here. scripts/module.mjs listens to dnd5e.postUseActivity,
     // so macros, chat cards and Midi rolls all book through the same code path.
-    //
-    // NOR do we aim here. A click on the bar is used EXACTLY the way the character
-    // sheet uses it, and targeting happens in one place for both: the preUseActivity
-    // hook (targeting.interceptUse). The bar once ran its own picker before use() and
-    // passed a marker along - and under Midi QoL, which replaces use() with its own
-    // workflow and target handling, that second path broke Protection from Evil and
-    // Good while the same spell cast from the sheet worked. One path cannot diverge.
-    return doc.use({ event });
+    return useFromBar(doc, event);
   }
 
 
