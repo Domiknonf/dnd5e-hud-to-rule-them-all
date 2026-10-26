@@ -280,7 +280,14 @@ attack roll keep the manual button; with Midi QoL active this is left to Midi.
 *Cancel* in the picker aborts the use and puts your old targets back; *Without a target*
 uses it with none. **Shift-click** a slot to skip the picker once and use whatever is
 targeted — the way to target on the canvas first. The *Only when the current targets
-don't fit* setting keeps fitting targets without asking, leftovers included. With Midi QoL active, filling an area is left to Midi's own auto-targeting.
+don't fit* setting keeps fitting targets without asking, leftovers included.
+
+**With Midi QoL active, targeting belongs to Midi.** Midi replaces dnd5e's usage with its
+own workflow — its own target confirmation, range checks, template targeting and effect
+application — so the bar stays out of it entirely: no picker, no auto-targeting, no
+effects of its own. A click on the bar is used exactly the way the character sheet uses
+it, so whatever Midi does for a sheet cast it does for the bar. For a picker on every
+cast, set Midi's *Target Confirmation* to taste.
 
 ## Public API
 

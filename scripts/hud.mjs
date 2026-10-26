@@ -12,7 +12,6 @@ import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 import { configTarget, setEntryOrder, setEntryHidden } from "./config.mjs";
-import { resolveActivity, beforeUse, afterUse, AIMED } from "./targeting.mjs";
 import { showsPurse, wealth, formatCoins } from "./materials.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -1160,25 +1159,21 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const doc = await fromUuid(entry.uuid);
     if (!doc) return;
     // entry.kind is "item" for items with several activities in the same economy
-    // bucket (see actions.collectActions) - resolveActivity() shows the same activity
-    // picker Item5e#use() and the character sheet's own roll button do. Otherwise it's
-    // a single unambiguous activity, used directly.
+    // bucket (see actions.collectActions) - Item5e#use() shows the same activity
+    // picker the character sheet's own roll button does. Otherwise it's a single
+    // unambiguous activity, used directly.
     // NOTE: we do NOT spend here. scripts/module.mjs listens to dnd5e.postUseActivity,
     // so macros, chat cards and Midi rolls all book through the same code path.
     //
-    // Targeting has to happen BEFORE use(): dnd5e copies game.user.targets onto the
-    // usage card and the attack roll from inside it (see targeting.beforeUse). So the
-    // activity is resolved here first - the same choice Item5e#use would offer.
-    const activity = await resolveActivity(doc, event);
-    if (activity === undefined) return doc.use({ event });
-    if (!activity) return;
-    const plan = await beforeUse(activity, event);
-    if (plan === false) return;
-    // Marked as aimed, so targeting.interceptUse does not stop it to aim it again.
-    const results = await activity.use({ event, [AIMED]: true });
-    await afterUse(activity, plan, results);
-    return results;
+    // NOR do we aim here. A click on the bar is used EXACTLY the way the character
+    // sheet uses it, and targeting happens in one place for both: the preUseActivity
+    // hook (targeting.interceptUse). The bar once ran its own picker before use() and
+    // passed a marker along - and under Midi QoL, which replaces use() with its own
+    // workflow and target handling, that second path broke Protection from Evil and
+    // Good while the same spell cast from the sheet worked. One path cannot diverge.
+    return doc.use({ event });
   }
+
 
   /**
    * Middle click on a slot, or left click on a passive feature: pin dnd5e's own
