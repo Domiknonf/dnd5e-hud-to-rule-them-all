@@ -137,5 +137,8 @@
   "dnd5e-hud-to-rule-them-all.materials.purse": "Purse: {purse}. Spells with a priced material component are paid from it.",
   "dnd5e-hud-to-rule-them-all.materials.cueTitle": "Material components, paid in gold",
   "dnd5e-hud-to-rule-them-all.materials.cuePay": "Pays {cost} — purse {purse} → {after}",
-  "dnd5e-hud-to-rule-them-all.materials.cueNeed": "Needs {cost} in the purse, nothing is spent — purse {purse}"
+  "dnd5e-hud-to-rule-them-all.materials.cueNeed": "Needs {cost} in the purse, nothing is spent — purse {purse}",
+  "dnd5e-hud-to-rule-them-all.settings.autoApplyEffects.name": "Apply buff and healing effects to the targets",
+  "dnd5e-hud-to-rule-them-all.settings.autoApplyEffects.hint": "dnd5e only puts an Apply button on the chat card, which players can't use on creatures they don't own. With this on, the effects of utility and healing activities (Protection from Evil and Good, Bless, Shield, Rage) land on the chosen targets right away, tied to the caster's concentration. Effects behind a save or an attack roll keep the manual button. A GM must be online for creatures the caster doesn't own. Off while Midi QoL is active, which applies effects itself.",
+  "dnd5e-hud-to-rule-them-all.effects.delegated": "{name}: the GM's client applies the effect to creatures you don't own."
 }

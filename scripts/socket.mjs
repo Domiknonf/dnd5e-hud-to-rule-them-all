@@ -10,6 +10,12 @@ let handlers = null;
 export function registerSocket() {
   game.socket.on(SOCKET, async ({ action, data } = {}) => {
     if (!game.user.isActiveGM) return;          // exactly one GM executes
+    // Not about a combatant: an effect a player's spell puts on a creature they do
+    // not own (see effects.applyToTargets).
+    if (action === "applyEffect") {
+      const { applyEffectRequest } = await import("./effects.mjs");
+      return applyEffectRequest(data);
+    }
     if (!handlers) handlers = await import("./economy.mjs");
     const combatant = await fromUuid(data?.combatantUuid);
     if (!combatant) return;
