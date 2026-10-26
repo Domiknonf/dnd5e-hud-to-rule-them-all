@@ -1,4 +1,5 @@
 import { MODULE_ID } from "./const.mjs";
+import { applyToTargets } from "./effects.mjs";
 
 const { DialogV2 } = foundry.applications.api;
 
@@ -347,6 +348,12 @@ export async function beforeUse(activity, event) {
  */
 export async function afterUse(activity, plan, results) {
   if (!results || !plan) return;
+  // Buffs and heals land on who they were aimed at - yourself for a self effect, the
+  // picked creatures otherwise (see effects.applyToTargets). Not for an aim-less
+  // activity, where whatever is targeted was never chosen for it.
+  if ((plan.kind === "self" || plan.kind === "pick") && mode() !== "off") {
+    await applyToTargets(activity, results);
+  }
   if (plan.kind === "pick" && plan.chosen) return reportOvercount(activity, plan, results);
   if (plan.kind !== "area") return;
   const templates = results.templates ?? [];
@@ -376,6 +383,8 @@ export async function afterUse(activity, plan, results) {
 
   setTargets(ids);
   await refreshCardTargets(results.message);
+  // An aura that buffs whoever stands in it (Aura of Protection, type "ally").
+  await applyToTargets(activity, results);
 }
 
 /**
@@ -569,4 +578,52 @@ export async function resolveActivity(doc, event) {
   if (activities.length === 1 || event?.shiftKey) return activities[0];
   const Choice = globalThis.dnd5e?.applications?.activity?.ActivityChoiceDialog;
   return Choice ? (await Choice.create(doc)) ?? null : undefined;
+}
+
+/* -------------------------------------------- */
+/*  Uses that do not start on the bar            */
+/* -------------------------------------------- */
+
+/**
+ * Marks a usage this module has already aimed, so the interceptor lets it through.
+ * A plain key rather than a dotted one: usage configs go through mergeObject, which
+ * would expand "a.b" into a nested object.
+ */
+export const AIMED = "hudtraAimed";
+
+/**
+ * dnd5e.preUseActivity, registered before every other handler of this module: aim
+ * uses that started on the character sheet (or anywhere a person clicked) the way
+ * the bar aims its own. Without this, Protection from Evil and Good cast from the
+ * sheet asked nobody who it was for and went to whatever happened to be targeted.
+ *
+ * The hook cannot wait for a picker, so the usage is stopped here and started again
+ * once the targets are settled - with the same configuration and the AIMED mark.
+ * Left alone: uses without a click (macros, other modules' automation), uses caused
+ * by another activity, shift-clicks, and everything while Midi QoL runs the show.
+ */
+export function interceptUse(activity, usageConfig, dialogConfig, messageConfig) {
+  if (usageConfig?.[AIMED] || !usageConfig?.event || usageConfig.cause) return true;
+  if (mode() === "off" || !canvas?.ready || game.modules.get("midi-qol")?.active) return true;
+  if (usageConfig.event.shiftKey) return true;
+  if (targetPlan(activity).kind === "none") return true;
+  // The hook hands over a working clone; start again from the item on the actor.
+  const original = activity.actor?.items.get(activity.item.id)?.system.activities?.get(activity.id);
+  if (!original) return true;
+  aimAndUse(original, usageConfig, dialogConfig, messageConfig);
+  return false;
+}
+
+async function aimAndUse(activity, usageConfig, dialogConfig, messageConfig) {
+  try {
+    const plan = await beforeUse(activity, usageConfig.event);
+    if (plan === false) return;
+    const message = foundry.utils.deepClone(messageConfig ?? {});
+    // Snapshotted before the targets were settled; dropped so use() takes a fresh one.
+    delete message.data?.flags?.dnd5e?.targets;
+    const results = await activity.use({ ...usageConfig, [AIMED]: true }, dialogConfig, message);
+    await afterUse(activity, plan, results);
+  } catch (err) {
+    console.error(`${MODULE_ID} | aiming ${activity.name} failed`, err);
+  }
 }

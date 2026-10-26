@@ -12,7 +12,7 @@ import { collectActions } from "./actions.mjs";
 import { spellSlots } from "./spells.mjs";
 import { openConfig, attackNotice } from "./config-app.mjs";
 import { configTarget, setEntryOrder, setEntryHidden } from "./config.mjs";
-import { resolveActivity, beforeUse, afterUse } from "./targeting.mjs";
+import { resolveActivity, beforeUse, afterUse, AIMED } from "./targeting.mjs";
 import { showsPurse, wealth, formatCoins } from "./materials.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -1174,7 +1174,8 @@ export class CombatHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!activity) return;
     const plan = await beforeUse(activity, event);
     if (plan === false) return;
-    const results = await activity.use({ event });
+    // Marked as aimed, so targeting.interceptUse does not stop it to aim it again.
+    const results = await activity.use({ event, [AIMED]: true });
     await afterUse(activity, plan, results);
     return results;
   }

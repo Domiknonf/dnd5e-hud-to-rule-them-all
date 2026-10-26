@@ -263,6 +263,20 @@ you pick up to what your highest remaining slot allows, because the slot is only
 afterwards in dnd5e's own dialog; if you then cast lower, the bar warns that you picked
 more creatures than that casting affects.
 
+The same happens for a cast started on the **character sheet**: dnd5e's hook cannot
+wait for a picker, so the bar stops that use, asks, and starts it again with the targets
+settled. Macros and other modules' automation (anything without a click) are left alone.
+
+**Effects land on the targets.** dnd5e itself only puts an *Apply* button on the chat
+card — which a player cannot use on a creature they do not own — so a buff like
+Protection from Evil and Good otherwise did nothing but start concentration. With
+*Apply buff and healing effects to the targets* on (world setting, default on), the
+effects of utility and healing activities (Protection from Evil and Good, Bless, Shield,
+Rage) are applied to the chosen targets right away, tied to the caster's concentration
+exactly as dnd5e's button would, so dropping concentration removes them. Creatures the
+caster does not own are written by the GM's client. Effects behind a saving throw or an
+attack roll keep the manual button; with Midi QoL active this is left to Midi.
+
 *Cancel* in the picker aborts the use and puts your old targets back; *Without a target*
 uses it with none. **Shift-click** a slot to skip the picker once and use whatever is
 targeted — the way to target on the canvas first. The *Only when the current targets

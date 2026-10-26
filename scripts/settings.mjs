@@ -69,6 +69,10 @@ export function registerSettings() {
     }
   });
 
+  // World scope: whether a spell's effect lands on its target by itself is a table
+  // rule, and the GM's client is the one that writes it onto creatures players do not own.
+  reg("autoApplyEffects", { ...WORLD, type: Boolean, default: true });
+
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
   reg("scale", {

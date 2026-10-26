@@ -12,6 +12,7 @@ import {
 import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
 import { checkMaterials, payMaterials, decorateUsageDialog } from "./materials.mjs";
+import { interceptUse } from "./targeting.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -45,6 +46,13 @@ Hooks.once("ready", () => {
 /* ------------------------------------------------------------------ */
 /*  Economy bookkeeping                                                */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Aim first. Registered before every other preUseActivity handler on purpose: when it
+ * stops a usage to open the target picker (a cast from the character sheet), the
+ * gates below must not have warned about it yet - they run again on the restart.
+ */
+Hooks.on("dnd5e.preUseActivity", interceptUse);
 
 /**
  * Gate: block/warn when the pool is empty. Returning false cancels the usage.
