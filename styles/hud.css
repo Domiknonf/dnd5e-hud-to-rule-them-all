@@ -1362,7 +1362,16 @@
   /* Target picker (targeting.pickTargets). A core DialogV2, so like the config window
      it follows Foundry's theme rather than the bar's leather; only the list is ours. */
   .hudtra-targets .hudtra-targets-body { display: flex; flex-direction: column; gap: 0.35rem; }
-  .hudtra-targets .hudtra-targets-what { margin: 0; opacity: 0.75; }
+  .hudtra-targets .hudtra-targets-head { display: flex; align-items: center; gap: 0.5rem; }
+  .hudtra-targets .hudtra-targets-what { flex: 1 1 auto; margin: 0; opacity: 0.75; }
+  .hudtra-targets .hudtra-targets-what em { opacity: 0.8; }
+  .hudtra-targets .hudtra-targets-adjust {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0 0.5rem;
+    line-height: 1.6rem;
+    font-size: var(--font-size-12, 0.85em);
+  }
   .hudtra-targets .hudtra-targets-count { margin: 0; font-weight: bold; font-variant-numeric: tabular-nums; }
   .hudtra-targets .hudtra-targets-divider {
     margin: 0.3rem 0 0;
@@ -1392,6 +1401,12 @@
   .hudtra-targets .hudtra-target.hostile label { border-left-color: #c0392b; }
   .hudtra-targets .hudtra-target label:hover,
   .hudtra-targets .hudtra-target.selected label { background: rgba(200, 163, 82, 0.2); }
+  /* The token under the mouse on the canvas: the row it belongs to. */
+  .hudtra-targets .hudtra-target.hovered label {
+    outline: 2px solid #c8a352;
+    outline-offset: -2px;
+    background: rgba(200, 163, 82, 0.3);
+  }
   .hudtra-targets .hudtra-target.out { opacity: 0.6; }
   .hudtra-targets .hudtra-target input { flex: 0 0 auto; margin: 0; }
   .hudtra-targets .hudtra-target input:disabled + img { filter: grayscale(1); }
@@ -1427,4 +1442,12 @@
   .activity-usage .hudtra-materials-cue:not(.spends) { border-color: rgb(200 163 82 / 0.5); background: transparent; }
   .activity-usage .hudtra-materials-cue.short { border-color: #c0392b; background: rgb(192 57 43 / 0.12); }
   .activity-usage .hudtra-materials-cue.short > i { color: #c0392b; }
+
+  /* Targeting override editor (targeting-config.mjs) - a core DialogV2 like the picker. */
+  .hudtra-target-rule-dialog .hudtra-target-rule { display: flex; flex-direction: column; gap: 0.4rem; }
+  .hudtra-target-rule-dialog .hudtra-target-rule .form-fields { gap: 0.5rem; }
+  .hudtra-target-rule-dialog .hudtra-target-rule input[type="number"] { flex: 0 0 5rem; }
+  .hudtra-target-rule-dialog .hudtra-target-rule label.checkbox {
+    display: flex; align-items: center; gap: 0.25rem; white-space: nowrap;
+  }
 }

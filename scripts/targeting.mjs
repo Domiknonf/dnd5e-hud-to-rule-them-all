@@ -1,5 +1,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { applyToTargets } from "./effects.mjs";
+import { entryConfig, entryKey } from "./config.mjs";
+import { cleanTargetRule, editTargetRule } from "./targeting-config.mjs";
 
 const { DialogV2 } = foundry.applications.api;
 
@@ -29,6 +31,60 @@ const { DialogV2 } = foundry.applications.api;
  *          description-only feature). The user's targets are left alone.
  */
 export function targetPlan(activity) {
+  return applyOverride(detectPlan(activity), targetRule(activity), activity);
+}
+
+/**
+ * The targeting override configured for this activity (targeting-config.mjs), or an
+ * empty rule. Read from the per-character config like every other per-entry rule;
+ * a failure to read it must never stop a cast, so it degrades to "as detected".
+ */
+export function targetRule(activity) {
+  try {
+    if (!activity?.actor || !activity.item) return {};
+    return cleanTargetRule(entryConfig(activity.actor, activity.item, activity).target);
+  } catch (err) {
+    console.warn(`${MODULE_ID} | could not read the targeting override`, err);
+    return {};
+  }
+}
+
+/**
+ * The override on top of what was detected. Every field is independent, so "this
+ * Healing Word takes one creature" changes the count and keeps the 60 ft and the
+ * creature filter the item already states.
+ * - mode "self" / "none" replace the plan outright.
+ * - mode "pick" turns anything else into a picker (one creature, the activity's own
+ *   range) before count, range and filter apply - for an area spell that means
+ *   picking the creatures by hand instead of placing a template.
+ * - count and filter apply to a picker and to an area; range only to a picker.
+ */
+function applyOverride(plan, rule, activity) {
+  if (!rule || !Object.keys(rule).length) return plan;
+  if (rule.mode === "self") return { kind: "self", overridden: true };
+  if (rule.mode === "none") return { kind: "none", overridden: true };
+  let next = plan;
+  if (rule.mode === "pick" && plan.kind !== "pick") next = {
+    kind: "pick", filter: "creature", count: 1, maxCount: 1, ...rangeOf(activity),
+    excludeSelf: false, preferSelf: false, rider: false
+  };
+  if (next.kind !== "pick" && next.kind !== "area") return next;
+  next = { ...next, overridden: true };
+  if (rule.filter) next.filter = rule.filter;
+  if (rule.count === "any") next.count = next.maxCount = null;
+  else if (Number.isFinite(rule.count)) next.count = next.maxCount = rule.count;
+  if (next.kind === "pick") {
+    if (rule.range === "any") { next.range = null; next.soft = false; }
+    else if (Number.isFinite(rule.range)) {
+      next.range = toSceneUnits(rule.range, rule.rangeUnits ?? "ft");
+      next.soft = false;
+    }
+  }
+  return next;
+}
+
+/** What the activity does with no override - the detection from its own data. */
+export function detectPlan(activity) {
   if (!activity) return { kind: "none" };
   const affects = activity.target?.affects ?? {};
   const template = activity.target?.template ?? {};
@@ -98,13 +154,16 @@ export function targetPlan(activity) {
   // no picker, and went to nobody. Asked for here instead, when the activity can only
   // mean somebody else: a buff or heal that carries an effect, or a save or damage
   // roll at range against one creature (a poisoned blade's save, Acid Arrow's acid).
+  // Wrong guesses are corrected per ability in the targeting override.
   // A cantrip-style utility with no effect (Prestidigitation, Thaumaturgy) stays
   // "none" - it has nobody to put anything on.
+  // One target, at any range: with nothing entered there is no number to go by, and
+  // most spells affect one creature. "Any number" made an imported Healing Word offer
+  // the whole scene. A spell that really takes more is set in its targeting override.
   const reaches = units === "touch" || units in (CONFIG.DND5E?.movementUnits ?? {});
   if (reaches && (activity.type === "heal" || (activity.type === "utility" && hasEffects(activity)))) {
-    const n = units === "touch" ? 1 : null;
     return {
-      kind: "pick", filter: "creature", count: n, maxCount: n, ...rangeOf(activity),
+      kind: "pick", filter: "creature", count: 1, maxCount: 1, ...rangeOf(activity),
       excludeSelf: false, preferSelf: units === "touch", rider: false
     };
   }
@@ -373,6 +432,13 @@ export async function beforeUse(activity, event) {
   // what is being chosen shows - and puts the old ones back on Cancel.
 
   const chosen = await pickTargets({ activity, plan, pool, caster, preselect });
+  // "Adjust" in the picker: edit this ability's targeting, then open the picker
+  // again under the new rule. The targets were put back as they were, so a rider
+  // still finds the creature it was aimed at.
+  if (chosen === ADJUST) {
+    await editTargeting(activity);
+    return beforeUse(activity, event);
+  }
   if (chosen === null) return false;
   setTargets(chosen);
   return { ...plan, chosen };
@@ -411,7 +477,7 @@ export async function afterUse(activity, plan, results) {
   if ((plan.choice || limited) && mode() === "always" && inside.length) {
     const chosen = await pickTargets({
       activity, plan: { ...plan, range: null, maxCount: plan.count },
-      pool: inside, caster, preselect: limited ? ids.slice(0, plan.count) : ids
+      pool: inside, caster, preselect: limited ? ids.slice(0, plan.count) : ids, adjustable: false
     });
     // The spell is already cast - a closed picker means "keep what the area caught",
     // still capped at what the area may affect.
@@ -489,13 +555,15 @@ function templateShape(doc) {
  * token ids, [] for "without a target", or null for cancel - in which case the
  * targets go back to what they were.
  */
-async function pickTargets({ activity, plan, pool, caster, preselect }) {
+async function pickTargets({ activity, plan, pool, caster, preselect, adjustable = true }) {
   const esc = Handlebars.escapeExpression;
   const t = (key, data) => esc(data ? game.i18n.format(`${MODULE_ID}.targets.${key}`, data)
     : game.i18n.localize(`${MODULE_ID}.targets.${key}`));
   const before = currentTargetIds();
   const limit = plan.maxCount ?? plan.count;
   const selected = new Set(preselect);
+  let unwire = null;
+  let adjusting = false;
   const units = canvas.scene?.grid?.units ?? "";
 
   const row = ({ token, distance }) => {
@@ -514,9 +582,18 @@ async function pickTargets({ activity, plan, pool, caster, preselect }) {
   };
   const inRange = pool.filter(c => plan.range == null || c.distance == null || c.distance <= plan.range);
   const outOfRange = pool.filter(c => !inRange.includes(c));
-  const header = [activity.labels?.target, activity.labels?.range].filter(Boolean).map(esc).join(" · ");
+  // What the picker allows, said in its own terms - the item's labels only describe
+  // the item, and with an override in force they would contradict the counter.
+  const header = describePlan(plan).text;
+  // Not after the fact: the area's picker opens once the spell is already cast, when
+  // there is no picker left to come back to under a new rule.
+  const canAdjust = adjustable && !!activity.actor?.isOwner && !!activity.item;
   const content = `<div class="hudtra-targets-body">
-      ${header ? `<p class="hudtra-targets-what">${header}</p>` : ""}
+      <div class="hudtra-targets-head">
+        <p class="hudtra-targets-what">${esc(header)}${plan.overridden ? ` <em>${t("adjusted")}</em>` : ""}</p>
+        ${canAdjust ? `<button type="button" class="hudtra-targets-adjust" data-tooltip="${t("adjustHint")}">
+          <i class="fa-solid fa-sliders"></i> ${t("adjust")}</button>` : ""}
+      </div>
       <p class="hudtra-targets-count"></p>
       ${pool.length ? "" : `<p class="hint">${t("none")}</p>`}
       <ul class="hudtra-target-list">${inRange.map(row).join("")}</ul>
@@ -535,10 +612,21 @@ async function pickTargets({ activity, plan, pool, caster, preselect }) {
       { action: "skip", label: t("skip"), icon: "fa-solid fa-ban", callback: () => [] },
       { action: "cancel", label: t("cancel"), icon: "fa-solid fa-xmark", callback: () => null }
     ],
-    render: (event, dialog) => wirePicker(dialog.element, { selected, limit, plan, t }),
+    render: (event, dialog) => {
+      if (unwire) return;
+      unwire = wirePicker(dialog.element, {
+        selected, limit, plan, t, candidates: new Set(pool.map(c => c.token.id)),
+        adjust: () => { adjusting = true; dialog.close(); }
+      });
+    },
     rejectClose: false
   }).catch(() => null);
+  unwire?.();
 
+  if (adjusting) {
+    setTargets(before);
+    return ADJUST;
+  }
   if (result === null || result === undefined) {
     setTargets(before);
     return null;
@@ -546,9 +634,19 @@ async function pickTargets({ activity, plan, pool, caster, preselect }) {
   return result;
 }
 
-function wirePicker(root, { selected, limit, plan, t }) {
+/** What pickTargets answers when the user asked to adjust the ability's targeting. */
+const ADJUST = Symbol("adjust");
+
+function wirePicker(root, { selected, limit, plan, t, candidates, adjust }) {
   const boxes = [...root.querySelectorAll(".hudtra-target input")];
   const counter = root.querySelector(".hudtra-targets-count");
+  // Our own writes to the canvas targets fire targetToken too; those must not be
+  // read back as the user's choice.
+  let applying = false;
+  const apply = () => {
+    applying = true;
+    try { setTargets([...selected]); } finally { applying = false; }
+  };
   const sync = () => {
     for (const box of boxes) {
       box.checked = selected.has(box.value);
@@ -558,10 +656,13 @@ function wirePicker(root, { selected, limit, plan, t }) {
       box.closest(".hudtra-target")?.classList.toggle("selected", box.checked);
     }
     const max = limit ?? "∞";
+    // textContent, so the plain string - t() escapes for HTML, and an apostrophe in
+    // "the spell's own level" would otherwise show up as an entity.
+    const raw = (key, data) => game.i18n.format(`${MODULE_ID}.targets.${key}`, data);
     counter.textContent = plan.maxCount && plan.maxCount !== plan.count
-      ? t("countUpcast", { n: selected.size, max, base: plan.count })
-      : t("count", { n: selected.size, max });
-    setTargets([...selected]);
+      ? raw("countUpcast", { n: selected.size, max, base: plan.count })
+      : raw("count", { n: selected.size, max });
+    apply();
   };
   root.addEventListener("change", (event) => {
     const box = event.target.closest?.(".hudtra-target input");
@@ -586,7 +687,43 @@ function wirePicker(root, { selected, limit, plan, t }) {
   // can be told apart.
   root.addEventListener("pointerover", (event) => hoverToken(event, true));
   root.addEventListener("pointerout", (event) => hoverToken(event, false));
+  root.querySelector(".hudtra-targets-adjust")?.addEventListener("click", () => adjust?.());
+
+  // And the other way round: the canvas talks back to the picker.
+  // - Hovering a token lights its row (and scrolls it into view in a long list).
+  // - Targeting on the canvas (T, or a double right-click) ticks or unticks its row,
+  //   within the limit: with one target the new one replaces the old, at a limit
+  //   above one a further target is refused, and a token that is not on the list
+  //   (an enemy for an allies-only spell) is untargeted again.
+  // The write back to the canvas is deferred and coalesced: Foundry fires one
+  // targetToken per token while it releases the old targets, and answering each of
+  // those mid-loop would fight its own iteration.
+  let pending = false;
+  const later = () => {
+    if (pending) return;
+    pending = true;
+    setTimeout(() => { pending = false; if (root.isConnected) sync(); }, 0);
+  };
+  const onTarget = (user, token, targeted) => {
+    if (applying || (user?.id ?? user) !== game.user?.id || !token?.id) return;
+    if (candidates.has(token.id)) {
+      if (!targeted) selected.delete(token.id);
+      else if (!selected.has(token.id)) {
+        if (limit === 1) selected.clear();
+        if (!limit || selected.size < limit) selected.add(token.id);
+      }
+    }
+    later();
+  };
+  const onHover = (token, hovered) => {
+    const li = token?.id && root.querySelector(`.hudtra-target[data-id="${CSS.escape(token.id)}"]`);
+    if (!li) return;
+    li.classList.toggle("hovered", !!hovered);
+    if (hovered) li.scrollIntoView?.({ block: "nearest" });
+  };
+  const hooks = [["targetToken", Hooks.on("targetToken", onTarget)], ["hoverToken", Hooks.on("hoverToken", onHover)]];
   sync();
+  return () => { for (const [name, id] of hooks) Hooks.off(name, id); };
 }
 
 function hoverToken(event, on) {
@@ -600,6 +737,48 @@ function hoverToken(event, on) {
   } catch {
     // Purely cosmetic; a core change to the hover signature must not break picking.
   }
+}
+
+/* -------------------------------------------- */
+/*  The override, from the picker and the gear  */
+/* -------------------------------------------- */
+
+/**
+ * A plan in words, for the picker's header and the editor's "Automatic (...)":
+ * { text, count, range, filter }, the last three as the editor's placeholders.
+ */
+export function describePlan(plan) {
+  const L = (key, data) => data ? game.i18n.format(`${MODULE_ID}.targetRule.${key}`, data)
+    : game.i18n.localize(`${MODULE_ID}.targetRule.${key}`);
+  const units = canvas?.scene?.grid?.units ?? "";
+  const filter = plan?.filter ?? "creature";
+  const count = plan?.count ?? null;
+  const range = plan?.range != null ? Math.round(plan.range * 10) / 10 : null;
+  const who = L(`filters.${filter}`);
+  let text;
+  switch (plan?.kind) {
+    case "self": text = L("modes.self"); break;
+    case "pick": text = L("detected.pick", {
+      count: count ?? "∞", who, range: range != null ? `${range} ${units}`.trim() : L("noLimit")
+    }); break;
+    case "area": text = L("detected.area", { count: count ?? L("allInside"), who }); break;
+    default: text = L("modes.none");
+  }
+  return { text, count: count ?? (plan?.kind === "pick" ? "∞" : ""), range: range ?? "", filter };
+}
+
+/**
+ * Edit one activity's targeting override. `keys` are the config keys to write - the
+ * gear dialog passes every key its button covers, the picker just this activity's.
+ */
+export function editTargeting(activity, keys = null) {
+  return editTargetRule({
+    actor: activity.actor,
+    keys: keys ?? [entryKey(activity.item, activity)],
+    name: activity.item?.name ?? activity.name,
+    current: targetRule(activity),
+    detected: describePlan(detectPlan(activity))
+  });
 }
 
 /* -------------------------------------------- */

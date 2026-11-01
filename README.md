@@ -254,7 +254,7 @@ activity is being used, so the bar settles them first, from the activity's own
 | *Any number of creatures* (Beacon of Hope) | Picker without a limit. |
 | A weapon or spell attack with no stated target (every weapon, Scorching Ray) | Picker for one target. You are not on your own attack's list. |
 | *Touch* (Cure Wounds, Protection from Evil and Good, Shocking Grasp) | Picker; a touch heal or buff starts on you. Anyone beyond 5 ft is listed under *Beyond touch* rather than hidden, since reach and size stretch it. |
-| No target entered, but a buff or heal with an effect at touch or range — homebrew, imports, older items | Picker all the same (one creature at touch, any number at range): a blank *Target* field must not mean "nobody". |
+| No target entered, but a buff or heal with an effect at touch or range — homebrew, imports, older items | Picker for one creature all the same: a blank *Target* field must not mean "nobody". More is set in the ability's targeting override. |
 | No target entered, a save or damage roll at range (Acid Arrow's lingering acid, a poisoned blade's save) | Picker for one, the creature you just targeted preselected. |
 | Range *Self* with a creature target — riders and handed-over items (Sneak Attack, Stunning Strike, Lay on Hands, a Potion of Healing) | Picker for one, no range limit, an attack rider keeps the creature you just attacked; a heal or potion starts on you. |
 | An area (Fireball, Burning Hands, Spirit Guardians, a breath weapon) | dnd5e places the template as usual; afterwards everything inside is targeted and the card's *Targeted* list is updated, so its damage and save buttons apply to them. A Cone, Line, Cube or Emanation that starts at you leaves you out (2024 rules); a Sphere at range does not. *Creatures of your choice* (Spirit Guardians) and areas that affect fewer creatures than they cover (Phantasmal Force) open the picker with the catch preselected. |
@@ -279,6 +279,29 @@ exactly as dnd5e's button would, so dropping concentration removes them. Creatur
 caster does not own are written by the GM's client. Effects behind a saving throw or an
 attack roll keep the manual button. With Midi QoL, the bar applies them only while Midi's
 own *Auto apply item effects* is off (Midi's default) — otherwise Midi does it, once.
+
+**The canvas talks back.** While the picker is open, hovering a token lights its row (and
+hovering a row lights its token), and targeting on the canvas — `T`, shift-`T` to add —
+ticks or unticks the row. The limit holds: with one target the new one replaces the
+old, past the limit a further target is refused, and a token that is not on the list
+(an enemy for an allies-only spell) is untargeted again.
+
+**When the item gets it wrong — the targeting override.** Imported and homebrew items
+often have a missing or wrong *Target* or *Range* (a Healing Word without its target
+count reads as "any number of creatures"). Each ability can be corrected per character,
+from **Adjust** in the picker itself — which reopens the picker under the new rule — or
+from the crosshair on its tile in the gear dialog:
+
+| Field | Choices |
+| --- | --- |
+| Targeting | Automatic · Pick creatures · Myself · Leave my targets alone |
+| Number of targets | a number, or *Any number* |
+| Range | a distance, or *No limit* |
+| Who can be picked | Any creature · Allies · Enemies · Creatures and objects |
+
+Every field left empty keeps what the item says, so setting just the number keeps its
+range and filter. *Back to automatic* removes the override. The tile's crosshair turns
+orange while one is set, and the tile's reset button clears it with the rest.
 
 *Cancel* in the picker aborts the use and puts your old targets back; *Without a target*
 uses it with none. **Shift-click** a slot to skip the picker once and use whatever is
@@ -329,8 +352,9 @@ imports stay acyclic and that the i18n keys line up.
 `node tools/targeting-test.cjs` (needs Playwright with Chromium) drives the target picker
 end to end against stubbed Foundry and dnd5e: bar and sheet clicks, with and without Midi
 QoL, Protection from Evil and Good with and without target data, Bless after stale
-targets, Misty Step, shift-click, cancel, multi-activity items. Run it after any change
-to `scripts/targeting.mjs` or `scripts/effects.mjs`.
+targets, Misty Step, shift-click, cancel, multi-activity items, every targeting
+override and the canvas-to-picker sync. Run it after any change to
+`scripts/targeting.mjs`, `scripts/targeting-config.mjs` or `scripts/effects.mjs`.
 
 Releases are cut by pushing a tag — the workflow stamps `module.json` and publishes the
 zip:
