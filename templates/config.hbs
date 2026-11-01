@@ -115,6 +115,13 @@
                 <i class="fa-solid fa-hand-fist"></i>
               </button>
               {{/if}}
+              {{#if showTarget}}
+              <button type="button" data-action="editTargeting"
+                      class="{{#if targetOverridden}}on set{{/if}}"
+                      data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.targetEdit">
+                <i class="fa-solid fa-crosshairs"></i>
+              </button>
+              {{/if}}
               <button type="button" data-action="toggleHidden"
                       data-tooltip="dnd5e-hud-to-rule-them-all.config.zones.hideToggle">
                 <i class="fa-solid {{#if hidden}}fa-eye{{else}}fa-eye-slash{{/if}}"></i>

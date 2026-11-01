@@ -215,6 +215,29 @@ export async function setEntryHidden(actor, keys, hidden) {
 }
 
 /**
+ * Set or clear the targeting override on every key one button covers. `target` is
+ * the normalised rule targeting-config.mjs builds ({ mode, count, range, rangeUnits,
+ * filter }, every field optional); an empty one removes the override, so "back to
+ * automatic" really is automatic again rather than a rule that says nothing.
+ */
+export async function setEntryTarget(actor, keys, target) {
+  const config = getActorConfig(actor);
+  const entries = editableEntries(config);
+  const empty = !target || !Object.keys(target).length;
+  for (const key of keys ?? []) {
+    const rule = { ...(entries[key] ?? {}) };
+    if (empty) delete rule.target;
+    else rule.target = { ...target };
+    if (Object.keys(rule).length) entries[key] = rule;
+    else delete entries[key];
+  }
+  const next = { ...config };
+  if (Object.keys(entries).length) next.entries = entries;
+  else delete next.entries;
+  return setActorConfig(actor, next);
+}
+
+/**
  * Drop every stored position, back to the automatic order. Only `sort` goes: what
  * pool something belongs to, whether it counts as an attack and what is hidden are
  * answers to different questions and are reset per entry in the dialog.

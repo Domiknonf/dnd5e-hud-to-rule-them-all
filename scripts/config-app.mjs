@@ -7,6 +7,7 @@ import { isTracked } from "./economy.mjs";
 import {
   configTarget, getActorConfig, setActorConfig, clearEntryOrder, entryKey as entryKeyOf
 } from "./config.mjs";
+import { editTargeting } from "./targeting.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -119,6 +120,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       toggleAttack: HudConfig.#onToggleAttack,
       toggleHidden: HudConfig.#onToggleHidden,
       resetEntry: HudConfig.#onResetEntry,
+      editTargeting: HudConfig.#onEditTargeting,
       resetOrder: HudConfig.#onResetOrder,
       clear: HudConfig.#onClear
     }
@@ -165,8 +167,10 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   #zonesFor(actor) {
     const zoneKeys = [...ASSIGNABLE_POOLS, "passive", HIDDEN_ZONE];
     const zones = new Map(zoneKeys.map(k => [k, []]));
+    const rules = getActorConfig(actor).entries ?? {};
 
     for (const row of collectConfigurable(actor)) {
+      const targetOverridden = row.keys.some(k => rules[k]?.target && Object.keys(rules[k].target).length);
       // row.pool is the EFFECTIVE pool - configuration already applied by
       // enumerateEntries - so a moved entry already sits in its new zone.
       let zone = row.hidden ? HIDDEN_ZONE : (row.pool ?? HIDDEN_ZONE);
@@ -187,8 +191,11 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         // `sort` deliberately does NOT count: reordering one zone writes a position
         // onto every tile in it, and marking all of them would turn the whole zone
         // orange. The mark means "a rule was set", not "this was touched".
-        overridden: row.poolOverridden || row.attackOverridden || row.hidden,
-        showAttack: zone === "action"
+        overridden: row.poolOverridden || row.attackOverridden || row.hidden || targetOverridden,
+        showAttack: zone === "action",
+        // Anything that can be used has targets to get wrong; a passive has none.
+        showTarget: row.usable && zone !== "passive",
+        targetOverridden
       });
     }
 
@@ -515,6 +522,9 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       if (Number.isFinite(rule.sort)) kept.sort = rule.sort;
       if (Number.isFinite(rule.attacks)) kept.attacks = rule.attacks;
       if (rule.grants !== undefined) kept.grants = rule.grants;
+      // The targeting override is edited in its own little dialog (crosshair button),
+      // but a drag here rewrites the whole rule - so it has to be named like the rest.
+      if (rule.target && Object.keys(rule.target).length) kept.target = rule.target;
       if (Object.keys(kept).length) entries[key] = kept;
     }
     const next = { ...config };
@@ -597,6 +607,23 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       else rule.hidden = true;
       return rule;
     });
+  }
+
+  /**
+   * The targeting override for one button (targeting-config.mjs): count, range, who
+   * and mode, for when the item's own Target and Range fields are wrong or missing.
+   * Written on every key the button covers, like the other per-entry rules.
+   */
+  static async #onEditTargeting(event, target) {
+    const actor = this.actor;
+    const key = target.closest(".hudtra-tile")?.dataset.key;
+    const row = actor && collectConfigurable(actor).find(r => r.key === key);
+    if (!row) return;
+    const [itemId, activityId] = String(row.keys[0] ?? "").split(":");
+    const item = actor.items.get(itemId);
+    const activity = item?.system.activities?.get(activityId) ?? item?.system.activities?.contents?.[0];
+    if (!activity) return;
+    if (await editTargeting(activity, row.keys)) return this.render();
   }
 
   /** Drop every rule for one entry, back to whatever detection says. */
