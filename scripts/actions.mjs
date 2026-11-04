@@ -254,6 +254,9 @@ function isUsable(item, filters) {
   // Read straight off `flags` rather than through getFlag(): identical result, minus
   // getFlag's validation of the scope against every active module in the world.
   if (item.flags?.dnd5e?.cachedFor) return false;
+  // A spell a wild magic surge cast (Fireball on yourself) lives on the actor only so
+  // its chat card keeps working - it is not something the character can cast.
+  if (item.flags?.[MODULE_ID]?.surgeSpell) return false;
 
   if (item.system?.equipped === false && filters.hideUnequipped) return false;
 

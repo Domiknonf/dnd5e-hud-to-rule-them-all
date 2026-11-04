@@ -8,6 +8,20 @@ import {
   configTarget, getActorConfig, setActorConfig, clearEntryOrder, entryKey as entryKeyOf
 } from "./config.mjs";
 import { editTargeting } from "./targeting.mjs";
+import { detectWildMage } from "./wild-magic.mjs";
+
+/** The wild magic select: automatic (saying what the sheet decided), on, off. */
+function wildMagicField(actor, config) {
+  const current = config.wildMagic === "on" || config.wildMagic === "off" ? config.wildMagic : "auto";
+  const feature = detectWildMage(actor);
+  const key = (k) => game.i18n.localize(`${MODULE_ID}.config.wildMagic.${k}`);
+  return {
+    options: ["auto", "on", "off"].map(value => ({ value, label: key(value), selected: value === current })),
+    hint: feature
+      ? game.i18n.format(`${MODULE_ID}.config.wildMagic.detected`, { feature: feature.name })
+      : key("notDetected")
+  };
+}
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -258,6 +272,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         ? game.i18n.format(`${MODULE_ID}.config.attacksPerAction.suggested`, { suggested: suggestion.count })
         : game.i18n.format(`${MODULE_ID}.config.attacksPerAction.none`, { fallback: DEFAULT_ATTACKS_PER_ACTION }),
       pools,
+      wildMagic: actor ? wildMagicField(actor, config) : null,
       zones: actor ? this.#zonesFor(actor) : [],
       limits: CONFIG_LIMITS
     };
@@ -554,6 +569,7 @@ export class HudConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       config.seenAttackSuggestion = previous.seenAttackSuggestion;
     }
     if (previous.entries) config.entries = previous.entries;
+    if (raw.wildMagic === "on" || raw.wildMagic === "off") config.wildMagic = raw.wildMagic;
 
     // Both blocks below are hidden for an untracked creature, so on one of those the
     // form carries no fields for them - and an unrendered field is exactly the trap

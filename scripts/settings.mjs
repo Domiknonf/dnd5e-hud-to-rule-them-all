@@ -52,6 +52,39 @@ export function registerSettings() {
   // World scope: what a spell costs is a table rule, not a per-player preference.
   reg("materialGold",    { ...WORLD, type: Boolean, default: false });
 
+  /* --- Wild magic ----------------------------------------- */
+  // World scope throughout: how chaos works is the table's rule. See wild-magic.mjs.
+  const plain = { onChange: undefined };
+  reg("wildMagicTrigger", {
+    ...WORLD, ...plain, type: String, default: "d20low",
+    choices: {
+      off:     `${MODULE_ID}.settings.wildMagicTrigger.off`,
+      d20low:  `${MODULE_ID}.settings.wildMagicTrigger.d20low`,
+      d20high: `${MODULE_ID}.settings.wildMagicTrigger.d20high`,
+      always:  `${MODULE_ID}.settings.wildMagicTrigger.always`,
+      manual:  `${MODULE_ID}.settings.wildMagicTrigger.manual`
+    }
+  });
+  reg("wildMagicSorcererOnly", { ...WORLD, ...plain, type: Boolean, default: false });
+  reg("wildMagicAutoApply",    { ...WORLD, ...plain, type: Boolean, default: true });
+  reg("wildMagicRollMode", {
+    ...WORLD, ...plain, type: String, default: "public",
+    choices: {
+      public: `${MODULE_ID}.settings.wildMagicRollMode.public`,
+      gm:     `${MODULE_ID}.settings.wildMagicRollMode.gm`
+    }
+  });
+  reg("wildMagicMana", { ...WORLD, ...plain, type: String, default: "" });
+  reg("wildMagicAnimations", {
+    ...WORLD, ...plain, type: String, default: "jb2a",
+    choices: {
+      jb2a: `${MODULE_ID}.settings.wildMagicAnimations.jb2a`,
+      psfx: `${MODULE_ID}.settings.wildMagicAnimations.psfx`,
+      off:  `${MODULE_ID}.settings.wildMagicAnimations.off`
+    }
+  });
+  reg("wildMagicAnimationOverrides", { ...WORLD, ...plain, type: String, default: "" });
+
   /* --- Content filters -------------------------------------- */
   reg("hideUnequipped",     { ...WORLD, type: Boolean, default: true });
   reg("hideUnprepared",     { ...WORLD, type: Boolean, default: true });

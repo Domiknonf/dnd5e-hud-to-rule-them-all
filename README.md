@@ -171,6 +171,52 @@ targets entirely alone.
 **Presentation** (per user) — HUD scale and sort order. How many rows the grid has is
 remembered per user too, but is set with the `+`/`-` on the bar itself rather than here.
 
+### Wild magic surges
+
+A 100-entry surge table, rolled for you. A creature is a wild mage when its sheet has a
+feature called *Wild Magic…* (the subclass, *Wild Magic Surge*), or when the gear
+dialog's **Wild magic surges** field says *Always*; *Never* switches it off.
+
+When a wild mage casts a spell of 1st level or higher, the bar rolls the surge check
+(*Wild magic: surge check*): a d20 that surges on a 1 (2014), on a 20 (2024), every
+spell, or only by hand. A surge posts one chat card with the d100, every die the entry
+needs already rolled (1d10 inches, 5d10+20 temporary HP, the coin flip, the silver
+pieces), the creatures it picked at random, and the caster's **spell save DC** — a
+surge that casts a spell or calls for a save uses the caster's spellcasting ability and
+DC unless the entry says otherwise.
+
+- **Applied on the caster right away** (*apply surges on the caster automatically*):
+  effects with their duration (Spectral Shield +2 AC, +100 lbs halving speed, Third Eye
+  advantage on Perception, swapped INT and STR, …), healing, mana, silver, the coin
+  cycle, the extra action on the bar's economy.
+- **A button on the card** for everything that reaches other creatures or needs a
+  decision: *Cast Fireball* (from your compendium, at 3rd level, no slot, the caster's
+  ability), crystal cocoon, the restrained/invisible/vulnerable areas, damage rolls with
+  dnd5e's own apply buttons, the nosebleed save. A player's button that touches a
+  creature they do not own is carried out by the GM.
+- **Every turn for a minute**: entry 1 rolls again and entry 15 heals 5 HP at the start
+  of the caster's turn, for as long as the effect it left is there.
+- **Mana**: entries 59, 98 and 100 change the attribute named in *Wild magic: mana
+  attribute*, or a resource / item called *Mana* or *Spell Points*.
+- **Animations** through [Sequencer](https://foundryvtt.com/packages/sequencer) from
+  **JB2A** (Patreon or free) and **PSFX**: a burst on the caster for every surge, plus
+  one per entry (a fireball on 7, lightning to the target on 65, fog on 63, …). The
+  entries are found by searching the Sequencer database, preferred pack first, so a
+  renamed file in a new pack version costs a fallback rather than the animation. Any
+  entry can be pinned to an exact database key in *Wild magic: animation overrides*.
+
+Surges from a macro:
+
+```js
+const { wildMagic } = game.modules.get("dnd5e-hud-to-rule-them-all").api;
+await wildMagic.surge(actor);                 // roll on the table
+await wildMagic.surge(actor, { number: 7 });  // force an entry
+await wildMagic.check(actor);                 // the surge check first
+```
+
+Spells cast by a surge go on the actor as *Fireball (Wild Magic)*, hidden from the bar,
+so their chat card and concentration keep working; they are removed at the next rest.
+
 ### Who gets counted
 
 The bar exists to help the person playing a creature keep track of what it can still
@@ -326,6 +372,7 @@ await api.refund(combatant);          // undoes the last booking
 await api.resetTurn(combatant);
 
 api.openConfig(actor);                // the gear dialog
+await api.wildMagic.surge(actor);     // a wild magic surge, see above
 ```
 
 `diagnose()` leads with `tracked`. If that is `false`, nothing below it is meant to

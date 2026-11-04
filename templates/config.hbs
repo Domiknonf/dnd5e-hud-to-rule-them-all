@@ -82,6 +82,20 @@
     </p>
     {{/if}}
 
+    {{!-- Wild magic: does a leveled spell from this creature roll for a surge.
+         Automatic follows the sheet (a feature called "Wild Magic..."). --}}
+    <div class="form-group hudtra-config-wild">
+      <label for="hudtra-cfg-wild">{{localize "dnd5e-hud-to-rule-them-all.config.wildMagic.name"}}</label>
+      <div class="form-fields">
+        <select id="hudtra-cfg-wild" name="wildMagic">
+          {{#each wildMagic.options}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <p class="hint">{{wildMagic.hint}}</p>
+    </div>
+
     {{!-- Drop zones, seeded by detection. Drag a tile between zones, or an item
          straight off the character sheet, to overrule where it belongs; dragging a
          tile also writes its position on the bar, which is one global run across the

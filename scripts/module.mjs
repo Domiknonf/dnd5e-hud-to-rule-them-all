@@ -13,6 +13,10 @@ import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
 import { checkMaterials, payMaterials, decorateUsageDialog } from "./materials.mjs";
 import { interceptUse } from "./targeting.mjs";
+import {
+  onSpellCast, onRenderMessage, onTurnStart, cleanupSurgeSpells, isSurgeSpell, isWildMage,
+  surge as wildSurge, check as wildCheck
+} from "./wild-magic.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -35,7 +39,10 @@ Hooks.once("ready", () => {
     openConfig, getActorConfig,
     // Console entry point: api.diagnose() prints what the module believes about the
     // selected token, so "nothing happens" has an answer that is not a guess.
-    diagnose
+    diagnose,
+    // Wild magic: surge(actor) rolls on the table now, surge(actor, { number: 7 })
+    // forces an entry, check(actor) rolls the surge check first.
+    wildMagic: { surge: wildSurge, check: wildCheck, isWildMage }
   };
   // Starts collapsed outside combat: the bar is available, but it does not shove
   // the macro bar aside until someone actually pulls it up (or combat starts).
@@ -59,6 +66,9 @@ Hooks.on("dnd5e.preUseActivity", interceptUse);
  * Runs on the client that initiated the activity, so the check is local and cheap.
  */
 Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
+  // A spell a wild magic surge casts costs the caster nothing - it is not their turn's
+  // action, and it must not be blocked by an empty pool either.
+  if (isSurgeSpell(activity?.item)) return true;
   const combatant = combatantFor(activity.actor);
   // Resolved once, before anything else, so the gate, the warning text and the
   // booking below all talk about the same pool. Off-turn this turns an action into
@@ -98,6 +108,7 @@ Hooks.on("renderActivityUsageDialog", (app, element) => decorateUsageDialog(app,
  */
 Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
   if (!game.combat?.started) return;
+  if (isSurgeSpell(activity?.item)) return;
   // A GM-run creature is not counted at all (see economy.isTracked), so there is
   // nothing to book. Checked before the combatant lookup because this is also what
   // keeps a monster-heavy encounter from writing a Combatant flag - and re-rendering
@@ -145,6 +156,16 @@ Hooks.on("dnd5e.postUseActivity", async (activity, usageConfig, results) => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Wild magic                                                         */
+/* ------------------------------------------------------------------ */
+
+// Separate from the booking above on purpose: a surge check happens in and out of
+// combat, for any caster, tracked or not. See wild-magic.mjs.
+Hooks.on("dnd5e.postUseActivity", onSpellCast);
+Hooks.on("renderChatMessageHTML", onRenderMessage);
+Hooks.on("dnd5e.restCompleted", (actor) => cleanupSurgeSpells(actor));
+
+/* ------------------------------------------------------------------ */
 /*  Turn / round handling                                              */
 /* ------------------------------------------------------------------ */
 
@@ -169,6 +190,8 @@ Hooks.on("combatStart", async (combat) => {
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
   const combatant = combat.combatants.get(current?.combatantId);
   if (game.user.isActiveGM && combatant && isTracked(combatant.actor)) await resetTurn(combatant);
+  // Surges that repeat at the start of the caster's turn (table entries 1 and 15).
+  if (combatant) await onTurnStart(combatant);
   refreshHUD();
 });
 

@@ -16,6 +16,11 @@ export function registerSocket() {
       const { applyEffectRequest } = await import("./effects.mjs");
       return applyEffectRequest(data);
     }
+    // A wild magic card's button that reaches creatures its presser does not own.
+    if (action === "wildMagic") {
+      const { handleRequest } = await import("./wild-magic.mjs");
+      return handleRequest(data);
+    }
     if (!handlers) handlers = await import("./economy.mjs");
     const combatant = await fromUuid(data?.combatantUuid);
     if (!combatant) return;
