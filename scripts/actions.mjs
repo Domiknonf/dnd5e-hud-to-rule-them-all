@@ -378,7 +378,45 @@ function plainDescription(item) {
   return text;
 }
 
+/**
+ * The uses pool an activity actually draws from, as dnd5e's consumption targets
+ * declare it - checked in their declared order, first pool with a max wins.
+ *
+ * activity.uses alone is the wrong question. An activity can carry uses of its own
+ * that nothing ever spends: dnd5e only takes from activity.uses through an
+ * "activityUses" target, never by itself. A druid's Wild Shape is exactly that - the
+ * Transform activity has its own max 2, spent 0, forever, while its "itemUses"
+ * target eats the item's @scale-driven uses. Reading activity.uses first showed
+ * 2/2 on a druid with 1 of 3 left.
+ *
+ * "itemUses" with no target means the activity's own item; with one, another item
+ * on the actor (dnd5e: `this.target ? actor.items.get(this.target) : this.item`).
+ * That is how Symbiotic Entity and Wild Companion show Wild Shape's count, which is
+ * what they really spend. A target with a negative value gives uses back (Wild
+ * Resurgence's "Restore Wild Shape") and says nothing about what the button costs,
+ * so it is skipped.
+ */
+function consumedUses(activity, item) {
+  for (const target of activity?.consumption?.targets ?? []) {
+    if (Number(target?.value) < 0) continue;
+    let uses = null;
+    if (target?.type === "activityUses") uses = activity.uses;
+    else if (target?.type === "itemUses") {
+      uses = (target.target ? item.actor?.items.get(target.target) : item)?.system?.uses;
+    }
+    if (uses?.max > 0) return { value: uses.value, max: uses.max };
+  }
+  return null;
+}
+
+/**
+ * What the button's uses counter shows. The consumption targets decide (see
+ * consumedUses); without an activity - one button over several - or without a
+ * matching target, it falls back to activity uses, then item uses.
+ */
 function usesFor(activity, item) {
+  const consumed = consumedUses(activity, item);
+  if (consumed) return consumed;
   const a = activity?.uses ?? {};
   const i = item.system?.uses ?? {};
   const value = a.max ? a.value : i.max ? i.value : null;

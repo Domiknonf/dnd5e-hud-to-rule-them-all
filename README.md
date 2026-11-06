@@ -234,6 +234,9 @@ translated or renamed content needs the dialog.
   Premades uses for Spike Growth's damage or Moonbeam's save — are never on the bar
   and never book anything. Once a spell unlocks one for real (Moonbeam: Move, Animate
   Dead: Command), it appears and books like any other activity.
+- **Uses counters** show the pool an activity actually spends, as its consumption
+  says — so Wild Shape shows the item's uses rather than an unused count on the
+  activity, and Wild Companion shows Wild Shape's.
 
 - **A refill that never happened.** Turn resets run on the active GM's client, so a
   reconnect or a throttled background tab could leave a player's pools spent into the
