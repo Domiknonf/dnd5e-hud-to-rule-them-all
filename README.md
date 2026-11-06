@@ -230,6 +230,10 @@ translated or renamed content needs the dialog.
 - **Stunned, Paralyzed, Unconscious, Petrified, Incapacitated** bar the economy
   outright; the pips stay visible and struck through, so it reads as the condition
   rather than as a broken bar.
+- **Rider activities** — dnd5e's riders, such as the helper activities Chris's
+  Premades uses for Spike Growth's damage or Moonbeam's save — are never on the bar
+  and never book anything. Once a spell unlocks one for real (Moonbeam: Move, Animate
+  Dead: Command), it appears and books like any other activity.
 
 - **A refill that never happened.** Turn resets run on the active GM's client, so a
   reconnect or a throttled background tab could leave a player's pools spent into the

@@ -42,6 +42,28 @@ export function isDescriptiveOnly(activity) {
 }
 
 /**
+ * A dnd5e "rider": an activity the item lists under flags.dnd5e.riders.activity,
+ * which only ever runs as a consequence of another use - never as something a
+ * creature chooses to do with its turn. Riders get no button and never cost a pool.
+ *
+ * Deliberately isRider and NOT canUse. dnd5e alone makes canUse false for riders,
+ * but Chris's Premades mirrors its hidden helper activities (Spike Growth: Damage,
+ * Moonbeam's per-turn save, Animate Dead: Command...) into the rider list AND
+ * libWrappers canUse to true for exactly those, so it can fire them as synthetic
+ * rolls - each of which goes through activity.use() and therefore through
+ * dnd5e.postUseActivity. Under CPR canUse says nothing; isRider still does.
+ *
+ * When CPR unlocks such an activity through an effect (Moonbeam: Move, Heat Metal:
+ * Pulse, Animate Dead: Command once something is raised) it drops it from the rider
+ * list again, so from then on it shows and books like any other activity. Only the
+ * dnd5e API is read here, never CPR's own flags. Optional chaining because
+ * module.json still admits dnd5e 5.0.0.
+ */
+export function isRider(activity) {
+  return activity?.isRider === true;
+}
+
+/**
  * PC "Extra Attack"-style feature names, English SRD content only (this module
  * assumes English compendiums - see README). Deliberately a plain name lookup, not
  * a text parser: the vocabulary is small, fixed and only ever appears on Player
@@ -436,7 +458,10 @@ export function enumerateEntries(actor) {
     // Same filter the bar uses - this is where the cached NPC-spellcasting copies
     // get dropped, and skipping it here is what put them in the dialog.
     if (!isUsable(item, filters)) continue;
-    const activities = [...item.system.activities].filter(a => !isDescriptiveOnly(a));
+    // Riders drop out here, next to the descriptive-only filter: bar and config
+    // dialog both come from this enumeration, so neither ever shows one.
+    const activities = [...item.system.activities]
+      .filter(a => !isDescriptiveOnly(a) && !isRider(a));
     if (!activities.length) continue;
 
     const byPool = new Map();
@@ -629,9 +654,13 @@ export function collectActions(actor) {
  *
  * Note this deliberately ignores the `hidden` flag: hiding something removes it from
  * the bar, it does not make it free.
+ *
+ * Riders are the opposite case: free, always, and checked before any pool is
+ * resolved - so no item or activity pool override (nor the off-turn reaction
+ * fallback) can ever make a CPR synthetic roll book anything. See isRider().
  */
 export function costOfActivity(activity) {
-  if (isDescriptiveOnly(activity)) return null;
+  if (isDescriptiveOnly(activity) || isRider(activity)) return null;
   return poolFor(activity);
 }
 

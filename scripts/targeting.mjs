@@ -2,6 +2,7 @@ import { MODULE_ID } from "./const.mjs";
 import { applyToTargets } from "./effects.mjs";
 import { entryConfig, entryKey } from "./config.mjs";
 import { cleanTargetRule, editTargetRule } from "./targeting-config.mjs";
+import { isRider } from "./actions.mjs";
 
 const { DialogV2 } = foundry.applications.api;
 
@@ -826,7 +827,9 @@ export async function useFromBar(doc, event) {
  */
 async function resolveActivity(doc, event) {
   if (doc?.documentName !== "Item") return doc;
-  const activities = doc.system.activities?.filter(a => a.canUse) ?? [];
+  // canUse alone is not enough: Chris's Premades patches it to true for its rider
+  // activities, which would put them in the choice dialog or fire one outright.
+  const activities = doc.system.activities?.filter(a => a.canUse && !isRider(a)) ?? [];
   // undefined hands the click back to Item5e#use (an item without activities posts
   // its card); null is a closed choice dialog, which uses nothing.
   if (!activities.length) return undefined;
