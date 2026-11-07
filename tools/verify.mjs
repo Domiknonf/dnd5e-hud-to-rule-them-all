@@ -12,6 +12,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
+/** Every file under `dir`, recursively, as paths relative to the repo root.
+    scripts/ has subfolders (scripts/automation/) - a flat readdir would skip them
+    and, worse, hand a directory to readFileSync. */
+const filesIn = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+  const full = path.join(dir, entry.name);
+  return entry.isDirectory() ? filesIn(full) : [full];
+});
+
 let bad = 0;
 const fail = (msg) => { console.log("FAIL  " + msg); bad++; };
 const ok = (msg) => console.log("ok    " + msg);
@@ -20,9 +28,11 @@ const ok = (msg) => console.log("ok    " + msg);
       keeps config.mjs free of the detection precisely to avoid one - so any cycle
       appearing here means a layering rule was crossed. */
 const graph = {};
-for (const f of fs.readdirSync("scripts").filter(f => f.endsWith(".mjs"))) {
-  const src = fs.readFileSync(path.join("scripts", f), "utf8");
-  graph[f] = [...src.matchAll(/from\s+"\.\/([\w.-]+\.mjs)"/g)].map(m => m[1]);
+for (const file of filesIn("scripts").filter(f => f.endsWith(".mjs"))) {
+  const f = path.relative("scripts", file);
+  const src = fs.readFileSync(file, "utf8");
+  graph[f] = [...src.matchAll(/from\s+"(\.\.?\/[\w./-]+\.mjs)"/g)]
+    .map(m => path.normalize(path.join(path.dirname(f), m[1])));
 }
 const state = {};
 const walk = (node, stack) => {
@@ -62,8 +72,8 @@ for (const file of fs.readdirSync("templates")) {
 /* 3. Every data-action has a handler. A button wired to nothing looks completely
       normal and simply does nothing when clicked. */
 const handlers = new Set();
-for (const file of fs.readdirSync("scripts").filter(f => f.endsWith(".mjs"))) {
-  const src = fs.readFileSync(path.join("scripts", file), "utf8");
+for (const file of filesIn("scripts").filter(f => f.endsWith(".mjs"))) {
+  const src = fs.readFileSync(file, "utf8");
   const block = src.match(/actions:\s*\{([\s\S]*?)\n\s{4}\}/);
   if (block) for (const m of block[1].matchAll(/^\s*(\w+):/gm)) handlers.add(m[1]);
 }
@@ -95,13 +105,13 @@ const PREFIX = "dnd5e-hud-to-rule-them-all.";
 const known = new Set(keys);
 let missing = 0;
 for (const dir of ["scripts", "templates"]) {
-  for (const file of fs.readdirSync(dir)) {
-    const src = fs.readFileSync(path.join(dir, file), "utf8");
+  for (const file of filesIn(dir)) {
+    const src = fs.readFileSync(file, "utf8");
     const seen = new Set();
     for (const m of src.matchAll(/`\$\{MODULE_ID\}\.([\w.]+)`/g)) seen.add(PREFIX + m[1]);
     for (const m of src.matchAll(/"(dnd5e-hud-to-rule-them-all\.[\w.]+)"/g)) seen.add(m[1]);
     for (const key of seen) {
-      if (!known.has(key)) { fail(`${dir}/${file}: i18n key "${key}" is not in lang/en.json`); missing++; }
+      if (!known.has(key)) { fail(`${file}: i18n key "${key}" is not in lang/en.json`); missing++; }
     }
   }
 }

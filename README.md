@@ -168,6 +168,9 @@ enforcement* is on.
 preselected), *Only when the current targets don't fit*, or *Off*, which leaves your
 targets entirely alone.
 
+**Table automations** — Fungal Infestation and Dark One's Blessing, each on its own
+switch; see [Table automations](#table-automations).
+
 **Presentation** (per user) — HUD scale and sort order. How many rows the grid has is
 remembered per user too, but is set with the `+`/`-` on the bar itself rather than here.
 
@@ -320,6 +323,38 @@ targets are settled before the use starts, and Midi's workflow picks them up fro
 Two things are left to Midi: the tokens inside a placed template (Midi's own template
 targeting), and a cast started on the character sheet — Midi rebuilds the use around its
 own *Target Confirmation*, so a sheet cast works the way Midi is set up.
+
+### Table automations
+
+Two class features that fire when a creature drops to 0 HP, each behind its own world
+setting (on by default, switchable without a reload):
+
+- **Fungal Infestation** (*Automate Fungal Infestation*) — a Small or Medium beast or
+  humanoid dies within 10 ft of a Circle of Spores druid who still has a use left. The
+  druid's player is asked (the GM, if that player is offline); yes uses the feature's
+  reaction activity like a click on the bar would, so the reaction is booked and the
+  enforcement setting applies. A zombie token with 1 HP then appears where the corpse
+  lay, owned like the druid, on the druid's side, and in combat directly after the
+  druid. It carries a one-hour effect as a reminder — remove it by hand. The corpse is
+  hidden, not deleted, so it can still be looted. The zombie is made from a world actor
+  named *Fungal Zombie*, imported once from the Zombie in the Player's Handbook (or the
+  dnd5e SRD) compendium if it does not exist. Several druids in reach are asked one
+  after the other, closest first, until one says yes.
+- **Dark One's Blessing** (*Automate Dark One's Blessing*) — when a Fiend warlock drops
+  an enemy to 0 HP, or anyone does within 10 ft of the warlock, the warlock gains
+  temporary hit points (Charisma modifier + warlock level, at least 1) and the chat says
+  so. It costs nothing and asks nobody. "Enemy" means the opposite token disposition:
+  friendly against hostile or secret; neutral tokens are nobody's enemy.
+
+The limits:
+
+- **No line-of-sight check.** 10 ft is measured edge to edge on the token's own scene,
+  using the world's diagonal rule on square grids; walls are not considered.
+- **Player characters at 0 HP are not dead** — they never feed Fungal Infestation.
+- **Who dealt the blow** is known when Midi QoL or dnd5e's chat card applies the damage.
+  When HP are changed by hand, the creature whose turn it is counts as the attacker.
+- **Nothing happens without a GM online**: the GM's client notices the death, creates
+  the zombie and grants the temporary hit points.
 
 ## Public API
 

@@ -13,6 +13,7 @@ import { openConfig } from "./config-app.mjs";
 import { getActorConfig } from "./config.mjs";
 import { checkMaterials, payMaterials, decorateUsageDialog } from "./materials.mjs";
 import { interceptUse } from "./targeting.mjs";
+import { registerAutomations } from "./automation/index.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
@@ -20,6 +21,7 @@ import { interceptUse } from "./targeting.mjs";
 
 Hooks.once("init", () => {
   registerSettings();
+  registerAutomations();
   registerSocket();
   const { loadTemplates } = foundry.applications.handlebars;
   loadTemplates([

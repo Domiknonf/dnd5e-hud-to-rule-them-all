@@ -73,6 +73,12 @@ export function registerSettings() {
   // rule, and the GM's client is the one that writes it onto creatures players do not own.
   reg("autoApplyEffects", { ...WORLD, type: Boolean, default: true });
 
+  /* --- Table automations ------------------------------------ */
+  // World scope: these act on the GM's client for everybody at the table. Read when
+  // they fire (see automation/zero-hp.mjs), so toggling one needs no reload.
+  reg("automationFungalInfestation", { ...WORLD, type: Boolean, default: true });
+  reg("automationDarkOnesBlessing",  { ...WORLD, type: Boolean, default: true });
+
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });
   reg("scale", {
