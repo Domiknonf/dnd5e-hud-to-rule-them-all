@@ -160,10 +160,15 @@ async function raise(event, druid, item) {
   }
 
   /**
-   * TODO verify live: an unsaved TokenDocument from Actor#getTokenDocument carries
-   * a `delta` whose updateSource accepts system.attributes.hp.value and ownership,
-   * and toObject() keeps both. Check: the new zombie's sheet shows 1 HP and the
-   * druid's player can control it.
+   * Verified live: writing hp.value 1 into the unsaved token's delta
+   * (tokenDoc.delta.updateSource) does NOT survive - the zombie spawned at full HP.
+   * So the delta goes into the creation data directly, and the HP are written once
+   * more on the created token's synthetic actor, where an update lands in the delta
+   * for certain. The second write only happens when the first did not stick.
+   *
+   * TODO verify live: ownership in the creation delta reaches the token. Check: the
+   * druid's player can control the zombie. If not, move it into the same
+   * zombie.actor.update() below.
    */
   const tokenDoc = await source.getTokenDocument({
     x: corpse.x,
@@ -173,12 +178,19 @@ async function raise(event, druid, item) {
     name: game.i18n.format(`${MODULE_ID}.automation.fungalInfestation.tokenName`, { corpse: corpse.name }),
     disposition: druid.token.disposition
   }, { parent: scene });
-  tokenDoc.delta.updateSource({
-    system: { attributes: { hp: { value: 1 } } },
-    ownership: foundry.utils.deepClone(druid.actor.ownership)
+  const data = foundry.utils.mergeObject(tokenDoc.toObject(), {
+    delta: {
+      system: { attributes: { hp: { value: 1 } } },
+      ownership: foundry.utils.deepClone(druid.actor.ownership)
+    }
   });
-  const [zombie] = await scene.createEmbeddedDocuments("Token", [tokenDoc.toObject()]);
+  const [zombie] = await scene.createEmbeddedDocuments("Token", [data]);
   if (!zombie) return;
+  // 1 HP and no more - a lower value never crosses 0, so this cannot trip the
+  // 0 HP trigger (it needs hp.value <= 0).
+  if (zombie.actor && zombie.actor.system?.attributes?.hp?.value !== 1) {
+    await zombie.actor.update({ "system.attributes.hp.value": 1 });
+  }
 
   const combat = game.combat;
   if (combat && (!combat.scene || combat.scene.id === scene.id)) {
