@@ -1,0 +1,34 @@
+{
+  "quick-map-markers": {
+    "type": {
+      "skull": "Gefahr",
+      "question": "Unbekannt",
+      "chest": "Schatz",
+      "sword": "Kampf"
+    },
+    "menu": {
+      "close": "Schließen",
+      "delete": "Marker entfernen",
+      "namePlaceholder": "Name (optional)",
+      "save": "Speichern"
+    },
+    "notify": {
+      "noGM": "Quick Map Markers: Ein GM muss online sein, um Marker zu setzen oder zu ändern.",
+      "noPermission": "Du kannst nur Marker ändern, die du selbst gesetzt hast."
+    },
+    "settings": {
+      "playersCanPlace": {
+        "name": "Spieler können Marker setzen",
+        "hint": "Wenn aus, können nur GMs per Doppelklick Marker auf die Szene setzen."
+      },
+      "everyoneCanEdit": {
+        "name": "Alle dürfen alle Marker bearbeiten",
+        "hint": "Wenn aus, können Spieler nur ihre eigenen Marker umbenennen oder entfernen. GMs dürfen immer alles."
+      },
+      "markerScale": {
+        "name": "Markergröße",
+        "hint": "Größe der Marker im Verhältnis zu einem Rasterfeld."
+      }
+    }
+  }
+}

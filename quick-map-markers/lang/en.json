@@ -1,0 +1,34 @@
+{
+  "quick-map-markers": {
+    "type": {
+      "skull": "Danger",
+      "question": "Unknown",
+      "chest": "Treasure",
+      "sword": "Combat"
+    },
+    "menu": {
+      "close": "Close",
+      "delete": "Remove marker",
+      "namePlaceholder": "Name (optional)",
+      "save": "Save"
+    },
+    "notify": {
+      "noGM": "Quick Map Markers: a GM has to be online to place or change markers.",
+      "noPermission": "You may only change markers you placed yourself."
+    },
+    "settings": {
+      "playersCanPlace": {
+        "name": "Players can place markers",
+        "hint": "If off, only GMs can place markers by double-clicking the scene."
+      },
+      "everyoneCanEdit": {
+        "name": "Everyone can edit every marker",
+        "hint": "If off, players can only rename or remove markers they placed themselves. GMs can always edit all markers."
+      },
+      "markerScale": {
+        "name": "Marker size",
+        "hint": "Marker size relative to one grid square."
+      }
+    }
+  }
+}
