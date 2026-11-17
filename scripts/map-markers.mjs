@@ -16,12 +16,15 @@ import { requestFromGM } from "./socket.mjs";
  */
 
 const FLAG = "mapMarkers";
-/** Radial order: top, right, bottom, left. */
-const TYPES = ["skull", "question", "chest", "sword"];
-const SLOTS = ["n", "e", "s", "w"];
+/** Radial order, clockwise from the top. */
+const TYPES = ["pin", "skull", "question", "chest", "sword"];
 const MAX_LABEL = 60;
 const DOUBLE_TAP_MS = 350;
 const DOUBLE_TAP_PX = 24;
+/** Markers never shrink below this on screen, so they stay findable on a big, zoomed-out map. */
+const MIN_SCREEN_PX = 32;
+/** On-screen size while "show all markers" is on. */
+const SPOTLIGHT_SCREEN_PX = 60;
 
 const iconPath = (type) => `modules/${MODULE_ID}/assets/map-markers/${type}.svg`;
 const setting = (key) => game.settings.get(MODULE_ID, key);
@@ -131,6 +134,8 @@ let layer = null;
 let drawSeq = 0;
 /** Marker ids already shown on this client for the current scene, to animate only new ones. */
 let seen = new Set();
+/** What is on the canvas right now, by marker id: { marker, container, ring, pop }. */
+let drawn = new Map();
 const textures = {};
 
 async function loadTextures() {
@@ -142,6 +147,23 @@ async function loadTextures() {
 
 function markerSize() {
   return (canvas.grid?.size ?? 100) * (setting("mapMarkersScale") ?? 0.8);
+}
+
+/**
+ * Extra scale on top of the marker's own size, so it keeps a minimum size on screen
+ * however far the map is zoomed out (and a larger one while the spotlight is on).
+ */
+function zoomFactor() {
+  const onScreen = markerSize() * (canvas.stage?.scale?.x ?? 1);
+  const min = spotlightOn() ? SPOTLIGHT_SCREEN_PX : MIN_SCREEN_PX;
+  return Math.max(1, min / Math.max(onScreen, 1));
+}
+
+function applyScale() {
+  const k = zoomFactor();
+  for (const d of drawn.values()) {
+    if (!d.container.destroyed) d.container.scale.set(k * d.pop);
+  }
 }
 
 async function draw({ initial = false } = {}) {
@@ -157,6 +179,7 @@ async function draw({ initial = false } = {}) {
     canvas.interface.addChild(layer);
   }
   for (const child of layer.removeChildren()) child.destroy({ children: true });
+  drawn = new Map();
 
   const size = markerSize();
   const TextClass = foundry.canvas?.containers?.PreciseText ?? globalThis.PreciseText ?? PIXI.Text;
@@ -165,6 +188,13 @@ async function draw({ initial = false } = {}) {
   for (const m of markers) {
     const container = new PIXI.Container();
     container.position.set(m.x, m.y);
+
+    // Pulsing ring, only visible while "show all markers" is on.
+    const ring = new PIXI.Graphics();
+    ring.lineStyle?.(size * 0.07, 0xffd36b, 1);
+    ring.drawCircle?.(0, 0, size * 0.62);
+    ring.visible = spotlightOn();
+    container.addChild(ring);
 
     const sprite = new PIXI.Sprite(textures[m.type]);
     sprite.anchor.set(0.5);
@@ -184,37 +214,183 @@ async function draw({ initial = false } = {}) {
     }
 
     layer.addChild(container);
-    if (!initial && !seen.has(m.id)) popIn(container);
+    const entry = { marker: m, container, ring, pop: 1 };
+    drawn.set(m.id, entry);
+    if (!initial && !seen.has(m.id)) popIn(entry);
     seen.add(m.id);
   }
+  applyScale();
+  refreshSpotlight();
 }
 
-function popIn(container) {
+function popIn(entry) {
   const ticker = canvas.app.ticker;
   const start = performance.now();
   const duration = 260;
-  container.scale.set(0.2);
+  entry.pop = 0.2;
   const step = () => {
-    if (container.destroyed) return ticker.remove(step);
+    if (entry.container.destroyed) return ticker.remove(step);
     const p = Math.min(1, (performance.now() - start) / duration);
     // Ease out with a small overshoot.
     const s = 1 + 2.2 * Math.pow(p - 1, 3) + 1.2 * Math.pow(p - 1, 2);
-    container.scale.set(0.2 + 0.8 * s);
-    if (p >= 1) {
-      container.scale.set(1);
-      ticker.remove(step);
-    }
+    entry.pop = p >= 1 ? 1 : 0.2 + 0.8 * s;
+    entry.container.scale.set(zoomFactor() * entry.pop);
+    if (p >= 1) ticker.remove(step);
   };
   ticker.add(step);
 }
 
+/* -------------------------------------------- */
+/*  Show all markers (spotlight)                */
+/* -------------------------------------------- */
+
+/** Held key (M by default) and the toggle button in the token controls, independently. */
+let spotlightKey = false;
+let spotlightToggle = false;
+let pulse = null;
+let edgeRoot = null;
+
+function spotlightOn() {
+  return (spotlightKey || spotlightToggle) && setting("mapMarkers");
+}
+
+/** Bring rings, scale, pulse and the edge arrows in line with the spotlight state. */
+function refreshSpotlight() {
+  const on = spotlightOn() && canvas.ready;
+  for (const d of drawn.values()) d.ring.visible = on;
+  applyScale();
+
+  const ticker = canvas.app?.ticker;
+  if (on && !pulse && ticker) {
+    pulse = () => {
+      const a = 0.55 + 0.45 * Math.sin(performance.now() / 170);
+      for (const d of drawn.values()) d.ring.alpha = a;
+    };
+    ticker.add(pulse);
+  } else if (!on && pulse) {
+    ticker?.remove(pulse);
+    pulse = null;
+  }
+  updateEdges();
+}
+
+function toClient(point) {
+  if (typeof canvas.clientCoordinatesFromCanvas === "function") return canvas.clientCoordinatesFromCanvas(point);
+  const rect = canvas.app.view.getBoundingClientRect();
+  const p = canvas.stage.worldTransform.apply(new PIXI.Point(point.x, point.y));
+  return { x: p.x + rect.left, y: p.y + rect.top };
+}
+
+/**
+ * While the spotlight is on, every marker outside the visible part of the map gets an
+ * arrow with its icon at the screen edge, pointing towards it. Clicking one pans there.
+ */
+function updateEdges() {
+  if (!spotlightOn() || !canvas.ready) {
+    edgeRoot?.remove();
+    edgeRoot = null;
+    return;
+  }
+  if (!edgeRoot) {
+    edgeRoot = document.createElement("div");
+    edgeRoot.className = "qmm-edges";
+    edgeRoot.addEventListener("click", (ev) => {
+      const el = ev.target.closest(".qmm-edge");
+      if (el) canvas.animatePan({ x: Number(el.dataset.x), y: Number(el.dataset.y), duration: 400 });
+    });
+    document.body.append(edgeRoot);
+  }
+
+  // The part of the board not covered by the controls, the sidebar and the bottom bar.
+  const board = canvas.app.view.getBoundingClientRect();
+  const sidebar = ui.sidebar?.element?.getBoundingClientRect?.()?.width ?? 0;
+  const box = {
+    left: board.left + 90,
+    top: board.top + 40,
+    right: Math.max(board.left + 200, board.right - sidebar - 40),
+    bottom: Math.max(board.top + 200, board.bottom - 160)
+  };
+  const cx = (box.left + box.right) / 2;
+  const cy = (box.top + box.bottom) / 2;
+
+  const items = [];
+  for (const { marker } of drawn.values()) {
+    const p = toClient(marker);
+    if (p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom) continue;
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const tx = dx ? ((dx > 0 ? box.right : box.left) - cx) / dx : Infinity;
+    const ty = dy ? ((dy > 0 ? box.bottom : box.top) - cy) / dy : Infinity;
+    const t = Math.min(tx, ty);
+
+    const el = document.createElement("div");
+    el.className = "qmm-edge";
+    el.style.left = `${cx + dx * t}px`;
+    el.style.top = `${cy + dy * t}px`;
+    el.style.setProperty("--qmm-angle", `${Math.atan2(dy, dx)}rad`);
+    el.dataset.x = marker.x;
+    el.dataset.y = marker.y;
+    el.dataset.tooltip = marker.label || game.i18n.localize(`${MODULE_ID}.mapMarkers.type.${marker.type}`);
+    const arrow = document.createElement("span");
+    arrow.className = "qmm-edge-arrow";
+    const img = document.createElement("img");
+    img.src = iconPath(marker.type);
+    img.alt = "";
+    el.append(arrow, img);
+    items.push(el);
+  }
+  edgeRoot.replaceChildren(...items);
+}
+
+Hooks.once("init", () => {
+  game.keybindings.register(MODULE_ID, "mapMarkersSpotlight", {
+    name: `${MODULE_ID}.keybindings.mapMarkersSpotlight.name`,
+    hint: `${MODULE_ID}.keybindings.mapMarkersSpotlight.hint`,
+    editable: [{ key: "KeyM" }],
+    onDown: () => {
+      if (!setting("mapMarkers") || !canvas.ready) return false;
+      spotlightKey = true;
+      refreshSpotlight();
+      return true;
+    },
+    onUp: () => {
+      if (!spotlightKey) return false;
+      spotlightKey = false;
+      refreshSpotlight();
+      return true;
+    }
+  });
+});
+
+/** Toggle in the token controls: the same spotlight, for touch screens and for leaving it on. */
+Hooks.on("getSceneControlButtons", (controls) => {
+  if (!setting("mapMarkers")) return;
+  const tokens = controls.tokens;
+  if (!tokens?.tools) return;
+  tokens.tools.mapMarkersSpotlight = {
+    name: "mapMarkersSpotlight",
+    title: `${MODULE_ID}.mapMarkers.spotlight`,
+    icon: "fa-solid fa-map-location-dot",
+    order: Object.keys(tokens.tools).length + 1,
+    toggle: true,
+    active: spotlightToggle,
+    onChange: (event, active) => {
+      spotlightToggle = !!active;
+      refreshSpotlight();
+    }
+  };
+});
+
 /** Redraw from scratch, e.g. after the size or the on/off setting changed. */
 export function redrawMapMarkers() {
+  ui.controls?.render({ reset: true });
   if (!setting("mapMarkers")) {
     drawSeq++; // drop a draw still waiting for its textures
     closeMenu();
     layer?.destroy({ children: true });
     layer = null;
+    drawn = new Map();
+    refreshSpotlight();
     return;
   }
   draw({ initial: true });
@@ -222,6 +398,7 @@ export function redrawMapMarkers() {
 
 Hooks.on("canvasReady", () => {
   layer = null;
+  drawn = new Map();
   seen = new Set();
   bindInput();
   if (setting("mapMarkers")) draw({ initial: true });
@@ -230,6 +407,16 @@ Hooks.on("canvasReady", () => {
 Hooks.on("canvasTearDown", () => {
   closeMenu();
   layer = null;
+  drawn = new Map();
+  if (pulse) canvas.app?.ticker.remove(pulse);
+  pulse = null;
+  edgeRoot?.remove();
+  edgeRoot = null;
+});
+
+Hooks.on("canvasPan", () => {
+  applyScale();
+  if (spotlightOn()) updateEdges();
 });
 
 Hooks.on("updateScene", (scene, changes) => {
@@ -274,7 +461,7 @@ function toCanvas(event) {
 }
 
 function markerAt(point) {
-  const radius = markerSize() / 2;
+  const radius = (markerSize() * zoomFactor()) / 2;
   const hits = getMarkers().filter((m) => Math.hypot(m.x - point.x, m.y - point.y) <= radius);
   return hits.sort((a, b) => b.created - a.created)[0] ?? null;
 }
@@ -327,7 +514,11 @@ function openMenu(event, { point = null, marker = null }) {
   TYPES.forEach((type, i) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `qmm-slice qmm-${SLOTS[i]}`;
+    button.className = "qmm-slice";
+    // Evenly round the pie, clockwise from the top.
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / TYPES.length;
+    button.style.left = `${100 + 66 * Math.cos(angle) - 29}px`;
+    button.style.top = `${100 + 66 * Math.sin(angle) - 29}px`;
     button.classList.toggle("is-current", marker?.type === type);
     button.dataset.type = type;
     button.dataset.tooltip = game.i18n.localize(`${MODULE_ID}.mapMarkers.type.${type}`);
