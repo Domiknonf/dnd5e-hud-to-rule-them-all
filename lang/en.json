@@ -180,5 +180,22 @@
   "dnd5e-hud-to-rule-them-all.targetRule.cancel": "Cancel",
   "dnd5e-hud-to-rule-them-all.targetRule.saved": "{name}: targeting saved.",
   "dnd5e-hud-to-rule-them-all.targetRule.cleared": "{name}: targeting back to automatic.",
-  "dnd5e-hud-to-rule-them-all.targetRule.noPermission": "Only the owner of this character can change its targeting."
+  "dnd5e-hud-to-rule-them-all.targetRule.noPermission": "Only the owner of this character can change its targeting.",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.type.skull": "Danger",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.type.question": "Unknown",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.type.chest": "Treasure",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.type.sword": "Combat",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.close": "Close",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.delete": "Remove marker",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.namePlaceholder": "Name (optional)",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.save": "Save",
+  "dnd5e-hud-to-rule-them-all.mapMarkers.noPermission": "You can only change map markers you placed yourself.",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkers.name": "Map markers",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkers.hint": "Double-click an empty spot of the scene to drop a skull, question mark, chest or sword marker that everybody sees, with an optional name. Double-click a marker to change, rename or remove it.",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkersPlayers.name": "Players can place map markers",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkersPlayers.hint": "If off, only GMs can place markers. Players need a GM online either way: the GM's client writes the marker to the scene.",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkersEditAll.name": "Everyone can edit every map marker",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkersEditAll.hint": "If off, players can only change or remove markers they placed themselves. GMs can always edit every marker.",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkersScale.name": "Map marker size",
+  "dnd5e-hud-to-rule-them-all.settings.mapMarkersScale.hint": "Marker size relative to one grid square."
 }

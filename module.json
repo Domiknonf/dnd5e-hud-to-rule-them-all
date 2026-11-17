@@ -28,7 +28,8 @@
     "scripts/module.mjs"
   ],
   "styles": [
-    "styles/hud.css"
+    "styles/hud.css",
+    "styles/map-markers.css"
   ],
   "languages": [
     {

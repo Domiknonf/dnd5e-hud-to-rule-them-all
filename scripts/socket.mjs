@@ -8,8 +8,13 @@ import { SOCKET } from "./const.mjs";
 let handlers = null;
 
 export function registerSocket() {
-  game.socket.on(SOCKET, async ({ action, data } = {}) => {
+  game.socket.on(SOCKET, async ({ action, data } = {}, senderId) => {
     if (!game.user.isActiveGM) return;          // exactly one GM executes
+    // A player placing, renaming or removing a map marker (see map-markers.mjs).
+    if (action === "mapMarker") {
+      const { applyMarkerRequest } = await import("./map-markers.mjs");
+      return applyMarkerRequest(data, senderId);
+    }
     // Not about a combatant: an effect a player's spell puts on a creature they do
     // not own (see effects.applyToTargets).
     if (action === "applyEffect") {

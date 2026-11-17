@@ -1,6 +1,7 @@
 import { MODULE_ID, GRID_ROWS, HUD_SCALE } from "./const.mjs";
 import { refreshHUD } from "./hud.mjs";
 import { HudConfig } from "./config-app.mjs";
+import { redrawMapMarkers } from "./map-markers.mjs";
 
 const WORLD = { scope: "world", config: true, requiresReload: false };
 const CLIENT = { scope: "client", config: true, requiresReload: false };
@@ -78,6 +79,18 @@ export function registerSettings() {
   // they fire (see automation/zero-hp.mjs), so toggling one needs no reload.
   reg("automationFungalInfestation", { ...WORLD, type: Boolean, default: true });
   reg("automationDarkOnesBlessing",  { ...WORLD, type: Boolean, default: true });
+
+  /* --- Map markers ----------------------------------------- */
+  // World scope: the markers are shared by the whole table, so who may place and edit
+  // them, and how big they are, is one answer for everybody. See map-markers.mjs.
+  reg("mapMarkers",         { ...WORLD, type: Boolean, default: true, onChange: redrawMapMarkers });
+  reg("mapMarkersPlayers",  { ...WORLD, type: Boolean, default: true });
+  reg("mapMarkersEditAll",  { ...WORLD, type: Boolean, default: false });
+  reg("mapMarkersScale", {
+    ...WORLD, type: Number, default: 0.8,
+    range: { min: 0.4, max: 2, step: 0.1 },
+    onChange: redrawMapMarkers
+  });
 
   /* --- Per-user presentation -------------------------------- */
   reg("sortAlphabetically", { ...CLIENT, type: Boolean, default: false });

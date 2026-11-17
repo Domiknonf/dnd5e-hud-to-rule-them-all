@@ -1,0 +1,144 @@
+/* Quick Map Markers - radial menu */
+
+.qmm-menu {
+  --qmm-bg: rgba(22, 20, 18, 0.92);
+  --qmm-border: rgba(214, 180, 110, 0.55);
+  --qmm-accent: #e2b866;
+  --qmm-text: #f1ece2;
+  position: fixed;
+  z-index: 1000;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  font-family: var(--font-primary, "Signika", sans-serif);
+}
+
+:where(.qmm-menu) button {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qmm-pie {
+  position: absolute;
+  left: -100px;
+  top: -100px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(40, 36, 32, 0.95) 0 30%, var(--qmm-bg) 31%);
+  border: 2px solid var(--qmm-border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  animation: qmm-open 140ms ease-out;
+}
+
+@keyframes qmm-open {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.qmm-slice {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  transition: transform 100ms ease-out, filter 100ms ease-out;
+}
+.qmm-slice img {
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+}
+.qmm-slice:hover,
+.qmm-slice:focus-visible {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 6px var(--qmm-accent));
+}
+.qmm-slice.is-current {
+  outline: 3px solid var(--qmm-accent);
+  outline-offset: 2px;
+}
+
+.qmm-n { left: 68px;  top: 6px; }
+.qmm-e { left: 130px; top: 68px; }
+.qmm-s { left: 68px;  top: 130px; }
+.qmm-w { left: 6px;   top: 68px; }
+
+.qmm-center {
+  position: absolute;
+  left: 78px;
+  top: 78px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--qmm-text);
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--qmm-border);
+}
+.qmm-center:hover,
+.qmm-center:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+}
+.qmm-center[data-action="delete"]:hover {
+  color: #ff8a7a;
+}
+
+/* Name field: hidden while choosing a new icon, below the pie when editing,
+   and in place of the pie right after a marker was placed. */
+.qmm-name {
+  position: absolute;
+  left: -120px;
+  top: 108px;
+  width: 240px;
+  display: none;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--qmm-bg);
+  border: 1px solid var(--qmm-border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+.qmm-menu.is-editing .qmm-name,
+.qmm-menu.is-naming .qmm-name {
+  display: flex;
+}
+.qmm-menu.is-naming .qmm-pie {
+  display: none;
+}
+.qmm-menu.is-naming .qmm-name {
+  top: -22px;
+  animation: qmm-open 140ms ease-out;
+}
+
+.qmm-name input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--qmm-text);
+  font-size: 15px;
+}
+.qmm-name input:focus {
+  outline: none;
+  border-color: var(--qmm-accent);
+}
+.qmm-name .qmm-save {
+  width: 32px;
+  height: 32px;
+  border-radius: 5px;
+  color: #1d1b19;
+  background: var(--qmm-accent);
+}
+.qmm-name .qmm-save:hover {
+  filter: brightness(1.1);
+}
