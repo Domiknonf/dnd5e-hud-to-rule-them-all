@@ -14,6 +14,7 @@ import { getActorConfig } from "./config.mjs";
 import { checkMaterials, payMaterials, decorateUsageDialog } from "./materials.mjs";
 import { interceptUse } from "./targeting.mjs";
 import { registerAutomations } from "./automation/index.mjs";
+import "./map-markers.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */

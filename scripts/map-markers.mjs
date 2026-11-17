@@ -1,19 +1,21 @@
+import { MODULE_ID } from "./const.mjs";
+import { requestFromGM } from "./socket.mjs";
+
 /**
- * Quick Map Markers
+ * Map markers.
  *
  * Double-click / double-tap an empty spot of the scene (Token layer) to open a small
  * radial menu, pick an icon, and the marker appears for everyone at once. Right after
  * placing it the menu turns into an optional name field. Double-clicking a marker opens
  * the same menu to change its icon, rename it or remove it.
  *
- * Markers live in a scene flag (flags.quick-map-markers.markers.<id>). Players cannot
- * update scenes themselves, so their changes are relayed to the active GM over the
- * module socket and written there. That is why a GM has to be online for players.
+ * Markers live in a scene flag (flags.<module>.mapMarkers.<id>). Players cannot update
+ * scenes themselves, so their changes go to the active GM over the module socket
+ * (socket.mjs routes "mapMarker" here) and are written there. That is why a GM has to
+ * be online for players.
  */
 
-const ID = "quick-map-markers";
-const SOCKET = `module.${ID}`;
-const FLAG = "markers";
+const FLAG = "mapMarkers";
 /** Radial order: top, right, bottom, left. */
 const TYPES = ["skull", "question", "chest", "sword"];
 const SLOTS = ["n", "e", "s", "w"];
@@ -21,52 +23,15 @@ const MAX_LABEL = 60;
 const DOUBLE_TAP_MS = 350;
 const DOUBLE_TAP_PX = 24;
 
-const iconPath = (type) => `modules/${ID}/icons/${type}.svg`;
-const t = (key) => game.i18n.localize(`${ID}.${key}`);
-
-/* -------------------------------------------- */
-/*  Settings                                    */
-/* -------------------------------------------- */
-
-Hooks.once("init", () => {
-  game.settings.register(ID, "playersCanPlace", {
-    name: `${ID}.settings.playersCanPlace.name`,
-    hint: `${ID}.settings.playersCanPlace.hint`,
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: true
-  });
-  game.settings.register(ID, "everyoneCanEdit", {
-    name: `${ID}.settings.everyoneCanEdit.name`,
-    hint: `${ID}.settings.everyoneCanEdit.hint`,
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: false
-  });
-  game.settings.register(ID, "markerScale", {
-    name: `${ID}.settings.markerScale.name`,
-    hint: `${ID}.settings.markerScale.hint`,
-    scope: "world",
-    config: true,
-    type: Number,
-    range: { min: 0.4, max: 2, step: 0.1 },
-    default: 0.8,
-    onChange: () => draw()
-  });
-});
-
-Hooks.once("ready", () => {
-  game.socket.on(SOCKET, onSocket);
-});
+const iconPath = (type) => `modules/${MODULE_ID}/assets/map-markers/${type}.svg`;
+const setting = (key) => game.settings.get(MODULE_ID, key);
 
 /* -------------------------------------------- */
 /*  Data                                        */
 /* -------------------------------------------- */
 
 function getMarkers(scene = canvas.scene) {
-  const raw = scene?.getFlag(ID, FLAG) ?? {};
+  const raw = scene?.getFlag(MODULE_ID, FLAG) ?? {};
   return Object.values(raw).filter((m) => m && TYPES.includes(m.type));
 }
 
@@ -88,11 +53,11 @@ function sanitize(m) {
 }
 
 function userMayEdit(user, marker) {
-  return user.isGM || game.settings.get(ID, "everyoneCanEdit") || marker.author === user.id;
+  return user.isGM || setting("mapMarkersEditAll") || marker.author === user.id;
 }
 
 function userMayPlace(user) {
-  return user.isGM || game.settings.get(ID, "playersCanPlace");
+  return user.isGM || setting("mapMarkersPlayers");
 }
 
 /* -------------------------------------------- */
@@ -105,7 +70,7 @@ let writeQueue = Promise.resolve();
 function applyWrite(action, payload, userId) {
   writeQueue = writeQueue
     .then(() => doWrite(action, payload, userId))
-    .catch((err) => console.error(`${ID} | write failed`, err));
+    .catch((err) => console.error(`${MODULE_ID} | map marker write failed`, err));
   return writeQueue;
 }
 
@@ -113,12 +78,12 @@ async function doWrite(action, payload = {}, userId) {
   const scene = game.scenes.get(payload.sceneId);
   const user = game.users.get(userId);
   if (!scene || !user) return;
-  const markers = scene.getFlag(ID, FLAG) ?? {};
-  const key = (id) => `flags.${ID}.${FLAG}.${id}`;
+  const markers = scene.getFlag(MODULE_ID, FLAG) ?? {};
+  const key = (id) => `flags.${MODULE_ID}.${FLAG}.${id}`;
 
   switch (action) {
     case "create": {
-      if (!userMayPlace(user)) return;
+      if (!setting("mapMarkers") || !userMayPlace(user)) return;
       const marker = sanitize({ ...payload.marker, author: user.id, created: Date.now() });
       if (!marker || markers[marker.id]) return;
       return scene.update({ [key(marker.id)]: marker });
@@ -136,28 +101,26 @@ async function doWrite(action, payload = {}, userId) {
     case "delete": {
       const current = markers[payload.markerId];
       if (!current || !userMayEdit(user, current)) return;
-      return scene.update({ [`flags.${ID}.${FLAG}.-=${current.id}`]: null });
+      return scene.update({ [`flags.${MODULE_ID}.${FLAG}.-=${current.id}`]: null });
     }
   }
 }
 
-function onSocket(message, senderId) {
-  if (!game.user.isActiveGM) return; // exactly one GM writes
-  const userId = typeof senderId === "string" && game.users.get(senderId) ? senderId : message?.userId;
-  applyWrite(message?.action, message?.payload, userId);
+/**
+ * GM side of the relay, called by socket.mjs for a "mapMarker" message. The sender id
+ * Foundry passes along is trusted over the one in the payload.
+ */
+export function applyMarkerRequest(data = {}, senderId) {
+  const userId = typeof senderId === "string" && game.users.get(senderId) ? senderId : data.userId;
+  return applyWrite(data.op, data, userId);
 }
 
-function request(action, payload) {
+function request(op, payload) {
   if (game.user.isGM) {
-    applyWrite(action, payload, game.user.id);
+    applyWrite(op, payload, game.user.id);
     return true;
   }
-  if (!game.users.activeGM) {
-    ui.notifications.warn(t("notify.noGM"));
-    return false;
-  }
-  game.socket.emit(SOCKET, { action, payload, userId: game.user.id });
-  return true;
+  return requestFromGM("mapMarker", { op, ...payload, userId: game.user.id });
 }
 
 /* -------------------------------------------- */
@@ -178,7 +141,7 @@ async function loadTextures() {
 }
 
 function markerSize() {
-  return (canvas.grid?.size ?? 100) * (game.settings.get(ID, "markerScale") ?? 0.8);
+  return (canvas.grid?.size ?? 100) * (setting("mapMarkersScale") ?? 0.8);
 }
 
 async function draw({ initial = false } = {}) {
@@ -245,11 +208,23 @@ function popIn(container) {
   ticker.add(step);
 }
 
+/** Redraw from scratch, e.g. after the size or the on/off setting changed. */
+export function redrawMapMarkers() {
+  if (!setting("mapMarkers")) {
+    drawSeq++; // drop a draw still waiting for its textures
+    closeMenu();
+    layer?.destroy({ children: true });
+    layer = null;
+    return;
+  }
+  draw({ initial: true });
+}
+
 Hooks.on("canvasReady", () => {
   layer = null;
   seen = new Set();
   bindInput();
-  draw({ initial: true });
+  if (setting("mapMarkers")) draw({ initial: true });
 });
 
 Hooks.on("canvasTearDown", () => {
@@ -258,8 +233,10 @@ Hooks.on("canvasTearDown", () => {
 });
 
 Hooks.on("updateScene", (scene, changes) => {
-  if (scene.id !== canvas.scene?.id) return;
-  if (!foundry.utils.hasProperty(changes, `flags.${ID}`) && !foundry.utils.hasProperty(changes, `flags.-=${ID}`)) return;
+  if (scene.id !== canvas.scene?.id || !setting("mapMarkers")) return;
+  // Deletions arrive as "-=<id>" keys under our flag, so look for the flag key itself.
+  const ours = changes.flags?.[MODULE_ID];
+  if (!ours || !Object.keys(ours).some((k) => k === FLAG || k === `-=${FLAG}`)) return;
   draw();
 });
 
@@ -307,13 +284,13 @@ function tokenAt(point) {
 }
 
 function onDoubleTap(event) {
-  if (!canvas.ready || !canvas.scene || menu) return;
+  if (!canvas.ready || !canvas.scene || menu || !setting("mapMarkers")) return;
   if (canvas.activeLayer !== canvas.tokens) return;
   const point = toCanvas(event);
 
   const marker = markerAt(point);
   if (marker) {
-    if (!userMayEdit(game.user, marker)) return ui.notifications.warn(t("notify.noPermission"));
+    if (!userMayEdit(game.user, marker)) return ui.notifications.warn(game.i18n.localize(`${MODULE_ID}.mapMarkers.noPermission`));
     return openMenu(event, { marker });
   }
 
@@ -353,8 +330,8 @@ function openMenu(event, { point = null, marker = null }) {
     button.className = `qmm-slice qmm-${SLOTS[i]}`;
     button.classList.toggle("is-current", marker?.type === type);
     button.dataset.type = type;
-    button.dataset.tooltip = t(`type.${type}`);
-    button.setAttribute("aria-label", t(`type.${type}`));
+    button.dataset.tooltip = game.i18n.localize(`${MODULE_ID}.mapMarkers.type.${type}`);
+    button.setAttribute("aria-label", game.i18n.localize(`${MODULE_ID}.mapMarkers.type.${type}`));
     const img = document.createElement("img");
     img.src = iconPath(type);
     img.alt = "";
@@ -365,7 +342,7 @@ function openMenu(event, { point = null, marker = null }) {
   center.type = "button";
   center.className = "qmm-center";
   center.dataset.action = editing ? "delete" : "close";
-  center.dataset.tooltip = t(editing ? "menu.delete" : "menu.close");
+  center.dataset.tooltip = game.i18n.localize(editing ? `${MODULE_ID}.mapMarkers.delete` : `${MODULE_ID}.mapMarkers.close`);
   center.setAttribute("aria-label", center.dataset.tooltip);
   center.innerHTML = `<i class="fa-solid ${editing ? "fa-trash" : "fa-xmark"}"></i>`;
   pie.append(center);
@@ -375,13 +352,13 @@ function openMenu(event, { point = null, marker = null }) {
   const input = document.createElement("input");
   input.type = "text";
   input.maxLength = MAX_LABEL;
-  input.placeholder = t("menu.namePlaceholder");
+  input.placeholder = game.i18n.localize(`${MODULE_ID}.mapMarkers.namePlaceholder`);
   input.value = marker?.label ?? "";
   const save = document.createElement("button");
   save.type = "submit";
   save.className = "qmm-save";
-  save.dataset.tooltip = t("menu.save");
-  save.setAttribute("aria-label", t("menu.save"));
+  save.dataset.tooltip = game.i18n.localize(`${MODULE_ID}.mapMarkers.save`);
+  save.setAttribute("aria-label", game.i18n.localize(`${MODULE_ID}.mapMarkers.save`));
   save.innerHTML = `<i class="fa-solid fa-check"></i>`;
   form.append(input, save);
 

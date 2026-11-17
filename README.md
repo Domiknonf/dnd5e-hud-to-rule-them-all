@@ -171,6 +171,9 @@ targets entirely alone.
 **Table automations** — Fungal Infestation and Dark One's Blessing, each on its own
 switch; see [Table automations](#table-automations).
 
+**Map markers** — on/off, whether players may place them, whether everyone may edit
+every marker, and their size; see [Map markers](#map-markers).
+
 **Presentation** (per user) — HUD scale and sort order. How many rows the grid has is
 remembered per user too, but is set with the `+`/`-` on the bar itself rather than here.
 
@@ -355,6 +358,24 @@ The limits:
   When HP are changed by hand, the creature whose turn it is counts as the attacker.
 - **Nothing happens without a GM online**: the GM's client notices the death, creates
   the zombie and grants the temporary hit points.
+
+### Map markers
+
+Double-click (or double-tap) an empty spot of the scene on the Token layer: a small
+radial menu opens with a **skull**, a **question mark**, a **treasure chest** and a
+**sword**. Pick one and the marker appears for everybody at once; the menu then turns
+into an optional name field (Enter saves, clicking away keeps what was typed).
+Double-click a marker to swap its icon, rename it, or remove it with the trash button
+in the middle.
+
+- Markers are stored on the scene, not as journal notes, so no core Note or Journal
+  permissions are involved and nobody has to switch the Notes layer on.
+- They are drawn above the fog of war: everyone sees them, explored or not.
+- Players change only their own markers unless *Everyone can edit every map marker* is
+  on; GMs can always change every marker.
+- **A GM has to be online** for players: the GM's client writes the marker to the scene.
+- Clear every marker of the current scene from a macro:
+  `canvas.scene.unsetFlag("dnd5e-hud-to-rule-them-all", "mapMarkers")`.
 
 ## Public API
 
