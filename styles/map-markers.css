@@ -43,8 +43,8 @@
 
 .qmm-slice {
   position: absolute;
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   transition: transform 100ms ease-out, filter 100ms ease-out;
 }
@@ -63,11 +63,6 @@
   outline: 3px solid var(--qmm-accent);
   outline-offset: 2px;
 }
-
-.qmm-n { left: 68px;  top: 6px; }
-.qmm-e { left: 130px; top: 68px; }
-.qmm-s { left: 68px;  top: 130px; }
-.qmm-w { left: 6px;   top: 68px; }
 
 .qmm-center {
   position: absolute;
@@ -141,4 +136,53 @@
 }
 .qmm-name .qmm-save:hover {
   filter: brightness(1.1);
+}
+
+/* "Show all markers": arrows at the screen edge for markers out of view. */
+.qmm-edges {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.qmm-edge {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  pointer-events: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+  animation: qmm-edge-pulse 1.1s ease-in-out infinite;
+}
+.qmm-edge img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.qmm-edge-arrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--qmm-angle, 0rad));
+}
+.qmm-edge-arrow::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: -8px;
+  border-left: 12px solid #ffd36b;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+.qmm-edge:hover {
+  animation: none;
+  transform: scale(1.15);
+}
+@keyframes qmm-edge-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
 }

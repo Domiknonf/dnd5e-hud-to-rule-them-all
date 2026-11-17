@@ -362,12 +362,17 @@ The limits:
 ### Map markers
 
 Double-click (or double-tap) an empty spot of the scene on the Token layer: a small
-radial menu opens with a **skull**, a **question mark**, a **treasure chest** and a
-**sword**. Pick one and the marker appears for everybody at once; the menu then turns
+radial menu opens with a **pin** for ordinary places, a **skull**, a **question mark**, a
+**treasure chest** and a **sword**. Pick one and the marker appears for everybody at once; the menu then turns
 into an optional name field (Enter saves, clicking away keeps what was typed).
 Double-click a marker to swap its icon, rename it, or remove it with the trash button
 in the middle.
 
+- Markers never shrink below about 32 px on screen, however far the map is zoomed out.
+- **Show all markers:** hold **M** (rebindable under *Configure Controls*), or switch on
+  the map-pin button in the token controls - handy on a tablet or to leave it on. Every
+  marker is drawn larger with a pulsing ring, and each marker outside the screen gets an
+  arrow with its icon at the screen edge; click one to pan there.
 - Markers are stored on the scene, not as journal notes, so no core Note or Journal
   permissions are involved and nobody has to switch the Notes layer on.
 - They are drawn above the fog of war: everyone sees them, explored or not.
