@@ -138,10 +138,23 @@ let seen = new Set();
 let drawn = new Map();
 const textures = {};
 
+/**
+ * The icon textures belong to this module alone. Going through Foundry's loadTexture
+ * put them in its texture cache, which destroys the least recently used entries once
+ * it is full - typically after a scene change or a big map loaded - and the markers
+ * then drew as nothing until a reload. An Image we load ourselves is never evicted.
+ */
+function textureOk(tex) {
+  return !!tex && !tex.destroyed && !tex.baseTexture?.destroyed && tex.valid !== false;
+}
+
 async function loadTextures() {
-  const load = foundry.canvas?.loadTexture ?? globalThis.loadTexture;
   for (const type of TYPES) {
-    if (!textures[type] || textures[type].destroyed) textures[type] = await load(iconPath(type));
+    if (textureOk(textures[type])) continue;
+    const img = new Image();
+    img.src = iconPath(type);
+    await img.decode();
+    textures[type] = new PIXI.Texture(new PIXI.BaseTexture(img));
   }
 }
 
@@ -169,7 +182,13 @@ function applyScale() {
 async function draw({ initial = false } = {}) {
   if (!canvas.ready || !canvas.scene) return;
   const seq = ++drawSeq;
-  await loadTextures();
+  try {
+    await loadTextures();
+  } catch (err) {
+    // The health check below tries again in a few seconds.
+    console.warn(`${MODULE_ID} | map marker icons failed to load`, err);
+    return;
+  }
   if (seq !== drawSeq || !canvas.ready) return;
 
   if (!layer || layer.destroyed || !layer.parent) {
@@ -214,7 +233,7 @@ async function draw({ initial = false } = {}) {
     }
 
     layer.addChild(container);
-    const entry = { marker: m, container, ring, pop: 1 };
+    const entry = { marker: m, container, ring, sprite, pop: 1 };
     drawn.set(m.id, entry);
     if (!initial && !seen.has(m.id)) popIn(entry);
     seen.add(m.id);
@@ -414,7 +433,46 @@ Hooks.on("canvasTearDown", () => {
   edgeRoot = null;
 });
 
+/* -------------------------------------------- */
+/*  Self-healing                                */
+/* -------------------------------------------- */
+
+/**
+ * Whether what is drawn still matches the scene: our container still on the canvas,
+ * every icon texture alive, and one sprite per stored marker. Anything that tears a
+ * piece out from under us (a texture evicted, the interface group rebuilt, a draw that
+ * failed) shows up here, and the markers are redrawn instead of staying gone until
+ * the next reload.
+ */
+function isHealthy() {
+  if (!layer || layer.destroyed || !layer.parent) return false;
+  const markers = getMarkers();
+  if (markers.length !== drawn.size) return false;
+  for (const m of markers) {
+    const d = drawn.get(m.id);
+    if (!d || d.container.destroyed || !d.container.parent) return false;
+    if (d.marker.type !== m.type || d.marker.label !== m.label || d.marker.x !== m.x || d.marker.y !== m.y) return false;
+    if (!d.sprite || d.sprite.destroyed || !textureOk(d.sprite.texture)) return false;
+  }
+  return true;
+}
+
+let healing = false;
+async function heal() {
+  if (healing || !canvas.ready || !canvas.scene || !setting("mapMarkers")) return;
+  if (isHealthy()) return;
+  healing = true;
+  try {
+    await draw({ initial: true });
+  } finally {
+    healing = false;
+  }
+}
+
+Hooks.once("ready", () => setInterval(heal, 3000));
+
 Hooks.on("canvasPan", () => {
+  heal();
   applyScale();
   if (spotlightOn()) updateEdges();
 });
