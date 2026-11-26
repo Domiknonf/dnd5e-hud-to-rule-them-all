@@ -131,6 +131,33 @@ function request(op, payload) {
 /* -------------------------------------------- */
 
 let layer = null;
+/** Name of our container on the canvas, so strays from an earlier draw can be found. */
+const LAYER_NAME = `${MODULE_ID}:map-markers-layer`;
+
+/**
+ * Remove every marker container on the canvas except `keep`. Foundry does not tear our
+ * container down with the scene's own layers, so after a canvas redraw the old one
+ * stayed behind - frozen at its old zoom scale - and the marker was drawn twice.
+ */
+function purgeLayers(keep = null) {
+  const parents = new Set([canvas.interface, layer?.parent].filter(Boolean));
+  for (const parent of parents) {
+    for (const child of [...(parent.children ?? [])]) {
+      if (child.name !== LAYER_NAME || child === keep) continue;
+      parent.removeChild(child);
+      if (!child.destroyed) child.destroy({ children: true });
+    }
+  }
+  if (layer && layer !== keep) {
+    if (layer.parent) layer.parent.removeChild(layer);
+    if (!layer.destroyed) layer.destroy({ children: true });
+    layer = null;
+  }
+}
+
+function countLayers() {
+  return (canvas.interface?.children ?? []).filter((c) => c.name === LAYER_NAME).length;
+}
 let drawSeq = 0;
 /** Marker ids already shown on this client for the current scene, to animate only new ones. */
 let seen = new Set();
@@ -191,12 +218,15 @@ async function draw({ initial = false } = {}) {
   }
   if (seq !== drawSeq || !canvas.ready) return;
 
-  if (!layer || layer.destroyed || !layer.parent) {
+  if (!layer || layer.destroyed || layer.parent !== canvas.interface) {
+    purgeLayers();
     layer = new PIXI.Container();
+    layer.name = LAYER_NAME;
     layer.eventMode = "none";
     layer.zIndex = 1000;
     canvas.interface.addChild(layer);
   }
+  purgeLayers(layer);
   for (const child of layer.removeChildren()) child.destroy({ children: true });
   drawn = new Map();
 
@@ -406,8 +436,7 @@ export function redrawMapMarkers() {
   if (!setting("mapMarkers")) {
     drawSeq++; // drop a draw still waiting for its textures
     closeMenu();
-    layer?.destroy({ children: true });
-    layer = null;
+    purgeLayers();
     drawn = new Map();
     refreshSpotlight();
     return;
@@ -416,7 +445,7 @@ export function redrawMapMarkers() {
 }
 
 Hooks.on("canvasReady", () => {
-  layer = null;
+  purgeLayers();
   drawn = new Map();
   seen = new Set();
   bindInput();
@@ -425,7 +454,7 @@ Hooks.on("canvasReady", () => {
 
 Hooks.on("canvasTearDown", () => {
   closeMenu();
-  layer = null;
+  purgeLayers();
   drawn = new Map();
   if (pulse) canvas.app?.ticker.remove(pulse);
   pulse = null;
@@ -445,7 +474,8 @@ Hooks.on("canvasTearDown", () => {
  * the next reload.
  */
 function isHealthy() {
-  if (!layer || layer.destroyed || !layer.parent) return false;
+  if (!layer || layer.destroyed || layer.parent !== canvas.interface) return false;
+  if (countLayers() !== 1) return false;
   const markers = getMarkers();
   if (markers.length !== drawn.size) return false;
   for (const m of markers) {
